@@ -1,0 +1,15 @@
+:root { --ink: #17211b; --lime: #c8f169; --blue: #1d6eff; --paper: #f6f7f2; }
+body { color: var(--ink); font-family: Georgia, 'Times New Roman', serif; background: var(--paper); }
+.navbar-brand span { color: var(--blue); }
+.nav-link, .btn { font-family: Arial, sans-serif; }
+.hero { background: radial-gradient(circle at 85% 15%, #d9e8ff 0, transparent 34%), var(--paper); }
+h1 { font-size: clamp(3rem, 7vw, 6.4rem); line-height: .95; letter-spacing: -2px; }
+.eyebrow { color: var(--blue); font: 700 .75rem/1 Arial, sans-serif; letter-spacing: 2px; }
+.btn-primary { background: var(--blue); border-color: var(--blue); }
+.metric-panel { padding: 2.5rem; background: var(--ink); color: white; box-shadow: 18px 18px 0 var(--lime); }
+.metric-panel strong { display: block; font-size: 6rem; line-height: 1; margin-top: 2rem; }
+.progress { height: 10px; background: #445149; }
+.progress-bar { background: var(--lime); }
+footer { background: white; }
+#map { min-height: 360px; }
+@media (max-width: 575px) { h1 { font-size: 3.6rem; } .metric-panel { box-shadow: 10px 10px 0 var(--lime); } }
