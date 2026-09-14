@@ -57,6 +57,31 @@
         .feature-list li::before { content: "✓"; color: #1d1d1f; font-weight: bold; margin-right: 10px; }
         .btn-buy { background-color: #1d1d1f; color: #ffffff; border-radius: 20px; padding: 10px 24px; font-weight: 600; width: 100%; border: none; margin-top: 20px; display: block; text-align: center; text-decoration: none;}
         .btn-buy:hover { background-color: #333336; color: #ffffff; }
+
+        /* ESTILOS DE LAS TARJETAS DE PRECIOS */
+        .pricing-card {
+            background: #ffffff;
+            border-radius: 24px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+            transition: transform 0.3s ease;
+            padding: 40px 30px;
+            height: 100%;
+            position: relative;
+        }
+        .pricing-card:hover { transform: translateY(-5px); }
+        .pricing-card.destacado { border: 2px solid #1d1d1f; }
+        .badge-popular {
+            position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
+            background: #1d1d1f; color: #ffffff; padding: 4px 16px; border-radius: 20px;
+            font-size: 0.75rem; font-weight: 600;
+        }
+        .price-text { font-size: 3.5rem; font-weight: 700; letter-spacing: -1.5px; }
+        .feature-list { list-style: none; padding: 0; margin-top: 30px; text-align: left; }
+        .feature-list li { margin-bottom: 15px; font-size: 0.95rem; color: #515154; display: flex; align-items: center; }
+        .feature-list li::before { content: "✓"; color: #1d1d1f; font-weight: bold; margin-right: 10px; }
+        .btn-buy { background-color: #1d1d1f; color: #ffffff; border-radius: 20px; padding: 10px 24px; font-weight: 600; width: 100%; border: none; margin-top: 20px; display: block; text-align: center; text-decoration: none;}
+        .btn-buy:hover { background-color: #333336; color: #ffffff; }
+
     </style>
 </head>
 <body>

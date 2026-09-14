@@ -15,3 +15,54 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 });
+
+document.addEventListener("DOMContentLoaded", async () => {
+    const contenedorPlanes = document.getElementById('contenedor-planes');
+    
+    // Si estamos en la página de inicio y el contenedor existe, cargamos los precios
+    if (contenedorPlanes) {
+        try {
+            // Petición al backend
+            const respuesta = await fetch('http://localhost:3000/api/planes');
+            const planes = await respuesta.json();
+            
+            contenedorPlanes.innerHTML = ''; // Limpiamos el spinner
+
+            if (planes.length === 0) {
+                contenedorPlanes.innerHTML = '<p class="text-center text-muted">Aún no hay planes configurados en la base de datos.</p>';
+                return;
+            }
+
+            // Generamos una tarjeta HTML por cada plan
+            planes.forEach(plan => {
+                const destacadoClass = plan.destacado ? 'destacado' : '';
+                const badgeHtml = plan.destacado ? `<span class="badge-popular">MÁS ELEGIDO</span>` : '';
+                
+                // Extraemos beneficios como reducción de morosidad y upselling[cite: 1]
+                const listaCaracteristicas = plan.caracteristicas.map(c => `<li>${c}</li>`).join('');
+
+                const tarjetaHtml = `
+                    <div class="col-lg-4 col-md-6">
+                        <div class="pricing-card ${destacadoClass}">
+                            ${badgeHtml}
+                            <h3 class="fw-semibold" style="color: #1d1d1f;">${plan.nombre}</h3>
+                            <p class="text-muted small">${plan.descripcion}</p>
+                            <div class="mt-4">
+                                <span class="price-text" style="color: #1d1d1f;">$${plan.precio}</span><span class="text-muted">${plan.tipoCobro}</span>
+                            </div>
+                            <ul class="feature-list">
+                                ${listaCaracteristicas}
+                            </ul>
+                            <a href="pages/demo.html" class="btn btn-buy">Agendar Demo</a>
+                        </div>
+                    </div>
+                `;
+                contenedorPlanes.innerHTML += tarjetaHtml;
+            });
+
+        } catch (error) {
+            console.error("Error conectando al backend:", error);
+            contenedorPlanes.innerHTML = '<p class="text-center text-danger">Error al cargar los planes desde el servidor.</p>';
+        }
+    }
+});

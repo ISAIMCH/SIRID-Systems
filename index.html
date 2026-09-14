@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" style="scroll-padding-top: 80px;">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,6 +12,9 @@
     <!-- Bootstrap Icons -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
 
+    <!-- CSS para OpenStreetMap (Leaflet) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
     <!-- Estilos personalizados (Estética Apple/Samsung) -->
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
@@ -19,7 +22,6 @@
         body {
             font-family: 'Inter', sans-serif;
             background-color: #1d1d1f; 
-            /* Eliminamos el padding-top para que el slider ocupe toda la pantalla detrás del menú */
             padding-top: 0; 
             overflow-x: hidden;
         }
@@ -33,144 +35,42 @@
             transition: all 0.3s ease;
         }
 
-        .navbar-brand {
-            font-weight: 600;
-            letter-spacing: -0.5px;
-            color: #ffffff !important;
-            font-size: 1.2rem;
-        }
-
-        .nav-link {
-            color: #d2d2d7 !important; 
-            font-size: 0.85rem;
-            font-weight: 400;
-            letter-spacing: 0.3px;
-            margin: 0 10px;
-            transition: color 0.2s ease;
-        }
-
-        .nav-link:hover {
-            color: #ffffff !important; 
-        }
+        .navbar-brand { font-weight: 600; letter-spacing: -0.5px; color: #ffffff !important; font-size: 1.2rem; }
+        .nav-link { color: #d2d2d7 !important; font-size: 0.85rem; font-weight: 400; letter-spacing: 0.3px; margin: 0 10px; transition: color 0.2s ease; }
+        .nav-link:hover { color: #ffffff !important; }
 
         /* Botones estilo premium */
-        .btn-demo {
-            background-color: #ffffff;
-            color: #1d1d1f;
-            font-size: 0.85rem;
-            font-weight: 600;
-            border-radius: 20px;
-            padding: 6px 16px;
-            border: none;
-            transition: transform 0.2s ease, opacity 0.2s ease;
-        }
-        .btn-demo:hover {
-            opacity: 0.9;
-            transform: scale(1.02);
-            color: #1d1d1f;
-        }
-
-        .btn-demo-lg {
-            background-color: #ffffff;
-            color: #1d1d1f;
-            font-size: 1.1rem;
-            font-weight: 600;
-            border-radius: 30px;
-            padding: 12px 32px;
-            text-decoration: none;
-            transition: transform 0.2s ease;
-            display: inline-block;
-        }
-        .btn-demo-lg:hover {
-            transform: scale(1.05);
-            color: #1d1d1f;
-        }
-
-        .btn-outline-premium {
-            border: 1px solid rgba(255, 255, 255, 0.5);
-            color: #ffffff;
-            font-size: 1.1rem;
-            font-weight: 400;
-            border-radius: 30px;
-            padding: 12px 32px;
-            text-decoration: none;
-            transition: all 0.2s ease;
-            display: inline-block;
-        }
-        .btn-outline-premium:hover {
-            background-color: rgba(255, 255, 255, 0.1);
-            border-color: #ffffff;
-            color: #ffffff;
-        }
+        .btn-demo { background-color: #ffffff; color: #1d1d1f; font-size: 0.85rem; font-weight: 600; border-radius: 20px; padding: 6px 16px; border: none; transition: transform 0.2s ease, opacity 0.2s ease; }
+        .btn-demo:hover { opacity: 0.9; transform: scale(1.02); color: #1d1d1f; }
+        .btn-demo-lg { background-color: #ffffff; color: #1d1d1f; font-size: 1.1rem; font-weight: 600; border-radius: 30px; padding: 12px 32px; text-decoration: none; transition: transform 0.2s ease; display: inline-block; }
+        .btn-demo-lg:hover { transform: scale(1.05); color: #1d1d1f; }
+        .btn-outline-premium { border: 1px solid rgba(255, 255, 255, 0.5); color: #ffffff; font-size: 1.1rem; font-weight: 400; border-radius: 30px; padding: 12px 32px; text-decoration: none; transition: all 0.2s ease; display: inline-block; }
+        .btn-outline-premium:hover { background-color: rgba(255, 255, 255, 0.1); border-color: #ffffff; color: #ffffff; }
 
         .navbar-toggler { border: none; }
-        .navbar-toggler-icon {
-            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%28255, 255, 255, 0.8%29' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
-        }
+        .navbar-toggler-icon { background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%28255, 255, 255, 0.8%29' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e"); }
 
         /* SLIDER FULL SCREEN (Hero Section) */
-        .hero-slider {
-            height: 100vh;
-            width: 100%;
-        }
-        
-        .carousel-item {
-            height: 100vh;
-            background-size: cover;
-            background-position: center;
-            background-repeat: no-repeat;
-        }
+        .hero-slider { height: 100vh; width: 100%; }
+        .carousel-item { height: 100vh; background-size: cover; background-position: center; background-repeat: no-repeat; }
+        .slider-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(180deg, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.8) 100%); z-index: 1; }
+        .slider-content { position: relative; z-index: 2; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 0 20px; }
+        .hero-title { font-size: clamp(3rem, 6vw, 5.5rem); font-weight: 700; letter-spacing: -2px; color: #ffffff; margin-bottom: 15px; text-shadow: 0 4px 20px rgba(0,0,0,0.4); }
+        .hero-subtitle { font-size: clamp(1.2rem, 2vw, 1.8rem); font-weight: 300; color: #f5f5f7; max-width: 800px; margin-bottom: 40px; text-shadow: 0 2px 10px rgba(0,0,0,0.5); }
+        .carousel-indicators [data-bs-target] { width: 40px; height: 3px; background-color: rgba(255, 255, 255, 0.4); border: none; border-radius: 2px; transition: background-color 0.3s ease; }
+        .carousel-indicators .active { background-color: #ffffff; }
 
-        /* Capa oscura sobre las imágenes para que el texto resalte */
-        .slider-overlay {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: linear-gradient(180deg, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.8) 100%);
-            z-index: 1;
-        }
-
-        .slider-content {
-            position: relative;
-            z-index: 2;
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            text-align: center;
-            padding: 0 20px;
-        }
-
-        .hero-title {
-            font-size: clamp(3rem, 6vw, 5.5rem);
-            font-weight: 700;
-            letter-spacing: -2px;
-            color: #ffffff;
-            margin-bottom: 15px;
-            text-shadow: 0 4px 20px rgba(0,0,0,0.4);
-        }
-
-        .hero-subtitle {
-            font-size: clamp(1.2rem, 2vw, 1.8rem);
-            font-weight: 300;
-            color: #f5f5f7;
-            max-width: 800px;
-            margin-bottom: 40px;
-            text-shadow: 0 2px 10px rgba(0,0,0,0.5);
-        }
-
-        /* Indicadores minimalistas (las rayitas de abajo) */
-        .carousel-indicators [data-bs-target] {
-            width: 40px;
-            height: 3px;
-            background-color: rgba(255, 255, 255, 0.4);
-            border: none;
-            border-radius: 2px;
-            transition: background-color 0.3s ease;
-        }
-        .carousel-indicators .active {
-            background-color: #ffffff;
-        }
+        /* ESTILOS DE LAS TARJETAS DE PRECIOS */
+        .pricing-card { background: #ffffff; border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); transition: transform 0.3s ease; padding: 40px 30px; height: 100%; position: relative; }
+        .pricing-card:hover { transform: translateY(-5px); }
+        .pricing-card.destacado { border: 2px solid #1d1d1f; }
+        .badge-popular { position: absolute; top: -12px; left: 50%; transform: translateX(-50%); background: #1d1d1f; color: #ffffff; padding: 4px 16px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; }
+        .price-text { font-size: 3.5rem; font-weight: 700; letter-spacing: -1.5px; }
+        .feature-list { list-style: none; padding: 0; margin-top: 30px; text-align: left; }
+        .feature-list li { margin-bottom: 15px; font-size: 0.95rem; color: #515154; display: flex; align-items: center; }
+        .feature-list li::before { content: "✓"; color: #1d1d1f; font-weight: bold; margin-right: 10px; }
+        .btn-buy { background-color: #1d1d1f; color: #ffffff; border-radius: 20px; padding: 10px 24px; font-weight: 600; width: 100%; border: none; margin-top: 20px; display: block; text-align: center; text-decoration: none;}
+        .btn-buy:hover { background-color: #333336; color: #ffffff; }
     </style>
 </head>
 <body>
@@ -188,7 +88,7 @@
                 <ul class="navbar-nav align-items-center">
                     <li class="nav-item"><a class="nav-link" href="pages/soluciones.html">Software</a></li>
                     <li class="nav-item"><a class="nav-link" href="pages/hardware.html">Hardware IoT</a></li>
-                    <li class="nav-item"><a class="nav-link" href="pages/precios.html">Precios</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#precios">Precios</a></li>
                     <li class="nav-item ms-lg-3 mt-3 mt-lg-0">
                         <a class="nav-link text-white opacity-75" href="pages/login.html">Iniciar Sesión</a>
                     </li>
@@ -201,10 +101,7 @@
     </nav>
 
     <!-- SLIDER PRINCIPAL (FULL SCREEN) -->
-    <!-- 'carousel-fade' para un efecto de transición suave -->
     <header id="heroCarousel" class="carousel slide carousel-fade hero-slider" data-bs-ride="carousel" data-bs-pause="false" data-bs-interval="5000">
-        
-        <!-- Indicadores -->
         <div class="carousel-indicators mb-4">
             <button type="button" data-bs-target="#heroCarousel" data-bs-slide-to="0" class="active"></button>
             <button type="button" data-bs-target="#heroCarousel" data-bs-slide-to="1"></button>
@@ -212,8 +109,7 @@
         </div>
 
         <div class="carousel-inner h-100">
-            
-            <!-- SLIDE 1: Ecosistema y Ventas -->
+            <!-- SLIDE 1 -->
             <div class="carousel-item active" style="background-image: url('https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=1920&auto=format&fit=crop');">
                 <div class="slider-overlay"></div>
                 <div class="container slider-content">
@@ -226,7 +122,7 @@
                 </div>
             </div>
 
-            <!-- SLIDE 2: Hardware IoT -->
+            <!-- SLIDE 2 -->
             <div class="carousel-item" style="background-image: url('https://images.unsplash.com/photo-1550525811-e5869dd03032?q=80&w=1920&auto=format&fit=crop');">
                 <div class="slider-overlay"></div>
                 <div class="container slider-content">
@@ -238,22 +134,21 @@
                 </div>
             </div>
 
-            <!-- SLIDE 3: Software y Coach Creator -->
+            <!-- SLIDE 3 -->
             <div class="carousel-item" style="background-image: url('https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?q=80&w=1920&auto=format&fit=crop');">
                 <div class="slider-overlay"></div>
                 <div class="container slider-content">
                     <h1 class="hero-title">Optimización en tiempo real.</h1>
-                    <p class="hero-subtitle">Mapas de calor por zonas y módulo Coach Creator para empoderar a tus entrenadores.</p>
+                    <p class="hero-subtitle">Mapas de calor por zonas y empodera a tus entrenadores digitales.</p>
                     <div class="d-flex gap-3 mt-2">
-                        <a href="pages/precios.html" class="btn btn-demo-lg">Ver Planes y Precios</a>
+                        <a href="#precios" class="btn btn-demo-lg">Ver Planes y Precios</a>
                     </div>
                 </div>
             </div>
-
         </div>
     </header>
 
-   <!-- SECCIÓN DE BENEFICIOS  -->
+    <!-- SECCIÓN DE BENEFICIOS -->
     <main class="container-fluid bg-white py-5">
         <div class="container mt-4">
             <div class="text-center mb-5">
@@ -262,10 +157,8 @@
             </div>
 
             <div class="row g-5">
-                <!-- Beneficio 1 -->
                 <div class="col-md-6 d-flex">
                     <div class="flex-shrink-0 me-4">
-                        <!-- Iconos invertidos: fondo oscuro (bg-dark) y símbolo blanco (text-white) -->
                         <div class="bg-dark text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 60px; height: 60px; font-size: 24px;">
                             <i class="bi bi-door-open"></i>
                         </div>
@@ -278,7 +171,6 @@
                     </div>
                 </div>
 
-                <!-- Beneficio 2 -->
                 <div class="col-md-6 d-flex">
                     <div class="flex-shrink-0 me-4">
                         <div class="bg-dark text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 60px; height: 60px; font-size: 24px;">
@@ -288,12 +180,11 @@
                     <div>
                         <h4 class="fw-bold text-dark">Pagos in-app</h4>
                         <p class="text-muted" style="font-size: 0.95rem;">
-                            La aplicación permitirá realizar el pago de la mensualidad directamente desde el dispositivo móvil, reduciendo la carga administrativa y los pagos atrasados.
+                            La aplicación permitirá realizar el pago de la mensualidad directamente desde el dispositivo móvil, reduciendo la carga administrativa y los pagos atrasados[cite: 1].
                         </p>
                     </div>
                 </div>
 
-                <!-- Beneficio 3 -->
                 <div class="col-md-6 d-flex">
                     <div class="flex-shrink-0 me-4">
                         <div class="bg-dark text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 60px; height: 60px; font-size: 24px;">
@@ -303,12 +194,11 @@
                     <div>
                         <h4 class="fw-bold text-dark">Estrategias de Upselling</h4>
                         <p class="text-muted" style="font-size: 0.95rem;">
-                            Generación de ingresos adicionales mediante el envío de información, avisos y promociones a través de notificaciones push.
+                            Generación de ingresos adicionales mediante el envío de información, avisos y promociones a través de notificaciones push[cite: 1].
                         </p>
                     </div>
                 </div>
 
-                <!-- Beneficio 4 -->
                 <div class="col-md-6 d-flex">
                     <div class="flex-shrink-0 me-4">
                         <div class="bg-dark text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 60px; height: 60px; font-size: 24px;">
@@ -318,7 +208,7 @@
                     <div>
                         <h4 class="fw-bold text-dark">Sistema de rachas</h4>
                         <p class="text-muted" style="font-size: 0.95rem;">
-                            Incentiva la constancia y mantiene la motivación del usuario adaptándose a su plan de entrenamiento, donde los días de descanso no rompen la racha.
+                            Incentiva la constancia y mantiene la motivación del usuario adaptándose a su plan de entrenamiento, donde los días de descanso no rompen la racha[cite: 1].
                         </p>
                     </div>
                 </div>
@@ -326,60 +216,87 @@
         </div>
     </main>
 
-    <!-- SECCIÓN DE UBICACIÓN  -->
-    <section class="container-fluid bg-white py-5 border-top border-light">
+    <!-- SECCIÓN DE PRECIOS INTEGRADA EN EL INICIO -->
+    <section id="precios" class="container-fluid bg-light py-5 text-center border-top border-light">
+        <div class="container mt-4 mb-5">
+            <h2 class="fw-bold" style="letter-spacing: -1px; color: #1d1d1f; font-size: 2.5rem;">Elige el plan para tu gimnasio.</h2>
+            <p class="text-muted fs-5">Tarifas claras cargadas en tiempo real desde la nube.</p>
+        </div>
+
         <div class="container">
+            <!-- Contenedor donde main.js inyectará los datos de MongoDB -->
+            <div id="contenedor-planes" class="row g-4 justify-content-center">
+                <!-- Spinner de carga temporal -->
+                <div class="col-12 text-center">
+                    <div class="spinner-border text-dark" role="status">
+                        <span class="visually-hidden">Cargando planes...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+    
+    <!-- SECCIÓN DE UBICACIÓN (MAPA) -->
+    <section class="container-fluid bg-white py-5 border-top border-light">
+        <div class="container mt-3 mb-3">
             <div class="row align-items-center">
                 <div class="col-md-4 mb-4 mb-md-0 text-center text-md-start">
                     <h3 class="fw-bold text-dark">Nuestra Ubicación</h3>
                     <p class="text-muted">Visita nuestra sucursal piloto en Mixquiahuala.</p>
                     <p class="text-muted small">
-                        Aquí Ian Donova integrará OpenStreetMap.
+                        Interactúa con el mapa para conocer nuestra área de cobertura e instalación de tecnología IoT.
                     </p>
                 </div>
                 <div class="col-md-8">
-                    <!-- Contenedor del mapa en tono claro (bg-light) -->
-                    <div id="map-container" class="bg-light border rounded d-flex align-items-center justify-content-center w-100" style="height: 350px;">
-                        <span class="text-muted opacity-50"><i class="bi bi-map me-2"></i>Espacio para Mapa (Ian Donova)</span>
+                    <!-- Contenedor del mapa, ahora con id="map" tal como espera tu JavaScript -->
+                    <div id="map" class="bg-light border rounded d-flex align-items-center justify-content-center w-100 shadow-sm" style="height: 350px;">
+                        <span class="text-muted opacity-50"><i class="bi bi-map me-2"></i>Cargando mapa...</span>
                     </div>
                 </div>
             </div>
         </div>
     </section>
 
-   <!-- FOOTER  -->
+    <!-- FOOTER Y FORMULARIO DE SUSCRIPCIÓN -->
     <footer class="container-fluid bg-dark text-white py-5">
         <div class="container">
             <div class="row">
                 <!-- Columna de Navegación -->
-                <div class="col-md-6 mb-4">
+                <div class="col-md-4 mb-4">
                     <h5 class="fw-bold text-white mb-3">Project-GymGo</h5>
-                    <div class="row">
-                        <div class="col-6">
-                            <ul class="list-unstyled">
-                                <li class="mb-2"><a href="pages/soluciones.html" class="text-white-50 text-decoration-none">Software (Admin y Staff)</a></li>
-                                <li class="mb-2"><a href="pages/hardware.html" class="text-white-50 text-decoration-none">Hardware IoT</a></li>
-                            </ul>
-                        </div>
-                        <div class="col-6">
-                            <ul class="list-unstyled">
-                                <li class="mb-2"><a href="pages/precios.html" class="text-white-50 text-decoration-none">Planes y Precios</a></li>
-                                <li class="mb-2"><a href="pages/demo.html" class="text-white-50 text-decoration-none">Agendar Demostración</a></li>
-                            </ul>
-                        </div>
-                    </div>
+                    <ul class="list-unstyled">
+                        <li class="mb-2"><a href="pages/soluciones.html" class="text-white-50 text-decoration-none">Software (Admin y Staff)</a></li>
+                        <li class="mb-2"><a href="pages/hardware.html" class="text-white-50 text-decoration-none">Hardware IoT</a></li>
+                        <li class="mb-2"><a href="#precios" class="text-white-50 text-decoration-none">Planes y Precios</a></li>
+                        <li class="mb-2"><a href="pages/demo.html" class="text-white-50 text-decoration-none">Agendar Demostración</a></li>
+                    </ul>
                 </div>
 
-                <!-- Columna Legal y Contacto -->
-                <div class="col-md-6 mb-4 text-md-end">
+                <!-- Columna Legal -->
+                <div class="col-md-4 mb-4">
                     <h5 class="fw-bold text-white mb-3">Legal y Contacto</h5>
                     <p class="text-white-50 mb-2" style="font-size: 0.85rem;">
                         Cumplimos con la Ley Federal de Protección de Datos Personales (LFPDPPP).
                     </p>
-                    <ul class="list-unstyled mt-3 d-inline-block text-start">
+                    <ul class="list-unstyled mt-3 text-start">
                         <li class="mb-2"><a href="#" class="text-white-50 text-decoration-none"><i class="bi bi-shield-check me-2 text-white"></i>Política de Privacidad</a></li>
                         <li class="mb-2"><a href="#" class="text-white-50 text-decoration-none"><i class="bi bi-file-earmark-text me-2 text-white"></i>Términos de Servicio</a></li>
                     </ul>
+                </div>
+
+                <!-- Formulario conectado a tu código data-validate -->
+                <div class="col-md-4 mb-4">
+                    <h5 class="fw-bold text-white mb-3">Boletín para Gimnasios</h5>
+                    <p class="text-white-50" style="font-size: 0.85rem;">Suscríbete para recibir consejos de administración y tendencias de hardware IoT.</p>
+                    <form data-validate class="needs-validation" novalidate>
+                        <div class="input-group">
+                            <input type="email" class="form-control" placeholder="tu@gimnasio.com" required>
+                            <button class="btn btn-primary" type="submit">Suscribir</button>
+                        </div>
+                        <div class="invalid-feedback text-warning">
+                            Por favor ingresa un correo válido.
+                        </div>
+                    </form>
                 </div>
             </div>
             
@@ -389,6 +306,13 @@
         </div>
     </footer>
 
+    <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- JS para OpenStreetMap (Leaflet) -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <!-- Aquí conectamos tu lógica (Asegúrate de que este archivo coincida con el código que me mostraste) -->
+    <script src="./assets/js/main.js"></script>
 </body>
 </html>
