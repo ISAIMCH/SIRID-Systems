@@ -9,6 +9,9 @@
     <!-- Bootstrap 5 -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+
     <!-- Estilos personalizados (Estética Apple/Samsung) -->
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
@@ -240,7 +243,7 @@
                 <div class="slider-overlay"></div>
                 <div class="container slider-content">
                     <h1 class="hero-title">Optimización en tiempo real.</h1>
-                    <p class="hero-subtitle">Mapas de calor por zonas y módulo Coach Creator para empoderar a tus entrenadores[cite: 1].</p>
+                    <p class="hero-subtitle">Mapas de calor por zonas y módulo Coach Creator para empoderar a tus entrenadores.</p>
                     <div class="d-flex gap-3 mt-2">
                         <a href="pages/precios.html" class="btn btn-demo-lg">Ver Planes y Precios</a>
                     </div>
@@ -250,11 +253,141 @@
         </div>
     </header>
 
-    <!-- Resto del contenido de la página -->
-    <main class="container-fluid bg-white py-5 text-center">
-        <h2 class="fw-bold mt-5">Transforma la gestión de tu negocio</h2>
-        <p class="text-muted">Las siguientes secciones irán aquí...</p>
+   <!-- SECCIÓN DE BENEFICIOS  -->
+    <main class="container-fluid bg-white py-5">
+        <div class="container mt-4">
+            <div class="text-center mb-5">
+                <h2 class="fw-bold text-dark" style="letter-spacing: -1px;">Beneficios para el ecosistema del gimnasio</h2>
+                <p class="text-muted">Una plataforma diseñada tanto para la administración como para los usuarios.</p>
+            </div>
+
+            <div class="row g-5">
+                <!-- Beneficio 1 -->
+                <div class="col-md-6 d-flex">
+                    <div class="flex-shrink-0 me-4">
+                        <!-- Iconos invertidos: fondo oscuro (bg-dark) y símbolo blanco (text-white) -->
+                        <div class="bg-dark text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 60px; height: 60px; font-size: 24px;">
+                            <i class="bi bi-door-open"></i>
+                        </div>
+                    </div>
+                    <div>
+                        <h4 class="fw-bold text-dark">Cero cuellos de botella en entrada</h4>
+                        <p class="text-muted" style="font-size: 0.95rem;">
+                            El acceso principal utilizará códigos QR dinámicos offline generados en el dispositivo del usuario. Como respaldo, el sistema contará con un teclado numérico físico.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Beneficio 2 -->
+                <div class="col-md-6 d-flex">
+                    <div class="flex-shrink-0 me-4">
+                        <div class="bg-dark text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 60px; height: 60px; font-size: 24px;">
+                            <i class="bi bi-credit-card"></i>
+                        </div>
+                    </div>
+                    <div>
+                        <h4 class="fw-bold text-dark">Pagos in-app</h4>
+                        <p class="text-muted" style="font-size: 0.95rem;">
+                            La aplicación permitirá realizar el pago de la mensualidad directamente desde el dispositivo móvil, reduciendo la carga administrativa y los pagos atrasados.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Beneficio 3 -->
+                <div class="col-md-6 d-flex">
+                    <div class="flex-shrink-0 me-4">
+                        <div class="bg-dark text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 60px; height: 60px; font-size: 24px;">
+                            <i class="bi bi-graph-up-arrow"></i>
+                        </div>
+                    </div>
+                    <div>
+                        <h4 class="fw-bold text-dark">Estrategias de Upselling</h4>
+                        <p class="text-muted" style="font-size: 0.95rem;">
+                            Generación de ingresos adicionales mediante el envío de información, avisos y promociones a través de notificaciones push.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Beneficio 4 -->
+                <div class="col-md-6 d-flex">
+                    <div class="flex-shrink-0 me-4">
+                        <div class="bg-dark text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 60px; height: 60px; font-size: 24px;">
+                            <i class="bi bi-fire"></i>
+                        </div>
+                    </div>
+                    <div>
+                        <h4 class="fw-bold text-dark">Sistema de rachas</h4>
+                        <p class="text-muted" style="font-size: 0.95rem;">
+                            Incentiva la constancia y mantiene la motivación del usuario adaptándose a su plan de entrenamiento, donde los días de descanso no rompen la racha.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
     </main>
+
+    <!-- SECCIÓN DE UBICACIÓN  -->
+    <section class="container-fluid bg-white py-5 border-top border-light">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-md-4 mb-4 mb-md-0 text-center text-md-start">
+                    <h3 class="fw-bold text-dark">Nuestra Ubicación</h3>
+                    <p class="text-muted">Visita nuestra sucursal piloto en Mixquiahuala.</p>
+                    <p class="text-muted small">
+                        Aquí Ian Donova integrará OpenStreetMap.
+                    </p>
+                </div>
+                <div class="col-md-8">
+                    <!-- Contenedor del mapa en tono claro (bg-light) -->
+                    <div id="map-container" class="bg-light border rounded d-flex align-items-center justify-content-center w-100" style="height: 350px;">
+                        <span class="text-muted opacity-50"><i class="bi bi-map me-2"></i>Espacio para Mapa (Ian Donova)</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+   <!-- FOOTER  -->
+    <footer class="container-fluid bg-dark text-white py-5">
+        <div class="container">
+            <div class="row">
+                <!-- Columna de Navegación -->
+                <div class="col-md-6 mb-4">
+                    <h5 class="fw-bold text-white mb-3">Project-GymGo</h5>
+                    <div class="row">
+                        <div class="col-6">
+                            <ul class="list-unstyled">
+                                <li class="mb-2"><a href="pages/soluciones.html" class="text-white-50 text-decoration-none">Software (Admin y Staff)</a></li>
+                                <li class="mb-2"><a href="pages/hardware.html" class="text-white-50 text-decoration-none">Hardware IoT</a></li>
+                            </ul>
+                        </div>
+                        <div class="col-6">
+                            <ul class="list-unstyled">
+                                <li class="mb-2"><a href="pages/precios.html" class="text-white-50 text-decoration-none">Planes y Precios</a></li>
+                                <li class="mb-2"><a href="pages/demo.html" class="text-white-50 text-decoration-none">Agendar Demostración</a></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Columna Legal y Contacto -->
+                <div class="col-md-6 mb-4 text-md-end">
+                    <h5 class="fw-bold text-white mb-3">Legal y Contacto</h5>
+                    <p class="text-white-50 mb-2" style="font-size: 0.85rem;">
+                        Cumplimos con la Ley Federal de Protección de Datos Personales (LFPDPPP).
+                    </p>
+                    <ul class="list-unstyled mt-3 d-inline-block text-start">
+                        <li class="mb-2"><a href="#" class="text-white-50 text-decoration-none"><i class="bi bi-shield-check me-2 text-white"></i>Política de Privacidad</a></li>
+                        <li class="mb-2"><a href="#" class="text-white-50 text-decoration-none"><i class="bi bi-file-earmark-text me-2 text-white"></i>Términos de Servicio</a></li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="border-top border-secondary mt-3 pt-4 text-center text-white-50" style="font-size: 0.85rem;">
+                &copy; 2026 SIRID Systems. Todos los derechos reservados.
+            </div>
+        </div>
+    </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 </body>
