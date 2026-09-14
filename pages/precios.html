@@ -1,1 +1,157 @@
-<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Precios | SIRID</title><link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"><link rel="stylesheet" href="../assets/css/estilos.css"></head><body><main class="container py-5"><a href="../index.html" class="navbar-brand fw-bold">SIRID<span>Systems</span></a><div class="py-5"><p class="eyebrow">COTIZADOR</p><h1>Elige el ritmo de tu crecimiento.</h1><div class="row g-4 mt-4"><div class="col-md-6"><div class="p-4 bg-white border h-100"><h2>Starter</h2><p class="text-secondary">Para una sede que quiere medir mejor.</p><h3>$2,499 <small>/ mes</small></h3><button class="btn btn-dark mt-3">Seleccionar</button></div></div><div class="col-md-6"><div class="p-4 bg-dark text-white h-100"><h2>Scale</h2><p class="text-white-50">Para redes con datos en cada decision.</p><h3>$6,999 <small>/ mes</small></h3><button class="btn btn-light mt-3">Hablar con ventas</button></div></div></div></div></main></body></html>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Precios | Project-GymGo</title>
+    
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f5f5f7; 
+            color: #1d1d1f;
+            padding-top: 80px; /* Espacio para que el menú no tape el título */
+        }
+
+        /* ESTILOS DEL MENÚ PREMIUM (Importados del index) */
+        .navbar-premium {
+            background-color: rgba(22, 22, 23, 0.7) !important; 
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            transition: all 0.3s ease;
+        }
+        .navbar-brand { font-weight: 600; color: #ffffff !important; }
+        .nav-link { color: #d2d2d7 !important; font-size: 0.85rem; font-weight: 400; margin: 0 10px; transition: color 0.2s ease; }
+        .nav-link:hover { color: #ffffff !important; }
+        .btn-demo { background-color: #ffffff; color: #1d1d1f; font-size: 0.85rem; font-weight: 600; border-radius: 20px; padding: 6px 16px; border: none; text-decoration: none;}
+        .btn-demo:hover { opacity: 0.9; color: #1d1d1f; }
+        .navbar-toggler { border: none; }
+        .navbar-toggler-icon { background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%28255, 255, 255, 0.8%29' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e"); }
+
+        /* ESTILOS DE LAS TARJETAS DINÁMICAS */
+        .pricing-card {
+            background: #ffffff;
+            border-radius: 24px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+            transition: transform 0.3s ease;
+            padding: 40px 30px;
+            height: 100%;
+            position: relative;
+        }
+        .pricing-card:hover { transform: translateY(-5px); }
+        .pricing-card.destacado { border: 2px solid #1d1d1f; }
+        .badge-popular {
+            position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
+            background: #1d1d1f; color: #ffffff; padding: 4px 16px; border-radius: 20px;
+            font-size: 0.75rem; font-weight: 600;
+        }
+        .price-text { font-size: 3.5rem; font-weight: 700; letter-spacing: -1.5px; }
+        .feature-list { list-style: none; padding: 0; margin-top: 30px; }
+        .feature-list li { margin-bottom: 15px; font-size: 0.95rem; color: #515154; display: flex; align-items: center; }
+        .feature-list li::before { content: "✓"; color: #1d1d1f; font-weight: bold; margin-right: 10px; }
+        .btn-buy { background-color: #1d1d1f; color: #ffffff; border-radius: 20px; padding: 10px 24px; font-weight: 600; width: 100%; border: none; margin-top: 20px; display: block; text-align: center; text-decoration: none;}
+        .btn-buy:hover { background-color: #333336; color: #ffffff; }
+    </style>
+</head>
+<body>
+
+    <!-- MENÚ PREMIUM (Rutas ajustadas para la carpeta pages/) -->
+    <nav class="navbar navbar-expand-lg navbar-premium fixed-top py-2">
+        <div class="container">
+            <a class="navbar-brand" href="../index.html">Project-GymGo</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navPremium">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse justify-content-end" id="navPremium">
+                <ul class="navbar-nav align-items-center">
+                    <li class="nav-item"><a class="nav-link" href="soluciones.html">Software</a></li>
+                    <li class="nav-item"><a class="nav-link" href="hardware.html">Hardware IoT</a></li>
+                    <li class="nav-item"><a class="nav-link" href="precios.html">Precios</a></li>
+                    <li class="nav-item ms-lg-3 mt-3 mt-lg-0">
+                        <a class="nav-link text-white opacity-75" href="login.html">Iniciar Sesión</a>
+                    </li>
+                    <li class="nav-item ms-lg-3 mt-3 mt-lg-0">
+                        <a class="btn btn-demo" href="demo.html">Agendar Demo</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- CONTENIDO DE PRECIOS -->
+    <div class="container py-5">
+        <div class="text-center mb-5">
+            <h1 class="fw-bold" style="letter-spacing: -1px;">Elige el plan para tu gimnasio.</h1>
+            <p class="text-muted fs-5">Tarifas claras cargadas en tiempo real desde la nube.</p>
+        </div>
+
+        <!-- Contenedor donde JavaScript inyectará los datos de MongoDB -->
+        <div id="contenedor-planes" class="row g-4 justify-content-center">
+            <!-- Spinner de carga temporal -->
+            <div class="col-12 text-center">
+                <div class="spinner-border text-dark" role="status">
+                    <span class="visually-hidden">Cargando planes...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- LÓGICA DE CONEXIÓN A LA BASE DE DATOS (Fetch API) -->
+    <script>
+        document.addEventListener("DOMContentLoaded", async () => {
+            const contenedor = document.getElementById('contenedor-planes');
+
+            try {
+                // Hacemos la petición a tu servidor Node.js
+                const respuesta = await fetch('http://localhost:3000/api/planes');
+                const planes = await respuesta.json();
+                
+                contenedor.innerHTML = ''; // Limpiamos el spinner
+
+                if (planes.length === 0) {
+                    contenedor.innerHTML = '<p class="text-center text-muted">Aún no hay planes configurados en la base de datos.</p>';
+                    return;
+                }
+
+                // Generamos una tarjeta HTML por cada plan que venga de MongoDB
+                planes.forEach(plan => {
+                    const destacadoClass = plan.destacado ? 'destacado' : '';
+                    const badgeHtml = plan.destacado ? `<span class="badge-popular">MÁS ELEGIDO</span>` : '';
+                    
+                    // Convertimos el arreglo de características en etiquetas <li>
+                    const listaCaracteristicas = plan.caracteristicas.map(c => `<li>${c}</li>`).join('');
+
+                    const tarjetaHtml = `
+                        <div class="col-lg-4 col-md-6">
+                            <div class="pricing-card ${destacadoClass}">
+                                ${badgeHtml}
+                                <h3 class="fw-semibold">${plan.nombre}</h3>
+                                <p class="text-muted small">${plan.descripcion}</p>
+                                <div class="mt-4">
+                                    <span class="price-text">$${plan.precio}</span><span class="text-muted">${plan.tipoCobro}</span>
+                                </div>
+                                <ul class="feature-list">
+                                    ${listaCaracteristicas}
+                                </ul>
+                                <a href="demo.html" class="btn btn-buy">Agendar Demo</a>
+                            </div>
+                        </div>
+                    `;
+                    contenedor.innerHTML += tarjetaHtml;
+                });
+
+            } catch (error) {
+                console.error("Error conectando al backend:", error);
+                contenedor.innerHTML = '<p class="text-center text-danger">Error al cargar los planes desde el servidor.</p>';
+            }
+        });
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
