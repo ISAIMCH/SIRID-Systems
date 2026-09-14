@@ -1,62 +1,124 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>SIRID Systems | Inteligencia para tu gimnasio</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="assets/css/estilos.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Project-GymGo: Ecosistema digital y hardware IoT para gimnasios.">
+    <title>Project-GymGo | Premium SaaS</title>
+
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Estilos personalizados (Estética Apple/Samsung) -->
+    <style>
+        /* Importar fuente limpia y moderna similar a San Francisco / Roboto */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap');
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f5f5f7; /* Gris muy claro, típico de fondos minimalistas */
+            padding-top: 60px;
+        }
+
+        /* Efecto de Cristal Esmerilado (Glassmorphism) */
+        .navbar-premium {
+            background-color: rgba(22, 22, 23, 0.8) !important; /* Negro translúcido */
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            transition: all 0.3s ease;
+        }
+
+        .navbar-brand {
+            font-weight: 600;
+            letter-spacing: -0.5px;
+            color: #ffffff !important;
+            font-size: 1.2rem;
+        }
+
+        .nav-link {
+            color: #d2d2d7 !important; /* Gris claro sutil */
+            font-size: 0.85rem;
+            font-weight: 400;
+            letter-spacing: 0.3px;
+            margin: 0 10px;
+            transition: color 0.2s ease;
+        }
+
+        .nav-link:hover {
+            color: #ffffff !important; /* Brillo al pasar el mouse */
+        }
+
+        /* Botón estilo Apple: Pequeño, bordes muy redondeados, alto contraste */
+        .btn-demo {
+            background-color: #ffffff;
+            color: #1d1d1f;
+            font-size: 0.85rem;
+            font-weight: 600;
+            border-radius: 20px;
+            padding: 6px 16px;
+            border: none;
+            transition: transform 0.2s ease, opacity 0.2s ease;
+        }
+
+        .btn-demo:hover {
+            opacity: 0.9;
+            transform: scale(1.02);
+            color: #1d1d1f;
+        }
+
+        /* Ajuste del botón hamburguesa para que sea visible en fondo oscuro */
+        .navbar-toggler {
+            border: none;
+        }
+        .navbar-toggler-icon {
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%28255, 255, 255, 0.8%29' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
+        }
+    </style>
 </head>
 <body>
-  <nav class="navbar navbar-expand-lg bg-white border-bottom sticky-top">
-    <div class="container">
-      <a class="navbar-brand fw-bold" href="index.html">SIRID<span>Systems</span></a>
-      <button class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#nav"><span class="navbar-toggler-icon"></span></button>
-      <div id="nav" class="collapse navbar-collapse">
-        <div class="navbar-nav ms-auto">
-          <a class="nav-link" href="pages/precios.html">Precios</a>
-          <a class="nav-link" href="pages/contacto.html">Contacto</a>
-          <a class="btn btn-dark ms-lg-3" href="pages/demo.html">Agendar demo</a>
-        </div>
-      </div>
-    </div>
-  </nav>
-  <main>
-    <section class="hero py-5">
-      <div class="container py-5">
-        <div class="row align-items-center g-5">
-          <div class="col-lg-7">
-            <p class="eyebrow">OPERACIONES QUE SE ANTICIPAN</p>
-            <h1>Convierte cada visita en una mejor experiencia.</h1>
-            <p class="lead text-secondary mt-4">SIRID conecta sensores IoT y analitica en tiempo real para que tu gimnasio opere con precision y crezca con confianza.</p>
-            <div class="d-flex gap-3 mt-4">
-              <a class="btn btn-primary btn-lg" href="pages/demo.html">Quiero ver SIRID</a>
-              <a class="btn btn-outline-dark btn-lg" href="pages/precios.html">Explorar precios</a>
+
+    <!-- MENÚ PREMIUM -->
+    <nav class="navbar navbar-expand-lg navbar-premium fixed-top py-2">
+        <div class="container">
+            <a class="navbar-brand" href="index.html">Project-GymGo</a>
+            
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navPremium">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            
+            <div class="collapse navbar-collapse justify-content-end" id="navPremium">
+                <ul class="navbar-nav align-items-center">
+                    <li class="nav-item">
+                        <a class="nav-link" href="pages/soluciones.html">Software</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="pages/hardware.html">Hardware IoT</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="pages/precios.html">Precios</a>
+                    </li>
+                    <li class="nav-item ms-lg-3 mt-3 mt-lg-0">
+                        <a class="nav-link text-white opacity-75" href="pages/login.html">Iniciar Sesión</a>
+                    </li>
+                    <li class="nav-item ms-lg-3 mt-3 mt-lg-0">
+                        <a class="btn btn-demo" href="pages/demo.html">Agendar Demo</a>
+                    </li>
+                </ul>
             </div>
-          </div>
-          <div class="col-lg-5">
-            <div class="metric-panel">
-              <span class="eyebrow">AFORO EN TIEMPO REAL</span>
-              <strong>72%</strong>
-              <div class="progress my-3"><div class="progress-bar" style="width:72%"></div></div>
-              <div class="d-flex justify-content-between text-secondary"><span>Capacidad actual</span><span>428 usuarios</span></div>
+        </div>
+    </nav>
+
+    <!-- Contenido temporal -->
+    <main class="container mt-5 pt-5">
+        <div class="row justify-content-center text-center">
+            <div class="col-md-8">
+                <h1 class="fw-bold" style="letter-spacing: -1px; color: #1d1d1f; font-size: 3rem;">El ecosistema para tu gimnasio.</h1>
+                <p class="text-muted mt-3 fs-5">El slider y el contenido principal irán aquí.</p>
             </div>
-          </div>
         </div>
-      </div>
-    </section>
-    <section class="py-5 bg-light">
-      <div class="container py-4">
-        <div class="row g-4">
-          <div class="col-md-4"><h3>Visibilidad total</h3><p class="text-secondary">Conoce tus horas pico, zonas y sucursales desde un solo panel.</p></div>
-          <div class="col-md-4"><h3>Acciones precisas</h3><p class="text-secondary">Anticipa saturaciones y asigna recursos donde generan mayor impacto.</p></div>
-          <div class="col-md-4"><h3>Crece sin friccion</h3><p class="text-secondary">Una plataforma lista para acompañar cada nueva sede.</p></div>
-        </div>
-      </div>
-    </section>
-  </main>
-  <footer class="py-4 border-top"><div class="container small text-secondary">SIRID Systems &copy; 2026</div></footer>
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="assets/js/main.js"></script>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
