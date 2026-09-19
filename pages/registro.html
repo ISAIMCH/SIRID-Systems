@@ -22,27 +22,12 @@
         <div class="col-12 col-md-8 col-lg-6 col-xl-5">
             <div class="auth-card p-4 p-md-5">
                 <div class="text-center mb-4">
-                    <span class="eyebrow">COMIENZA HOY</span>
+                    <!-- <span class="eyebrow">COMIENZA HOY</span> -->
                     <h1 class="auth-title">Crea tu cuenta</h1>
                     <p class="auth-subtitle">Accede al ecosistema digital de tu gimnasio.</p>
                 </div>
 
                 <form id="registroForm">
-                    <div class="row mb-3">
-                        <div class="col-md-6">
-                            <label for="regNombre" class="auth-label">Nombre(s)</label>
-                            <input type="text" class="form-control auth-input" id="regNombre" autocomplete="given-name" required>
-                        </div>
-                        <div class="col-md-6 mt-3 mt-md-0">
-                            <label for="regApellidos" class="auth-label">Apellidos</label>
-                            <input type="text" class="form-control auth-input" id="regApellidos" autocomplete="family-name" required>
-                        </div>
-                    </div>
-
-                    <div class="mb-3">
-                        <label for="regFechaNac" class="auth-label">Fecha de nacimiento</label>
-                        <input type="date" class="form-control auth-input" id="regFechaNac" min="1900-01-01" autocomplete="bday" required>
-                    </div>
 
                     <div class="mb-3">
                         <label for="regEmail" class="auth-label">Correo electrónico</label>
@@ -61,6 +46,50 @@
                         <input type="password" class="form-control auth-input" id="regPasswordConfirm" autocomplete="new-password" maxlength="64" required>
                         <div class="password-status" id="confirmStatus" aria-live="polite"></div>
                     </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="regNombre" class="auth-label">Nombre(s)</label>
+                            <input type="text" class="form-control auth-input" id="regNombre" autocomplete="given-name" required>
+                        </div>
+                        <div class="col-md-6 mt-3 mt-md-0">
+                            <label for="regApellidos" class="auth-label">Apellidos</label>
+                            <input type="text" class="form-control auth-input" id="regApellidos" autocomplete="family-name" required>
+                        </div>
+                    </div>
+
+                    <fieldset class="mb-3 border-0 p-0">
+                        <legend class="auth-label">Fecha de nacimiento</legend>
+                        <div class="row gx-2 birth-date-group">
+                            <div class="col-4">
+                                <label for="regDiaNac" class="visually-hidden">Día</label>
+                                <input type="text" class="form-control auth-input" id="regDiaNac" placeholder="Día" inputmode="numeric" pattern="[0-9]{1,2}" maxlength="2" aria-label="Día de nacimiento" required>
+                            </div>
+                            <div class="col-4">
+                                <label for="regMesNac" class="visually-hidden">Mes</label>
+                                <select class="form-select auth-input" id="regMesNac" aria-label="Mes de nacimiento" required>
+                                    <option value="">Mes</option>
+                                    <option value="01">Enero</option>
+                                    <option value="02">Febrero</option>
+                                    <option value="03">Marzo</option>
+                                    <option value="04">Abril</option>
+                                    <option value="05">Mayo</option>
+                                    <option value="06">Junio</option>
+                                    <option value="07">Julio</option>
+                                    <option value="08">Agosto</option>
+                                    <option value="09">Septiembre</option>
+                                    <option value="10">Octubre</option>
+                                    <option value="11">Noviembre</option>
+                                    <option value="12">Diciembre</option>
+                                </select>
+                            </div>
+                            <div class="col-4">
+                                <label for="regAnioNac" class="visually-hidden">Año</label>
+                                <input type="text" class="form-control auth-input" id="regAnioNac" placeholder="Año" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" aria-label="Año de nacimiento" required>
+                            </div>
+                        </div>
+                        <div class="invalid-feedback d-block" id="birthDateStatus" aria-live="polite"></div>
+                    </fieldset>
 
                     <button type="submit" class="btn auth-submit w-100 py-2 mb-3">Crear cuenta</button>
                     

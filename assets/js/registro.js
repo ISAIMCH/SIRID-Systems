@@ -20,6 +20,11 @@ function isValidBirthDate(value) {
     return year >= 1900 && date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day && date.getTime() <= todayUtc;
 }
 
+function getBirthDateValue(day, month, year) {
+    if (!day || !month || !year) return '';
+    return `${year.padStart(4, '0')}-${month}-${day.padStart(2, '0')}`;
+}
+
 function passwordChecks(password, userData) {
     const normalizedPassword = normalizeText(password);
     const personalValues = [userData.email, userData.nombre, userData.apellidos]
@@ -63,13 +68,35 @@ document.addEventListener('DOMContentLoaded', () => {
     const confirmation = document.getElementById('regPasswordConfirm');
     const confirmStatus = document.getElementById('confirmStatus');
     const email = document.getElementById('regEmail');
-    const birthDate = document.getElementById('regFechaNac');
+    const birthDay = document.getElementById('regDiaNac');
+    const birthMonth = document.getElementById('regMesNac');
+    const birthYear = document.getElementById('regAnioNac');
+    const birthDateStatus = document.getElementById('birthDateStatus');
     const today = new Date();
-    birthDate.max = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const currentDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+    function validateBirthDateFields() {
+        const birthDate = getBirthDateValue(birthDay.value, birthMonth.value, birthYear.value);
+        const isValid = isValidBirthDate(birthDate);
+        const message = !birthDay.value || !birthMonth.value || !birthYear.value
+            ? 'Completa día, mes y año.'
+            : isValid ? '' : 'Escribe una fecha de nacimiento válida.';
+        birthDateStatus.textContent = message;
+        [birthDay, birthMonth, birthYear].forEach((field) => field.setCustomValidity(message));
+        return isValid;
+    }
 
     ['regPassword', 'regEmail', 'regNombre', 'regApellidos'].forEach((id) => document.getElementById(id).addEventListener('input', updatePasswordMeter));
     email.addEventListener('input', () => email.setCustomValidity(isValidEmail(email.value) ? '' : 'Escribe un correo electrónico válido.'));
-    birthDate.addEventListener('input', () => birthDate.setCustomValidity(isValidBirthDate(birthDate.value) ? '' : 'Escribe una fecha de nacimiento válida.'));
+    birthDay.addEventListener('input', () => {
+        birthDay.value = birthDay.value.replace(/\D/g, '').slice(0, 2);
+        validateBirthDateFields();
+    });
+    birthMonth.addEventListener('change', validateBirthDateFields);
+    birthYear.addEventListener('input', () => {
+        birthYear.value = birthYear.value.replace(/\D/g, '').slice(0, 4);
+        validateBirthDateFields();
+    });
     confirmation.addEventListener('input', () => {
         confirmStatus.textContent = confirmation.value && confirmation.value !== password.value ? 'Las contraseñas no coinciden.' : confirmation.value ? 'Las contraseñas coinciden.' : '';
         confirmStatus.className = `password-status ${confirmation.value && confirmation.value !== password.value ? 'is-invalid' : confirmation.value ? 'is-valid' : ''}`;
@@ -80,12 +107,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const userData = {
             nombre: document.getElementById('regNombre').value.trim(),
             apellidos: document.getElementById('regApellidos').value.trim(),
-            fechaNacimiento: birthDate.value,
+            fechaNacimiento: getBirthDateValue(birthDay.value, birthMonth.value, birthYear.value),
             email: email.value.trim().toLowerCase(),
             password: password.value
         };
         const checks = updatePasswordMeter();
-        if (!isValidEmail(userData.email) || !isValidBirthDate(userData.fechaNacimiento)) {
+        if (!isValidEmail(userData.email) || !validateBirthDateFields() || userData.fechaNacimiento > currentDate) {
             alert('Revisa el formato del correo y la fecha de nacimiento.');
             return;
         }
