@@ -1,13 +1,39 @@
-const loginForm = document.querySelector('#login-form');
-loginForm?.addEventListener('submit', async (event) => {
-  event.preventDefault();
-  const message = document.querySelector('#login-message');
-  const credentials = Object.fromEntries(new FormData(loginForm));
-  try {
-    const response = await fetch('http://localhost:3000/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(credentials) });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.message || 'No se pudo iniciar sesion');
-    localStorage.setItem('sirid_token', data.token);
-    window.location.href = 'admin.html';
-  } catch (error) { message.textContent = error.message; message.className = 'alert alert-danger'; }
+document.addEventListener('DOMContentLoaded', () => {
+    const loginForm = document.getElementById('loginForm');
+
+    if (loginForm) {
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault(); // Evita que la página se recargue
+
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            try {
+                // Petición al backend local (cambiar a URL de Railway al subir a producción)
+                const response = await fetch('http://localhost:3000/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    // Guardar el token y el nombre en el navegador
+                    localStorage.setItem('token', data.token);
+                    localStorage.setItem('userName', data.user.nombre); 
+                    
+                    alert('Inicio de sesión exitoso');
+                    window.location.href = '../index.html';
+                } else {
+                    alert('Error: ' + data.msg);
+                }
+            } catch (error) {
+                console.error('Error de conexión:', error);
+                alert('No se pudo conectar con el servidor.');
+            }
+        });
+    }
 });
