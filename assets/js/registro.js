@@ -48,12 +48,12 @@ function updatePasswordMeter() {
         apellidos: document.getElementById('regApellidos').value
     };
     const checks = passwordChecks(password, userData);
-    const bar = document.getElementById('passwordMeterBar');
+    const meter = document.getElementById('passwordMeter');
     const status = document.getElementById('passwordStatus');
     const score = Number(checks.length) + Number(checks.common) + Number(checks.personal) + (password.length >= 12 ? 1 : 0) + (/[A-Z]/.test(password) && /[a-z]/.test(password) && /\d/.test(password) && /[^A-Za-z0-9]/.test(password) ? 1 : 0);
 
-    bar.style.width = `${Math.min(score * 20, 100)}%`;
-    bar.style.backgroundColor = score <= 2 ? '#dc3545' : score <= 4 ? '#d99a00' : '#2f9e44';
+    meter.className = 'password-meter';
+    if (password) meter.classList.add(score <= 2 ? 'is-weak' : score <= 4 ? 'is-medium' : 'is-strong');
     status.className = 'password-status';
     if (!password) status.textContent = 'Usa entre 8 y 64 caracteres.';
     else if (!checks.length) { status.textContent = 'La contraseña debe tener entre 8 y 64 caracteres.'; status.classList.add('is-invalid'); }

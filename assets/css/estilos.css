@@ -122,20 +122,32 @@ footer { background: white; }
 
         /* Medidor de seguridad de contraseña */
         .password-meter {
-            height: 4px;
-            background-color: #e5e5ea;
-            border-radius: 2px;
+            display: flex;
+            gap: 4px;
             margin-top: 8px;
             overflow: hidden;
             width: 100%;
         }
 
-        #passwordMeterBar {
+        .password-meter span {
             display: block;
-            height: 100%;
-            width: 0%;
-            background-color: #0071e3;
-            transition: width 0.3s ease, background-color 0.3s ease;
+            flex: 1;
+            height: 4px;
+            border-radius: 2px;
+            background-color: #e5e5ea;
+            transition: background-color 0.3s ease;
+        }
+
+        .password-meter.is-weak span:first-child {
+            background-color: #dc3545;
+        }
+
+        .password-meter.is-medium span:nth-child(-n + 2) {
+            background-color: #d99a00;
+        }
+
+        .password-meter.is-strong span {
+            background-color: #2f9e44;
         }
 
         .password-status {

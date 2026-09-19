@@ -24,6 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     // Guardar el token y el nombre en el navegador
                     localStorage.setItem('token', data.token);
                     localStorage.setItem('userName', data.user.nombre); 
+                    localStorage.setItem('userData', JSON.stringify(data.user));
                     
                     alert('Inicio de sesión exitoso');
                     window.location.href = '../index.html';

@@ -37,7 +37,11 @@
                     <div class="mb-3">
                         <label for="regPassword" class="auth-label">Contraseña</label>
                         <input type="password" class="form-control auth-input" id="regPassword" autocomplete="new-password" minlength="8" maxlength="64" required>
-                        <div class="password-meter" aria-hidden="true"><span id="passwordMeterBar"></span></div>
+                        <div class="password-meter" id="passwordMeter" aria-hidden="true">
+                            <span></span>
+                            <span></span>
+                            <span></span>
+                        </div>
                         <div class="password-status" id="passwordStatus" aria-live="polite">Usa entre 8 y 64 caracteres.</div>
                     </div>
 
