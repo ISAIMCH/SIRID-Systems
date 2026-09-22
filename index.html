@@ -12,9 +12,6 @@
     <!-- Bootstrap Icons -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
 
-    <!-- CSS para OpenStreetMap (Leaflet) -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-
     <!-- Estilos personalizados (Estética Apple/Samsung) -->
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
@@ -71,6 +68,30 @@
         .feature-list li::before { content: "✓"; color: #1d1d1f; font-weight: bold; margin-right: 10px; }
         .btn-buy { background-color: #1d1d1f; color: #ffffff; border-radius: 20px; padding: 10px 24px; font-weight: 600; width: 100%; border: none; margin-top: 20px; display: block; text-align: center; text-decoration: none;}
         .btn-buy:hover { background-color: #333336; color: #ffffff; }
+
+        /* Banner de cookies */
+.cookie-banner {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background-color: #1d1d1f;
+    color: #f5f5f7;
+    padding: 18px 20px;
+    z-index: 2000;
+    display: none;
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.3);
+}
+.cookie-banner p { margin: 0; font-size: 0.9rem; color: #d2d2d7; }
+.cookie-banner a { color: #ffffff; text-decoration: underline; }
+.cookie-banner .btn-cookie-aceptar {
+    background-color: #ffffff; color: #1d1d1f; border-radius: 20px;
+    padding: 8px 20px; font-weight: 600; font-size: 0.85rem; border: none;
+}
+.cookie-banner .btn-cookie-config {
+    background-color: transparent; color: #ffffff; border: 1px solid rgba(255,255,255,0.4);
+    border-radius: 20px; padding: 8px 20px; font-weight: 400; font-size: 0.85rem;
+}
     </style>
 </head>
 <body>
@@ -89,7 +110,6 @@
                     <li class="nav-item"><a class="nav-link" href="#sobre_nosotros">Conocenos</a></li>
                     <li class="nav-item"><a class="nav-link" href="#beneficios">Beneficios</a></li>
                     <li class="nav-item"><a class="nav-link" href="#precios">Precios</a></li>
-                    <li class="nav-item"><a class="nav-link" href="#ubicacion">Ubicación</a></li>
                     <li class="nav-item ms-lg-3 mt-3 mt-lg-0">
                         <a class="nav-link text-white opacity-75" href="pages/login.html">Iniciar Sesión</a>
                     </li>
@@ -147,17 +167,7 @@
                     </div>
                 </div>
             </div>
-            <!-- SLIDE 4 -->
-            <div class="carousel-item" style="background-image: url('https://images.unsplash.com/photo-1524661135-423995f22d0b?q=80&w=1920&auto=format&fit=crop');">
-                <div class="slider-overlay"></div>
-                <div class="container slider-content">
-                    <h1 class="hero-title">Visítanos en persona.</h1>
-                    <p class="hero-subtitle">Conoce nuestra sucursal piloto en Mixquiahuala y prueba el ecosistema.</p>
-                    <div class="d-flex gap-3 mt-2">
-                        <a href="#ubicacion" class="btn btn-demo-lg">Ver Ubicación</a>
-                    </div>
-                </div>
-            </div>
+
 
         </div>
     </header>
@@ -305,6 +315,16 @@
     <footer class="container-fluid bg-dark text-white py-5">
         <div class="container">
             <div class="row">
+                <!-- BANNER DE COOKIES -->
+<div id="cookieBanner" class="cookie-banner">
+    <div class="container d-flex flex-wrap justify-content-between align-items-center gap-3">
+        <p>Usamos cookies para mejorar tu experiencia en Project-GymGo. Consulta más en nuestra <a href="#">Política de Privacidad</a>.</p>
+        <div class="d-flex gap-2 flex-shrink-0">
+            <button id="btnConfigCookies" class="btn-cookie-config">Configurar cookies</button>
+            <button id="btnAceptarCookies" class="btn-cookie-aceptar">Aceptar cookies</button>
+        </div>
+    </div>
+</div>
                 <!-- Columna de Navegación -->
                 <div class="col-md-4 mb-4">
                     <h5 class="fw-bold text-white mb-3">Project-GymGo</h5>
@@ -360,5 +380,7 @@
     
     <!-- Aquí conectamos tu lógica (Asegúrate de que este archivo coincida con el código que me mostraste) -->
     <script src="./assets/js/main.js"></script>
+
+    
 </body>
 </html>

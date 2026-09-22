@@ -66,3 +66,32 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
     }
 });
+
+function setCookie(nombre, valor, dias) {
+    const fecha = new Date();
+    fecha.setTime(fecha.getTime() + dias * 24 * 60 * 60 * 1000);
+    document.cookie = `${nombre}=${valor};expires=${fecha.toUTCString()};path=/`;
+}
+
+function getCookie(nombre) {
+    const match = document.cookie.match(new RegExp(`(^| )${nombre}=([^;]+)`));
+    return match ? match[2] : null;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const banner = document.getElementById('cookieBanner');
+
+    if (!getCookie('cookiesAceptadas')) {
+        banner.style.display = 'block';
+    }
+
+    document.getElementById('btnAceptarCookies').addEventListener('click', () => {
+        setCookie('cookiesAceptadas', 'true', 365);
+        banner.style.display = 'none';
+    });
+
+    document.getElementById('btnConfigCookies').addEventListener('click', () => {
+        // Aquí después puedes abrir un modal con opciones (necesarias/analíticas/marketing)
+        alert('Aquí iría tu panel de configuración de cookies.');
+    });
+});
