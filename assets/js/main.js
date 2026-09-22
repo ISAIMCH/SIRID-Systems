@@ -96,6 +96,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
+
     // ==========================================
     // 1. LÓGICA DE LA BARRA DE NAVEGACIÓN (LOGIN)
     // ==========================================
