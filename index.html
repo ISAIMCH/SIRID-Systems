@@ -439,21 +439,37 @@
                     </ul>
                 </div>
 
-                <!-- Formulario conectado a tu código data-validate -->
+               <!-- Columna de Contacto (Formulario Compacto) -->
                 <div class="col-md-4 mb-4">
-                    <h5 class="fw-bold text-white mb-3">Boletín para Gimnasios</h5>
-                    <p class="text-white-50" style="font-size: 0.85rem;">Suscríbete para recibir consejos de administración y tendencias de hardware IoT.</p>
-                    <form data-validate class="needs-validation" novalidate>
-                        <div class="input-group">
-                            <input type="email" class="form-control" placeholder="tu@gimnasio.com" required>
-                            <button class="btn btn-primary" type="submit">Suscribir</button>
+                    <h5 class="fw-bold text-white mb-3">Contáctanos</h5>
+                    <p class="text-white-50" style="font-size: 0.85rem;">¿Dudas sobre la plataforma? Envíanos un mensaje.</p>
+                    
+                    <!-- Formulario conectado a EmailJS -->
+                    <form id="contactForm" data-validate class="needs-validation" novalidate>
+                        <div class="mb-2">
+                            <!-- El atributo name es vital para EmailJS -->
+                            <input type="text" class="form-control form-control-sm" id="user_name" name="user_name" placeholder="Tu Nombre" required>
                         </div>
-                        <div class="invalid-feedback text-warning">
-                            Por favor ingresa un correo válido.
+                        <div class="mb-2">
+                            <input type="email" class="form-control form-control-sm" id="user_email" name="user_email" placeholder="tu@correo.com" required>
+                        </div>
+                        <div class="mb-3">
+                            <textarea class="form-control form-control-sm" id="message" name="message" rows="2" placeholder="Escribe tu mensaje..." required></textarea>
+                        </div>
+                        
+                        <!-- Botones de Acción Compactos -->
+                        <div class="d-grid gap-2">
+                            <!-- Botón de Correo (Ejecuta el submit para EmailJS) -->
+                            <button type="submit" class="btn btn-primary btn-sm fw-bold" id="btn-correo">
+                                <i class="bi bi-envelope me-1"></i> Enviar por Correo
+                            </button>
+                            <!-- Botón de WhatsApp -->
+                            <button type="button" class="btn btn-success btn-sm fw-bold" onclick="enviarWhatsApp()">
+                                <i class="bi bi-whatsapp me-1"></i> WhatsApp
+                            </button>
                         </div>
                     </form>
                 </div>
-            </div>
             
             <div class="border-top border-secondary mt-3 pt-4 text-center text-white-50" style="font-size: 0.85rem;">
                 &copy; 2026 SIRID Systems. Todos los derechos reservados.
@@ -471,6 +487,61 @@
     <!-- Aquí conectamos tu lógica (Asegúrate de que este archivo coincida con el código que me mostraste) -->
     <script src="./assets/js/main.js"></script>
 
+    <!-- SDK de EmailJS -->
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
     
+    <script type="text/javascript">
+        // 1. INICIALIZAR EMAILJS
+        // Sustituye 'TU_PUBLIC_KEY' por la llave pública que te dará EmailJS al registrarte
+        (function() {
+            emailjs.init("9Bl9zpYGGTk8prZ0z");
+        })();
+
+        // 2. FUNCIÓN PARA ENVIAR CORREO (EmailJS)
+        document.getElementById('contactForm').addEventListener('submit', function(event) {
+            event.preventDefault(); // Evita que la página se recargue al dar clic
+            
+            const btn = document.getElementById('btn-correo');
+            btn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Enviando...';
+            
+            // Sustituye por tus IDs de servicio y plantilla de EmailJS
+            const serviceID = 'service_4kbxym3';
+            const templateID = 'template_6ppilu2';
+
+            emailjs.sendForm(serviceID, templateID, this)
+                .then(function() {
+                    btn.innerHTML = '<i class="bi bi-check-circle me-2"></i>Mensaje Enviado';
+                    btn.classList.replace('btn-dark', 'btn-success'); // Cambia a verde
+                    document.getElementById('contactForm').reset(); // Limpia el formulario
+                }, function(error) {
+                    btn.innerHTML = '<i class="bi bi-x-circle me-2"></i>Error al enviar';
+                    btn.classList.replace('btn-dark', 'btn-danger'); // Cambia a rojo
+                    console.log('Error de EmailJS:', error);
+                });
+        });
+
+        // 3. FUNCIÓN PARA ENVIAR WHATSAPP
+        function enviarWhatsApp() {
+            const nombre = document.getElementById('user_name').value;
+            const correo = document.getElementById('user_email').value;
+            const mensaje = document.getElementById('message').value;
+            
+            if(!nombre || !mensaje) {
+                alert('Por favor, ingresa tu nombre y mensaje antes de enviar por WhatsApp.');
+                return;
+            }
+            
+            // Reemplaza con el celular oficial del proyecto (Código 52 para México, sin símbolo +)
+            const telefonoGym = "527721050282"; 
+            
+            const textoFormateado = `Hola equipo PulseGym, soy ${nombre} (${correo}). ${mensaje}`;
+            
+            // Usa la API pública de WhatsApp
+            const url = `https://wa.me/${telefonoGym}?text=${encodeURIComponent(textoFormateado)}`;
+            
+            window.open(url, '_blank');
+        }
+    </script>
+
 </body>
 </html>
