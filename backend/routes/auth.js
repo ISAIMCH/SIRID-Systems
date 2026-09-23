@@ -1,8 +1,25 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
+const nodemailer = require('nodemailer');
+const { OAuth2Client } = require('google-auth-library');
 const User = require('../models/User');
 const router = express.Router();
+
+// Configuración de Resend / SendGrid
+const transporter = nodemailer.createTransport({
+    host: 'smtp.resend.com',
+    port: 465,
+    secure: true,
+    auth: {
+        user: 'resend',
+        pass: process.env.EMAIL_API_KEY
+    }
+});
+
+// Cliente de Google
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 const COMMON_PASSWORDS = new Set([
     '12345678', '123456789', 'password', 'contraseña', 'qwerty123',
@@ -22,10 +39,11 @@ const isValidBirthDate = (value) => {
     return year >= 1900 && date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day && date.getTime() <= todayUtc;
 };
 
-// Agregar justo arriba de router.post('/login', ...)
+// ==========================================
+// 1. REGISTRO (CON DOBLE OPT-IN)
+// ==========================================
 router.post('/register', async (req, res) => {
     try {
-        // Ahora extraemos todos los datos del formulario
         const { nombre, apellidos, fechaNacimiento, email, password } = req.body;
 
         if (typeof email !== 'string' || email.trim().length > 254 || !EMAIL_PATTERN.test(email.trim())) {
@@ -37,6 +55,7 @@ router.post('/register', async (req, res) => {
         if (typeof password !== 'string' || password.length < 8 || password.length > 64) {
             return res.status(400).json({ msg: 'La contraseña debe tener entre 8 y 64 caracteres' });
         }
+
         const normalizedEmail = email.trim().toLowerCase();
         const normalizedPassword = normalizeText(password);
         const emailName = normalizeText(normalizedEmail).split('@')[0];
@@ -50,69 +69,125 @@ router.post('/register', async (req, res) => {
             return res.status(400).json({ msg: 'La contraseña no puede coincidir con tus datos personales' });
         }
 
-        // Validar si el correo ya está registrado
         let user = await User.findOne({ email: normalizedEmail });
         if (user) {
             return res.status(400).json({ msg: 'El correo ya está registrado' });
         }
 
-        // Crear la "sal" y encriptar la contraseña
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
+        const tokenVerificacion = crypto.randomBytes(32).toString('hex');
 
-        // Crear el nuevo usuario con todos sus datos y guardarlo en MongoDB
         user = new User({
             nombre,
             apellidos,
             fechaNacimiento,
             email: normalizedEmail,
-            password: hashedPassword
+            password: hashedPassword,
+            verificado: false, 
+            tokenVerificacion
         });
 
         await user.save();
 
-        res.status(201).json({ msg: 'Usuario registrado exitosamente' });
+        const urlVerificacion = `http://localhost:3000/api/auth/verificar/${tokenVerificacion}`;
+        
+        await transporter.sendMail({
+            from: '"Project-GymGo" <onboarding@projectgymgo.com>',
+            to: normalizedEmail,
+            subject: 'Activa tu cuenta | Project-GymGo',
+            html: `<h2>Hola ${nombre},</h2>
+                   <p>Por favor verifica tu correo haciendo clic en el siguiente enlace:</p>
+                   <a href="${urlVerificacion}">Activar mi cuenta</a>`
+        });
+
+        res.status(201).json({ msg: 'Usuario registrado. Revisa tu correo para verificar la cuenta.' });
     } catch (err) {
         console.error(err);
         res.status(500).json({ msg: 'Error en el servidor al registrar' });
     }
 });
 
+// ==========================================
+// 2. VERIFICACIÓN DE CORREO
+// ==========================================
+router.get('/verificar/:token', async (req, res) => {
+    try {
+        const user = await User.findOne({ tokenVerificacion: req.params.token });
+        if (!user) {
+            return res.status(400).send('Enlace inválido o expirado.');
+        }
+
+        user.verificado = true;
+        user.tokenVerificacion = undefined;
+        await user.save();
+
+        res.redirect('http://127.0.0.1:5500/pages/login.html?verificado=true');
+    } catch (error) {
+        res.status(500).send('Error al verificar la cuenta.');
+    }
+});
+
+// ==========================================
+// 3. LOGIN TRADICIONAL
+// ==========================================
 router.post('/login', async (req, res) => {
     try {
         const { email, password } = req.body;
+        const user = await User.findOne({ email: email.toLowerCase() });
+        
+        if (!user) return res.status(400).json({ msg: 'Usuario no encontrado' });
+        if (!user.verificado) return res.status(403).json({ msg: 'Verifica tu correo electrónico para ingresar.' });
 
-        // 1. Verificar si el usuario existe
-        const user = await User.findOne({ email });
-        if (!user) {
-            return res.status(400).json({ msg: 'Usuario no encontrado' });
-        }
+        // Si el usuario se registró con Google, no tendrá contraseña tradicional
+        if (!user.password) return res.status(400).json({ msg: 'Inicia sesión con Google.' });
 
-        // 2. Comparar la contraseña ingresada con el Hash de la BD
         const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) {
-            return res.status(400).json({ msg: 'Contraseña incorrecta' });
-        }
+        if (!isMatch) return res.status(400).json({ msg: 'Contraseña incorrecta' });
 
-        // 3. Generar y enviar el Token (JWT)
-        const token = jwt.sign(
-            { id: user._id }, 
-            process.env.JWT_SECRET, 
-            { expiresIn: '2h' }
-        );
+        const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '2h' });
 
-        // ¡NUEVO! Ahora también enviamos el nombre al frontend
-        res.json({ 
-            token, 
-            user: { 
-                id: user._id, 
-                email: user.email,
-                nombre: user.nombre,       // Añadimos el nombre
-                apellidos: user.apellidos  // Añadimos los apellidos
-            } 
-        });
+        res.json({ token, user: { id: user._id, email: user.email, nombre: user.nombre, apellidos: user.apellidos } });
     } catch (err) {
         res.status(500).json({ msg: 'Error en el servidor' });
+    }
+});
+
+// ==========================================
+// 4. LOGIN CON GOOGLE
+// ==========================================
+router.post('/google', async (req, res) => {
+    try {
+        const { credential } = req.body;
+        
+        // Desencriptar el token de Google
+        const ticket = await googleClient.verifyIdToken({
+            idToken: credential,
+            audience: process.env.GOOGLE_CLIENT_ID
+        });
+        const payload = ticket.getPayload();
+        
+        // Buscar si ya existe en nuestra BD
+        let user = await User.findOne({ email: payload.email });
+        
+        if (!user) {
+            // Si no existe, lo registramos automáticamente ya verificado
+            user = new User({
+                nombre: payload.given_name,
+                apellidos: payload.family_name || '',
+                email: payload.email,
+                verificado: true // Google ya validó su correo
+            });
+            await user.save();
+        }
+
+        // Generar nuestro propio JWT para la sesión
+        const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '2h' });
+
+        res.json({ token, user: { id: user._id, email: user.email, nombre: user.nombre } });
+    } catch (error) {
+        console.error(error);
+        res.status(401).json({ msg: 'Token de Google inválido' });
     }
 });
 

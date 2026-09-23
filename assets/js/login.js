@@ -10,7 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             try {
                 // Petición al backend local (cambiar a URL de Railway al subir a producción)
-                const response = await fetch('http://localhost:3000/api/auth/login', {
+                const response = await fetch('https://sirid-systems.onrender.com/api/auth/login', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
