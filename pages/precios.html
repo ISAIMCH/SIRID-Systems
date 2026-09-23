@@ -134,7 +134,7 @@
 
             try {
                 // Hacemos la petición a tu servidor Node.js
-                const respuesta = await fetch('http://localhost:3000/api/planes');
+                const respuesta = await fetch('https://sirid-systems.onrender.com/api/planes');
                 const planes = await respuesta.json();
                 
                 contenedor.innerHTML = ''; // Limpiamos el spinner

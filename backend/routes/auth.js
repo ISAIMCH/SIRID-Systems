@@ -90,7 +90,7 @@ router.post('/register', async (req, res) => {
 
         await user.save();
 
-        const urlVerificacion = `http://localhost:3000/api/auth/verificar/${tokenVerificacion}`;
+        const urlVerificacion = `https://sirid-systems.onrender.com/api/auth/verificar/${tokenVerificacion}`;
         
         await transporter.sendMail({
             from: '"Project-GymGo" <onboarding@projectgymgo.com>',
