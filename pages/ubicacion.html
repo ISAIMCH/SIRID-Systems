@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ubicación | Project-GymGo</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        :root { --ink: #17211b; --lime: #c8f169; --blue: #1d6eff; --paper: #f6f7f2; }
+        * { box-sizing: border-box; }
+        body { margin: 0; color: var(--ink); background: var(--paper); font-family: Inter, system-ui, sans-serif; }
+        .location-app { display: grid; grid-template-columns: minmax(260px, 340px) 1fr; min-height: 520px; height: min(600px, 72vh); background: #fff; }
+        .location-panel { padding: 24px; display: flex; flex-direction: column; gap: 18px; border-right: 1px solid #e6e9e3; position: relative; z-index: 500; }
+        .eyebrow { color: var(--blue); font-size: .7rem; font-weight: 800; letter-spacing: 1.5px; }
+        h1 { font-size: 1.65rem; line-height: 1.05; margin: 6px 0 0; letter-spacing: -.8px; }
+        .intro { color: #69736c; font-size: .84rem; line-height: 1.5; margin: 0; }
+        .search-wrap { position: relative; }
+        .search-wrap i { position: absolute; left: 13px; top: 12px; color: #737d76; }
+        #placeSearch { width: 100%; border: 1px solid #dfe4dd; border-radius: 12px; padding: 11px 38px; outline: 0; font: inherit; font-size: .84rem; }
+        #placeSearch:focus { border-color: var(--blue); box-shadow: 0 0 0 4px rgba(29,110,255,.12); }
+        .clear-search { position: absolute; right: 8px; top: 7px; width: 28px; height: 28px; border: 0; border-radius: 50%; background: transparent; color: #737d76; cursor: pointer; }
+        .clear-search:hover { background: #edf1eb; color: var(--ink); }
+        .suggestions { position: absolute; left: 0; right: 0; top: 46px; z-index: 600; display: none; overflow: hidden; border: 1px solid #e0e5df; border-radius: 12px; background: #fff; box-shadow: 0 12px 26px rgba(0,0,0,.13); }
+        .suggestions.visible { display: block; }
+        .suggestion { display: block; width: 100%; border: 0; border-bottom: 1px solid #eef1ed; background: #fff; padding: 10px 12px; color: var(--ink); text-align: left; cursor: pointer; font: .75rem/1.35 Inter, sans-serif; }
+        .suggestion:last-child { border-bottom: 0; }
+        .suggestion:hover, .suggestion:focus { background: #f3f7ff; outline: 0; }
+        .search-help { font-size: .72rem; color: #858d87; margin: 7px 0 0; }
+        .location-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .control-btn, .route-btn { border: 0; border-radius: 10px; padding: 10px 9px; font: 700 .74rem Inter, sans-serif; cursor: pointer; transition: transform .2s, opacity .2s; }
+        .control-btn { background: #edf1eb; color: var(--ink); }
+        .route-btn { background: var(--ink); color: #fff; text-decoration: none; text-align: center; display: block; }
+        .control-btn:hover, .route-btn:hover { transform: translateY(-2px); opacity: .88; }
+        .branch-list { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; min-height: 90px; }
+        .branch-item { border: 1px solid #e7ebe5; border-radius: 12px; background: #fff; padding: 11px; text-align: left; cursor: pointer; transition: border-color .2s, background .2s, transform .2s; }
+        .branch-item:hover, .branch-item.active { border-color: var(--blue); background: #f3f7ff; transform: translateX(2px); }
+        .branch-item strong { display: block; font-size: .8rem; }
+        .branch-item span { display: block; color: #737d76; font-size: .7rem; margin-top: 4px; }
+        .map-shell { position: relative; min-width: 0; }
+        #locationMap { height: 100%; min-height: 520px; width: 100%; }
+        .map-badge { position: absolute; top: 16px; left: 16px; z-index: 400; padding: 9px 12px; border-radius: 999px; background: rgba(255,255,255,.92); box-shadow: 0 5px 20px rgba(0,0,0,.14); font-size: .72rem; font-weight: 700; }
+        .map-badge i { color: var(--blue); margin-right: 5px; }
+        .gym-pin { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); background: var(--ink); color: var(--lime); border: 3px solid #fff; box-shadow: 0 4px 12px rgba(0,0,0,.28); }
+        .gym-pin i { transform: rotate(45deg); font-size: 16px; }
+        .start-pin { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: var(--blue); color: #fff; border: 3px solid #fff; box-shadow: 0 3px 10px rgba(0,0,0,.3); }
+        .route-status { color: #b42318; font-size: .72rem; line-height: 1.35; margin: -8px 0 0; }
+        @media (max-width: 720px) { .location-app { grid-template-columns: 1fr; height: auto; } .location-panel { border-right: 0; border-bottom: 1px solid #e6e9e3; padding: 18px; } #locationMap { min-height: 390px; height: 390px; } .branch-list { max-height: 150px; } }
+    </style>
+</head>
+<body>
+    <main class="location-app">
+        <aside class="location-panel">
+            <div><span class="eyebrow"><i class="bi bi-geo-alt-fill me-1"></i>RED PROJECT-GYMGO</span><h1>Encuentranos.</h1><p class="intro">Explora nuestras ubicaciones y elige desde dónde quieres comenzar tu ruta.</p></div>
+            <div class="search-wrap"><i class="bi bi-search"></i><input id="placeSearch" type="search" placeholder="Buscar ciudad o punto de inicio" autocomplete="off"><button id="clearSearch" class="clear-search" type="button" aria-label="Limpiar búsqueda"><i class="bi bi-x-lg"></i></button><div id="suggestions" class="suggestions" role="listbox"></div><p id="searchHelp" class="search-help">Escribe para ver sugerencias de lugares.</p></div>
+            <div class="location-actions"><button id="locateBtn" class="control-btn" type="button"><i class="bi bi-crosshair me-1"></i><span>Mi ubicación</span></button><button id="fitBtn" class="control-btn" type="button"><i class="bi bi-arrows-fullscreen me-1"></i>Ver todos</button></div>
+            <div id="branchList" class="branch-list" aria-live="polite"></div>
+            <p id="routeStatus" class="route-status d-none" aria-live="polite"></p>
+            <a id="routeBtn" class="route-btn" href="https://maps.app.goo.gl/M6CXb564vbWYVKgv8" target="_blank" rel="noopener"><i class="bi bi-sign-turn-right-fill me-1"></i>Cómo llegar al destino</a>
+        </aside>
+        <section class="map-shell"><div class="map-badge"><i class="bi bi-barbell"></i>Destino GymGo</div><div id="locationMap"></div></section>
+    </main>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+    <script>
+        const destination = { nombre: 'Project-GymGo', direccion: 'Destino principal', lat: 20.206275, lng: -99.222415 };
+        const map = L.map('locationMap', { zoomControl: false }).setView([destination.lat, destination.lng], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap' }).addTo(map);
+        L.control.zoom({ position: 'bottomright' }).addTo(map);
+        const gymIcon = L.divIcon({ className: '', html: '<div class="gym-pin"><i class="bi bi-barbell"></i></div>', iconSize: [34, 34], iconAnchor: [17, 34], popupAnchor: [0, -34] });
+        const startIcon = L.divIcon({ className: '', html: '<div class="start-pin"><i class="bi bi-geo-alt-fill"></i></div>', iconSize: [30, 30], iconAnchor: [15, 15] });
+        const destinationMarker = L.marker([destination.lat, destination.lng], { icon: gymIcon }).addTo(map).bindPopup('<strong>Project-GymGo</strong><br>Destino principal').openPopup();
+        let startMarker;
+        let branches = [];
+        let locations = [destination];
+        let searchTimer;
+        let routeLine;
+        let currentStart;
+        const branchList = document.getElementById('branchList');
+        const searchInput = document.getElementById('placeSearch');
+        const suggestions = document.getElementById('suggestions');
+        const searchHelp = document.getElementById('searchHelp');
+        const locateBtn = document.getElementById('locateBtn');
+        const routeBtn = document.getElementById('routeBtn');
+        const routeStatus = document.getElementById('routeStatus');
+        function updateRouteLink(lat, lng) { routeBtn.href = `https://www.google.com/maps/dir/?api=1&origin=${lat},${lng}&destination=${destination.lat},${destination.lng}&travelmode=driving`; }
+        async function drawRoute(lat, lng) {
+            currentStart = { lat, lng };
+            updateRouteLink(lat, lng);
+            routeStatus.classList.remove('d-none');
+            routeStatus.textContent = 'Calculando ruta...';
+            try {
+                const response = await fetch(`https://router.project-osrm.org/route/v1/driving/${lng},${lat};${destination.lng},${destination.lat}?overview=full&geometries=geojson`);
+                if (!response.ok) throw new Error('Route service unavailable');
+                const data = await response.json();
+                const coordinates = data.routes?.[0]?.geometry?.coordinates;
+                if (!coordinates?.length) throw new Error('Route not found');
+                if (routeLine) map.removeLayer(routeLine);
+                routeLine = L.geoJSON({ type: 'Feature', geometry: { type: 'LineString', coordinates } }, { style: { color: '#d92d20', weight: 5, opacity: .9 } }).addTo(map);
+                routeStatus.textContent = `${(data.routes[0].distance / 1000).toFixed(1)} km · ${(data.routes[0].duration / 3600).toFixed(1)} h en auto`;
+                map.fitBounds(routeLine.getBounds(), { padding: [35, 35] });
+            } catch (error) {
+                if (routeLine) map.removeLayer(routeLine);
+                routeLine = L.polyline([[lat, lng], [destination.lat, destination.lng]], { color: '#d92d20', weight: 4, dashArray: '8 8', opacity: .85 }).addTo(map);
+                routeStatus.textContent = 'Ruta aproximada mostrada. Usa Google Maps para el trayecto exacto.';
+                map.fitBounds(routeLine.getBounds(), { padding: [35, 35] });
+            }
+        }
+        function setStart(lat, lng, label) { if (startMarker) map.removeLayer(startMarker); startMarker = L.marker([lat, lng], { icon: startIcon }).addTo(map).bindPopup(`<strong>Inicio</strong><br>${label}`).openPopup(); map.fitBounds(L.latLngBounds([[lat, lng], [destination.lat, destination.lng]]), { padding: [35, 35] }); drawRoute(lat, lng); }
+        function showBranches(items) { branchList.innerHTML = items.map((branch, index) => `<button class="branch-item ${index === 0 ? 'active' : ''}" type="button" data-index="${index}"><strong><i class="bi bi-${branch.nombre === destination.nombre ? 'barbell' : 'building'} me-1"></i>${branch.nombre}</strong><span>${branch.direccion}</span></button>`).join(''); branchList.querySelectorAll('.branch-item').forEach((item) => item.addEventListener('click', () => { const branch = items[Number(item.dataset.index)]; setStart(branch.lat, branch.lng, branch.nombre); map.setView([branch.lat, branch.lng], 15); branchList.querySelectorAll('.branch-item').forEach((button) => button.classList.remove('active')); item.classList.add('active'); })); }
+        function hideSuggestions() { suggestions.classList.remove('visible'); suggestions.innerHTML = ''; }
+        function showSuggestions(items) { suggestions.innerHTML = items.map((item, index) => `<button class="suggestion" type="button" data-index="${index}" role="option"><i class="bi bi-geo-alt me-2"></i>${item.display_name}</button>`).join(''); suggestions.classList.toggle('visible', items.length > 0); suggestions.querySelectorAll('.suggestion').forEach((item) => item.addEventListener('click', () => { const place = items[Number(item.dataset.index)]; searchInput.value = place.display_name; hideSuggestions(); searchHelp.textContent = 'Punto de inicio seleccionado.'; setStart(Number(place.lat), Number(place.lon), place.display_name); })); }
+        async function searchPlaces(query) { if (query.length < 3) { hideSuggestions(); searchHelp.textContent = 'Escribe al menos 3 caracteres para buscar.'; return; } searchHelp.textContent = 'Buscando lugares...'; try { const response = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&addressdetails=1&q=${encodeURIComponent(query)}`, { headers: { Accept: 'application/json' } }); const results = await response.json(); showSuggestions(results); searchHelp.textContent = results.length ? 'Selecciona un lugar para usarlo como inicio.' : 'No encontramos coincidencias.'; } catch (error) { searchHelp.textContent = 'No se pudo cargar la búsqueda. Intenta de nuevo.'; } }
+        fetch('../data/sucursales.json').then((response) => response.json()).then((items) => { branches = items; locations = [destination, ...items]; items.forEach((branch) => L.marker([branch.lat, branch.lng], { icon: gymIcon }).addTo(map).bindPopup(`<strong>${branch.nombre}</strong><br>${branch.direccion}`)); showBranches(locations); }).catch(() => { showBranches([destination]); });
+        document.getElementById('fitBtn').addEventListener('click', () => map.fitBounds(L.latLngBounds(locations.map((location) => [location.lat, location.lng])), { padding: [30, 30] }));
+        locateBtn.addEventListener('click', () => { if (!navigator.geolocation) { searchHelp.textContent = 'Tu navegador no permite obtener la ubicación.'; return; } locateBtn.disabled = true; locateBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>Buscando...'; searchHelp.textContent = 'Solicitando tu ubicación...'; navigator.geolocation.getCurrentPosition((position) => { setStart(position.coords.latitude, position.coords.longitude, 'Tu ubicación actual'); locateBtn.disabled = false; locateBtn.innerHTML = '<i class="bi bi-check-circle me-1"></i>Ubicación lista'; searchHelp.textContent = 'Tu ubicación se marcó como punto de inicio.'; }, () => { locateBtn.disabled = false; locateBtn.innerHTML = '<i class="bi bi-crosshair me-1"></i>Mi ubicación'; searchHelp.textContent = 'No pudimos obtenerla. Revisa el permiso del navegador.'; }); });
+        searchInput.addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => searchPlaces(searchInput.value.trim()), 350); });
+        searchInput.addEventListener('keydown', (event) => { if (event.key === 'Escape') hideSuggestions(); });
+        document.getElementById('clearSearch').addEventListener('click', () => { searchInput.value = ''; hideSuggestions(); searchHelp.textContent = 'Escribe para ver sugerencias de lugares.'; routeStatus.classList.add('d-none'); searchInput.focus(); if (startMarker) { map.removeLayer(startMarker); startMarker = null; } if (routeLine) { map.removeLayer(routeLine); routeLine = null; } currentStart = null; routeBtn.href = 'https://maps.app.goo.gl/M6CXb564vbWYVKgv8'; map.setView([destination.lat, destination.lng], 13); });
+        routeBtn.addEventListener('click', (event) => { if (!currentStart) { event.preventDefault(); searchHelp.textContent = 'Elige un punto de inicio para generar la ruta.'; searchInput.focus(); } });
+        document.addEventListener('click', (event) => { if (!event.target.closest('.search-wrap')) hideSuggestions(); });
+    </script>
+</body>
+</html>
