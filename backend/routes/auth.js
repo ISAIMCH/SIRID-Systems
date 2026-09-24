@@ -18,6 +18,8 @@ const transporter = nodemailer.createTransport({
     }
 });
 
+const verificationSender = process.env.EMAIL_FROM || 'onboarding@resend.dev';
+
 // Cliente de Google
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -43,6 +45,7 @@ const isValidBirthDate = (value) => {
 // 1. REGISTRO (CON DOBLE OPT-IN)
 // ==========================================
 router.post('/register', async (req, res) => {
+    let createdUser;
     try {
         const { nombre, apellidos, fechaNacimiento, email, password } = req.body;
 
@@ -78,7 +81,7 @@ router.post('/register', async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, salt);
         const tokenVerificacion = crypto.randomBytes(32).toString('hex');
 
-        user = new User({
+        createdUser = new User({
             nombre,
             apellidos,
             fechaNacimiento,
@@ -88,12 +91,12 @@ router.post('/register', async (req, res) => {
             tokenVerificacion
         });
 
-        await user.save();
+        await createdUser.save();
 
-        const urlVerificacion = `https://sirid-systems.onrender.com/api/auth/verificar/${tokenVerificacion}`;
+        const urlVerificacion = `${process.env.API_PUBLIC_URL || 'https://sirid-systems.onrender.com'}/api/auth/verificar/${tokenVerificacion}`;
         
         await transporter.sendMail({
-            from: '"Project-GymGo" <onboarding@projectgymgo.com>',
+            from: `"Project-GymGo" <${verificationSender}>`,
             to: normalizedEmail,
             subject: 'Activa tu cuenta | Project-GymGo',
             html: `<h2>Hola ${nombre},</h2>
@@ -103,8 +106,13 @@ router.post('/register', async (req, res) => {
 
         res.status(201).json({ msg: 'Usuario registrado. Revisa tu correo para verificar la cuenta.' });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ msg: 'Error en el servidor al registrar' });
+        if (createdUser?._id) {
+            await User.deleteOne({ _id: createdUser._id }).catch((cleanupError) => {
+                console.error('No se pudo limpiar el registro incompleto:', cleanupError.message);
+            });
+        }
+        console.error('Error en registro:', err.message);
+        res.status(503).json({ msg: 'No se pudo enviar el correo de verificación. Inténtalo de nuevo más tarde.' });
     }
 });
 
@@ -135,7 +143,7 @@ router.get('/verificar/:token', async (req, res) => {
 router.post('/login', async (req, res) => {
     try {
         const { email, password } = req.body;
-        const user = await User.findOne({ email: email.toLowerCase() });
+        const user = await User.findOne({ email: email.trim().toLowerCase() });
         
         if (!user) return res.status(400).json({ msg: 'Usuario no encontrado' });
         if (!user.verificado) return res.status(403).json({ msg: 'Verifica tu correo electrónico para ingresar.' });
@@ -169,16 +177,20 @@ router.post('/google', async (req, res) => {
         const payload = ticket.getPayload();
         
         // Buscar si ya existe en nuestra BD
-        let user = await User.findOne({ email: payload.email });
+        const normalizedEmail = payload.email.trim().toLowerCase();
+        let user = await User.findOne({ email: normalizedEmail });
         
         if (!user) {
             // Si no existe, lo registramos automáticamente ya verificado
             user = new User({
                 nombre: payload.given_name,
                 apellidos: payload.family_name || '',
-                email: payload.email,
+                email: normalizedEmail,
                 verificado: true // Google ya validó su correo
             });
+            await user.save();
+        } else if (!user.verificado) {
+            user.verificado = true;
             await user.save();
         }
 

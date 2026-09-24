@@ -38,3 +38,24 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 });
+
+async function handleGoogleCredential(response) {
+    try {
+        const result = await fetch('https://sirid-systems.onrender.com/api/auth/google', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ credential: response.credential })
+        });
+        const data = await result.json();
+
+        if (!result.ok) throw new Error(data.msg || 'No se pudo iniciar sesión con Google.');
+
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('userName', data.user.nombre);
+        localStorage.setItem('userData', JSON.stringify(data.user));
+        window.location.href = '../index.html';
+    } catch (error) {
+        console.error('Error de autenticación con Google:', error);
+        alert(error.message || 'No se pudo iniciar sesión con Google.');
+    }
+}

@@ -52,6 +52,15 @@
 
                     <!-- Botón Ingresar -->
                     <button type="submit" class="btn btn-premium w-100 mb-4">Iniciar sesión</button>
+
+                    <div class="text-center mb-4">
+                        <div id="g_id_onload"
+                            data-client_id="342051956504-6lhed41n2j0g8740nmg4j51fcmsurelp.apps.googleusercontent.com"
+                            data-callback="handleGoogleCredential"
+                            data-auto_prompt="false">
+                        </div>
+                        <div class="g_id_signin" data-type="standard" data-size="large" data-width="320"></div>
+                    </div>
                     
                     <!-- Redirección a Registro -->
                     <div class="text-center border-top pt-4">
@@ -69,6 +78,7 @@
     
     <!-- Script de conexión al backend para enviar credenciales -->
     <script src="../assets/js/login.js"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
 
 </body>
 </html>
