@@ -7,18 +7,26 @@ const { OAuth2Client } = require('google-auth-library');
 const User = require('../models/User');
 const router = express.Router();
 
-// Configuración de Resend / SendGrid
+const verificationSender = process.env.EMAIL_USER || 'project.gymgo@gmail.com';
 const transporter = nodemailer.createTransport({
-    host: 'smtp.resend.com',
-    port: 465,
-    secure: true,
+    service: 'gmail',
     auth: {
-        user: 'resend',
-        pass: process.env.EMAIL_API_KEY
+        user: verificationSender,
+        pass: process.env.GMAIL_APP_PASSWORD
     }
 });
 
-const verificationSender = process.env.EMAIL_FROM || 'onboarding@resend.dev';
+async function sendVerificationEmail({ recipient, name, verificationUrl }) {
+    await transporter.sendMail({
+        from: `Project-GymGo <${verificationSender}>`,
+        to: recipient,
+        replyTo: process.env.EMAIL_REPLY_TO || verificationSender,
+        subject: 'Activa tu cuenta | Project-GymGo',
+        html: `<h2>Hola ${name},</h2>
+               <p>Por favor verifica tu correo haciendo clic en el siguiente enlace:</p>
+               <a href="${verificationUrl}">Activar mi cuenta</a>`
+    });
+}
 
 // Cliente de Google
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
@@ -95,13 +103,10 @@ router.post('/register', async (req, res) => {
 
         const urlVerificacion = `${process.env.API_PUBLIC_URL || 'https://sirid-systems.onrender.com'}/api/auth/verificar/${tokenVerificacion}`;
         
-        await transporter.sendMail({
-            from: `"Project-GymGo" <${verificationSender}>`,
-            to: normalizedEmail,
-            subject: 'Activa tu cuenta | Project-GymGo',
-            html: `<h2>Hola ${nombre},</h2>
-                   <p>Por favor verifica tu correo haciendo clic en el siguiente enlace:</p>
-                   <a href="${urlVerificacion}">Activar mi cuenta</a>`
+        await sendVerificationEmail({
+            recipient: normalizedEmail,
+            name: nombre,
+            verificationUrl: urlVerificacion
         });
 
         res.status(201).json({ msg: 'Usuario registrado. Revisa tu correo para verificar la cuenta.' });
