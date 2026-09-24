@@ -122,7 +122,8 @@ router.get('/verificar/:token', async (req, res) => {
         user.tokenVerificacion = undefined;
         await user.save();
 
-        res.redirect('http://127.0.0.1:5500/pages/login.html?verificado=true');
+        // CORRECCIÓN: Apuntando al Frontend público de Render en lugar de localhost
+        res.redirect('https://sirid-systems-1.onrender.com/pages/login.html?verificado=true');
     } catch (error) {
         res.status(500).send('Error al verificar la cuenta.');
     }
