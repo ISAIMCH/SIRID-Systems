@@ -7,6 +7,20 @@ const { OAuth2Client } = require('google-auth-library');
 const User = require('../models/User');
 const router = express.Router();
 
+function authenticateToken(req, res, next) {
+    const authorization = req.headers.authorization || '';
+    const token = authorization.startsWith('Bearer ') ? authorization.slice(7) : null;
+
+    if (!token) return res.status(401).json({ msg: 'Sesión no válida.' });
+
+    try {
+        req.userId = jwt.verify(token, process.env.JWT_SECRET).id;
+        next();
+    } catch (error) {
+        return res.status(401).json({ msg: 'Tu sesión expiró. Inicia sesión nuevamente.' });
+    }
+}
+
 const verificationSender = process.env.EMAIL_USER || 'project.gymgo@gmail.com';
 const transporter = nodemailer.createTransport({
     service: 'gmail',
@@ -206,6 +220,48 @@ router.post('/google', async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(401).json({ msg: 'Token de Google inválido' });
+    }
+});
+
+router.get('/me', authenticateToken, async (req, res) => {
+    try {
+        const user = await User.findById(req.userId).select('-password -tokenVerificacion');
+        if (!user) return res.status(404).json({ msg: 'Usuario no encontrado.' });
+        res.json({ user });
+    } catch (error) {
+        res.status(500).json({ msg: 'No se pudo cargar tu perfil.' });
+    }
+});
+
+router.patch('/me', authenticateToken, async (req, res) => {
+    try {
+        const { nombre, apellidos, fechaNacimiento, currentPassword, newPassword } = req.body;
+        const user = await User.findById(req.userId);
+        if (!user) return res.status(404).json({ msg: 'Usuario no encontrado.' });
+
+        if (nombre !== undefined) {
+            if (typeof nombre !== 'string' || nombre.trim().length < 2) return res.status(400).json({ msg: 'Escribe un nombre válido.' });
+            user.nombre = nombre.trim();
+        }
+        if (apellidos !== undefined) {
+            if (typeof apellidos !== 'string' || apellidos.trim().length < 2) return res.status(400).json({ msg: 'Escribe apellidos válidos.' });
+            user.apellidos = apellidos.trim();
+        }
+        if (fechaNacimiento !== undefined) {
+            if (!isValidBirthDate(fechaNacimiento)) return res.status(400).json({ msg: 'La fecha de nacimiento no es válida.' });
+            user.fechaNacimiento = fechaNacimiento;
+        }
+        if (newPassword !== undefined && newPassword !== '') {
+            if (!user.password) return res.status(400).json({ msg: 'Esta cuenta usa Google para iniciar sesión.' });
+            if (typeof currentPassword !== 'string' || !(await bcrypt.compare(currentPassword, user.password))) return res.status(400).json({ msg: 'La contraseña actual no es correcta.' });
+            if (newPassword.length < 8 || newPassword.length > 64) return res.status(400).json({ msg: 'La nueva contraseña debe tener entre 8 y 64 caracteres.' });
+            user.password = await bcrypt.hash(newPassword, await bcrypt.genSalt(10));
+        }
+
+        await user.save();
+        res.json({ msg: 'Perfil actualizado correctamente.', user: { id: user._id, nombre: user.nombre, apellidos: user.apellidos, email: user.email, fechaNacimiento: user.fechaNacimiento, verificado: user.verificado } });
+    } catch (error) {
+        res.status(500).json({ msg: 'No se pudo actualizar tu perfil.' });
     }
 });
 

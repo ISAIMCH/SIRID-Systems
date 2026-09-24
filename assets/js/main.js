@@ -114,8 +114,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 <ul class="dropdown-menu dropdown-menu-end border-0 shadow-sm mt-3 rounded-4 p-2">
                     <li><h6 class="dropdown-header text-secondary">Mi Cuenta</h6></li>
-                    <li><a class="dropdown-item py-2 rounded" href="#"><i class="bi bi-person me-2 text-muted"></i>Mi perfil</a></li>
-                    <li><a class="dropdown-item py-2 rounded" href="#"><i class="bi bi-card-text me-2 text-muted"></i>Mis datos</a></li>
+                    <li><a class="dropdown-item py-2 rounded" href="pages/perfil.html"><i class="bi bi-person me-2 text-muted"></i>Mi perfil</a></li>
                     <li><hr class="dropdown-divider my-2"></li>
                     <li>
                         <a class="dropdown-item py-2 rounded text-danger fw-medium" href="#" id="logoutBtn">
