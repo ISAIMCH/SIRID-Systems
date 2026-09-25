@@ -42,6 +42,20 @@ async function sendVerificationEmail({ recipient, name, verificationUrl }) {
     });
 }
 
+async function sendPasswordResetEmail({ recipient, name, resetUrl }) {
+    await transporter.sendMail({
+        from: `Project-GymGo <${verificationSender}>`,
+        to: recipient,
+        replyTo: process.env.EMAIL_REPLY_TO || verificationSender,
+        subject: 'Restablece tu contraseña | Project-GymGo',
+        html: `<h2>Hola ${name},</h2>
+               <p>Recibimos una solicitud para cambiar la contraseña de tu cuenta.</p>
+               <p>Este enlace es válido durante 30 minutos y solo puede usarse una vez:</p>
+               <a href="${resetUrl}">Restablecer contraseña</a>
+               <p>Si no solicitaste este cambio, puedes ignorar este correo.</p>`
+    });
+}
+
 // Cliente de Google
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -178,6 +192,56 @@ router.post('/login', async (req, res) => {
         res.json({ token, user: { id: user._id, email: user.email, nombre: user.nombre, apellidos: user.apellidos } });
     } catch (err) {
         res.status(500).json({ msg: 'Error en el servidor' });
+    }
+});
+
+router.post('/forgot-password', async (req, res) => {
+    const genericMessage = 'Si el correo está registrado, recibirás un enlace para restablecer tu contraseña.';
+    try {
+        const email = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+        if (!EMAIL_PATTERN.test(email)) return res.status(200).json({ msg: genericMessage });
+
+        const user = await User.findOne({ email });
+        if (!user || !user.password) return res.status(200).json({ msg: genericMessage });
+
+        const rawToken = crypto.randomBytes(32).toString('hex');
+        user.passwordResetToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+        user.passwordResetExpires = new Date(Date.now() + 30 * 60 * 1000);
+        await user.save();
+
+        const resetUrl = `${process.env.FRONTEND_PUBLIC_URL || 'https://sirid-systems-1.onrender.com'}/pages/reset-password.html?token=${rawToken}`;
+        await sendPasswordResetEmail({ recipient: user.email, name: user.nombre, resetUrl });
+        return res.status(200).json({ msg: genericMessage });
+    } catch (error) {
+        console.error('Error solicitando restablecimiento:', error.message);
+        return res.status(200).json({ msg: genericMessage });
+    }
+});
+
+router.post('/reset-password', async (req, res) => {
+    try {
+        const { token, password } = req.body;
+        if (typeof token !== 'string' || typeof password !== 'string' || password.length < 8 || password.length > 64) {
+            return res.status(400).json({ msg: 'El enlace o la nueva contraseña no son válidos.' });
+        }
+
+        const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+        const user = await User.findOne({ passwordResetToken: hashedToken, passwordResetExpires: { $gt: new Date() } });
+        if (!user) return res.status(400).json({ msg: 'El enlace es inválido o ya expiró.' });
+
+        const normalizedPassword = normalizeText(password);
+        const personalData = [user.nombre, user.apellidos, user.email].map(normalizeText).filter(Boolean);
+        if (COMMON_PASSWORDS.has(normalizedPassword) || personalData.some((value) => value.length > 3 && value === normalizedPassword)) {
+            return res.status(400).json({ msg: 'La contraseña es común o coincide con tus datos personales.' });
+        }
+
+        user.password = await bcrypt.hash(password, await bcrypt.genSalt(10));
+        user.passwordResetToken = undefined;
+        user.passwordResetExpires = undefined;
+        await user.save();
+        res.json({ msg: 'Contraseña actualizada. Ya puedes iniciar sesión.' });
+    } catch (error) {
+        res.status(500).json({ msg: 'No se pudo actualizar la contraseña.' });
     }
 });
 

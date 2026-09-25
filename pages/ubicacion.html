@@ -41,6 +41,7 @@
         #locationMap { height: 100%; min-height: 520px; width: 100%; }
         .map-badge { position: absolute; top: 16px; left: 16px; z-index: 400; padding: 9px 12px; border-radius: 999px; background: rgba(255,255,255,.92); box-shadow: 0 5px 20px rgba(0,0,0,.14); font-size: .72rem; font-weight: 700; }
         .map-badge i { color: var(--blue); margin-right: 5px; }
+        .map-shortcuts { position: absolute; right: 16px; top: 16px; z-index: 400; padding: 8px 10px; border-radius: 10px; background: rgba(255,255,255,.92); color: #69736c; box-shadow: 0 5px 20px rgba(0,0,0,.12); font-size: .68rem; }
         .gym-pin { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); background: var(--ink); color: var(--lime); border: 3px solid #fff; box-shadow: 0 4px 12px rgba(0,0,0,.28); }
         .gym-pin i { transform: rotate(45deg); font-size: 16px; }
         .start-pin { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: var(--blue); color: #fff; border: 3px solid #fff; box-shadow: 0 3px 10px rgba(0,0,0,.3); }
@@ -58,7 +59,7 @@
             <p id="routeStatus" class="route-status d-none" aria-live="polite"></p>
             <a id="routeBtn" class="route-btn" href="https://maps.app.goo.gl/M6CXb564vbWYVKgv8" target="_blank" rel="noopener"><i class="bi bi-sign-turn-right-fill me-1"></i>Cómo llegar al destino</a>
         </aside>
-        <section class="map-shell"><div class="map-badge"><i class="bi bi-barbell"></i>Destino GymGo</div><div id="locationMap"></div></section>
+        <section class="map-shell"><div class="map-badge"><i class="bi bi-barbell"></i>Destino GymGo</div><div class="map-shortcuts"><i class="bi bi-keyboard me-1"></i>Ctrl + / Ctrl - para zoom</div><div id="locationMap" tabindex="0" aria-label="Mapa interactivo"></div></section>
     </main>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
     <script>
@@ -117,6 +118,7 @@
         searchInput.addEventListener('keydown', (event) => { if (event.key === 'Escape') hideSuggestions(); });
         document.getElementById('clearSearch').addEventListener('click', () => { searchInput.value = ''; hideSuggestions(); searchHelp.textContent = 'Escribe para ver sugerencias de lugares.'; routeStatus.classList.add('d-none'); searchInput.focus(); if (startMarker) { map.removeLayer(startMarker); startMarker = null; } if (routeLine) { map.removeLayer(routeLine); routeLine = null; } currentStart = null; routeBtn.href = 'https://maps.app.goo.gl/M6CXb564vbWYVKgv8'; map.setView([destination.lat, destination.lng], 13); });
         routeBtn.addEventListener('click', (event) => { if (!currentStart) { event.preventDefault(); searchHelp.textContent = 'Elige un punto de inicio para generar la ruta.'; searchInput.focus(); } });
+        document.addEventListener('keydown', (event) => { if (!event.ctrlKey || event.altKey || event.metaKey) return; if (event.key === '+' || event.key === '=') { event.preventDefault(); map.zoomIn(); } if (event.key === '-' || event.key === '_') { event.preventDefault(); map.zoomOut(); } });
         document.addEventListener('click', (event) => { if (!event.target.closest('.search-wrap')) hideSuggestions(); });
     </script>
 </body>
