@@ -1,4 +1,18 @@
 document.addEventListener('DOMContentLoaded', () => {
+    const animatedElements = document.querySelectorAll('.fade-in-up');
+    if ('IntersectionObserver' in window) {
+        const observer = new IntersectionObserver((entries, currentObserver) => {
+            entries.forEach((entry) => {
+                if (!entry.isIntersecting) return;
+                entry.target.classList.add('is-visible');
+                currentObserver.unobserve(entry.target);
+            });
+        }, { threshold: 0.16 });
+        animatedElements.forEach((element) => observer.observe(element));
+    } else {
+        animatedElements.forEach((element) => element.classList.add('is-visible'));
+    }
+
   document.querySelectorAll('form[data-validate]').forEach((form) => {
     form.addEventListener('submit', (event) => {
       if (!form.checkValidity()) { event.preventDefault(); event.stopPropagation(); }
@@ -73,6 +87,8 @@ function getCookie(nombre) {
 document.addEventListener('DOMContentLoaded', () => {
     const banner = document.getElementById('cookieBanner');
 
+    if (!banner) return;
+
     if (!getCookie('cookiesAceptadas')) {
         banner.style.display = 'block';
     }
@@ -87,6 +103,18 @@ document.addEventListener('DOMContentLoaded', () => {
         alert('Aquí iría tu panel de configuración de cookies.');
     });
 });
+
+function enviarWhatsApp() {
+    const nombre = document.getElementById('user_name')?.value.trim();
+    const correo = document.getElementById('user_email')?.value.trim();
+    const mensaje = document.getElementById('message')?.value.trim();
+    if (!nombre || !mensaje) {
+        alert('Por favor, ingresa tu nombre y mensaje antes de enviar por WhatsApp.');
+        return;
+    }
+    const texto = `Hola equipo GymGo, soy ${nombre} (${correo}). ${mensaje}`;
+    window.open(`https://wa.me/527721050282?text=${encodeURIComponent(texto)}`, '_blank', 'noopener');
+}
 
 
     // ==========================================

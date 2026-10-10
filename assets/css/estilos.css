@@ -36,10 +36,14 @@ body { background: var(--gymgo-bg); color: var(--gymgo-text); font-family: 'Spli
 .nav-link:hover { color: var(--gymgo-neon) !important; }
 .btn-demo, .btn-demo-lg { background: var(--gymgo-neon); color: #071007; border-radius: 14px; font-weight: 900; border: 0; box-shadow: 0 8px 24px rgba(155,255,99,.18); transition: transform .25s cubic-bezier(.2,.8,.2,1), box-shadow .25s ease, background .25s ease; }
 .btn-demo:hover, .btn-demo-lg:hover { color: #071007; background: #b5ff8a; transform: translateY(-3px) scale(1.02); box-shadow: 0 14px 32px rgba(155,255,99,.28); }
+.whatsapp-cta { animation: whatsapp-pulse 3s ease-in-out infinite; }
+@keyframes whatsapp-pulse { 0%, 100% { box-shadow: 0 8px 24px rgba(155,255,99,.18); } 50% { box-shadow: 0 8px 34px rgba(155,255,99,.42); } }
 .btn-outline-premium { border: 1px solid rgba(244,248,245,.26); color: var(--gymgo-text); border-radius: 14px; transition: transform .25s cubic-bezier(.2,.8,.2,1), background .25s ease, border-color .25s ease; }
 .btn-outline-premium:hover { background: rgba(155,255,99,.1); border-color: var(--gymgo-neon); color: var(--gymgo-neon); transform: translateY(-3px); }
 .hero-slider, .carousel-item { height: min(860px, 100vh); min-height: 680px; }
-.carousel-item { background-image: radial-gradient(circle at 78% 35%, rgba(155,255,99,.16), transparent 22%), radial-gradient(circle at 16% 75%, rgba(85,214,208,.1), transparent 26%), linear-gradient(135deg, #080B09 0%, #111815 100%) !important; }
+.carousel-item { background-image: linear-gradient(90deg, rgba(8,11,9,.92) 0%, rgba(8,11,9,.62) 46%, rgba(8,11,9,.24) 100%), url('https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=85&w=2200&auto=format&fit=crop') !important; }
+.carousel-item:nth-child(2) { background-image: linear-gradient(90deg, rgba(8,11,9,.92) 0%, rgba(8,11,9,.62) 46%, rgba(8,11,9,.24) 100%), url('https://images.unsplash.com/photo-1517963879433-6ad2b056d1f1?q=85&w=2200&auto=format&fit=crop') !important; }
+.carousel-item:nth-child(3) { background-image: linear-gradient(90deg, rgba(8,11,9,.92) 0%, rgba(8,11,9,.62) 46%, rgba(8,11,9,.24) 100%), url('https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?q=85&w=2200&auto=format&fit=crop') !important; }
 .slider-overlay { background: linear-gradient(180deg, rgba(8,11,9,.18), rgba(8,11,9,.82)); }
 .slider-content { align-items: flex-start; text-align: left; max-width: 1180px; }
 .hero-kicker { color: var(--gymgo-neon); font-size: .7rem; font-weight: 900; letter-spacing: 2.5px; margin-bottom: 18px; }
@@ -64,6 +68,15 @@ body { background: var(--gymgo-bg); color: var(--gymgo-text); font-family: 'Spli
 footer { background: #050705 !important; }
 .cookie-banner { background: rgba(18,21,18,.94); border-top: 1px solid var(--gymgo-border); }
 .cookie-banner .btn-cookie-aceptar { background: var(--gymgo-neon); color: #071007; border-radius: 12px; }
+.fade-in-up { opacity: 0; transform: translateY(34px); transition: opacity .75s ease, transform .75s cubic-bezier(.2,.8,.2,1); }
+.fade-in-up.is-visible { opacity: 1; transform: translateY(0); }
+.fade-in-up:nth-child(2) { transition-delay: .1s; }
+.fade-in-up:nth-child(3) { transition-delay: .2s; }
+.fade-in-up:nth-child(4) { transition-delay: .3s; }
+#contactForm .form-control { background: rgba(13,16,14,.8); border: 1px solid var(--gymgo-border); border-radius: 12px; color: var(--gymgo-text); }
+#contactForm .form-control::placeholder { color: var(--gymgo-muted); }
+#contactForm .form-control:focus { background: rgba(13,16,14,.95); border-color: var(--gymgo-neon); box-shadow: 0 0 0 3px rgba(155,255,99,.12); color: var(--gymgo-text); }
+#contactForm #btn-correo { background: var(--gymgo-neon); border-color: var(--gymgo-neon); color: #071007; }
 @media (max-width: 720px) { .hero-slider, .carousel-item { min-height: 720px; } .slider-content { padding: 0 28px; } .hero-title { letter-spacing: -1px; } }
 
 /*    <!-- Estilos Premium (Estética Apple/Samsung) integrados a tus clases originales --> */
