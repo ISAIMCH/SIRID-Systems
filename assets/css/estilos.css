@@ -14,6 +14,58 @@ footer { background: white; }
 #map { min-height: 360px; }
 @media (max-width: 575px) { h1 { font-size: 3.6rem; } .metric-panel { box-shadow: 10px 10px 0 var(--lime); } }
 
+/* Landing GymGo: tokens shared with the mobile app. */
+:root {
+    --gymgo-bg: #080B09;
+    --gymgo-surface: #121512;
+    --gymgo-elevated: #18211D;
+    --gymgo-border: #27342E;
+    --gymgo-text: #F4F8F5;
+    --gymgo-muted: #888F8A;
+    --gymgo-neon: #9BFF63;
+    --gymgo-cyan: #55D6D0;
+}
+
+html { background: var(--gymgo-bg); }
+body { background: var(--gymgo-bg); color: var(--gymgo-text); font-family: 'Spline Sans', 'Inter', sans-serif; }
+.navbar-premium { background: rgba(8, 11, 9, .78) !important; border-bottom: 1px solid rgba(155, 255, 99, .12); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); }
+.navbar-brand, .nav-link { color: var(--gymgo-text) !important; }
+.gymgo-brand { display: inline-flex; align-items: center; gap: 10px; font-weight: 900; letter-spacing: 2px; }
+.gymgo-mark { display: inline-grid; width: 32px; height: 32px; place-items: center; border-radius: 10px; background: var(--gymgo-neon); color: #071007; font-weight: 900; letter-spacing: 0; }
+.nav-link { color: var(--gymgo-muted) !important; }
+.nav-link:hover { color: var(--gymgo-neon) !important; }
+.btn-demo, .btn-demo-lg { background: var(--gymgo-neon); color: #071007; border-radius: 14px; font-weight: 900; border: 0; box-shadow: 0 8px 24px rgba(155,255,99,.18); transition: transform .25s cubic-bezier(.2,.8,.2,1), box-shadow .25s ease, background .25s ease; }
+.btn-demo:hover, .btn-demo-lg:hover { color: #071007; background: #b5ff8a; transform: translateY(-3px) scale(1.02); box-shadow: 0 14px 32px rgba(155,255,99,.28); }
+.btn-outline-premium { border: 1px solid rgba(244,248,245,.26); color: var(--gymgo-text); border-radius: 14px; transition: transform .25s cubic-bezier(.2,.8,.2,1), background .25s ease, border-color .25s ease; }
+.btn-outline-premium:hover { background: rgba(155,255,99,.1); border-color: var(--gymgo-neon); color: var(--gymgo-neon); transform: translateY(-3px); }
+.hero-slider, .carousel-item { height: min(860px, 100vh); min-height: 680px; }
+.carousel-item { background-image: radial-gradient(circle at 78% 35%, rgba(155,255,99,.16), transparent 22%), radial-gradient(circle at 16% 75%, rgba(85,214,208,.1), transparent 26%), linear-gradient(135deg, #080B09 0%, #111815 100%) !important; }
+.slider-overlay { background: linear-gradient(180deg, rgba(8,11,9,.18), rgba(8,11,9,.82)); }
+.slider-content { align-items: flex-start; text-align: left; max-width: 1180px; }
+.hero-kicker { color: var(--gymgo-neon); font-size: .7rem; font-weight: 900; letter-spacing: 2.5px; margin-bottom: 18px; }
+.hero-title { max-width: 850px; color: var(--gymgo-text); font-size: clamp(3.2rem, 7vw, 6.4rem); line-height: .97; letter-spacing: -2px; text-shadow: none; }
+.hero-subtitle { max-width: 650px; color: #B8C5B9; font-size: clamp(1rem, 2vw, 1.25rem); line-height: 1.6; text-shadow: none; }
+.carousel-indicators [data-bs-target] { background: rgba(155,255,99,.3); }
+.carousel-indicators .active { background: var(--gymgo-neon); }
+#quienes-somos, #beneficios, #precios, #ubicacion { background: var(--gymgo-bg) !important; color: var(--gymgo-text); border-color: var(--gymgo-border) !important; }
+#quienes-somos h2, #quienes-somos h4, #quienes-somos h5, #beneficios h2, #beneficios h4, #precios h2, #precios h3 { color: var(--gymgo-text) !important; }
+#quienes-somos .text-muted, #beneficios .text-muted, #precios .text-muted { color: var(--gymgo-muted) !important; }
+#quienes-somos .bg-dark, #beneficios .bg-dark { background: var(--gymgo-elevated) !important; color: var(--gymgo-neon) !important; border: 1px solid var(--gymgo-border); }
+#quienes-somos .rounded-circle { box-shadow: 0 0 24px rgba(155,255,99,.1); }
+#beneficios .row > div > div:last-child { text-align: left; }
+#beneficios .row > div { padding: 22px; border: 1px solid var(--gymgo-border); border-radius: 20px; background: rgba(18,21,18,.72); transition: transform .25s ease, border-color .25s ease; }
+#beneficios .row > div:hover { transform: translateY(-5px); border-color: rgba(155,255,99,.45); }
+.pricing-card { background: rgba(18,21,18,.82); border: 1px solid var(--gymgo-border); border-radius: 20px; box-shadow: none; color: var(--gymgo-text); }
+.pricing-card.destacado { border: 1px solid var(--gymgo-neon); box-shadow: 0 0 36px rgba(155,255,99,.1); }
+.pricing-card .text-muted, .pricing-card .feature-list li { color: var(--gymgo-muted) !important; }
+.feature-list li::before { color: var(--gymgo-neon); }
+.btn-buy { background: var(--gymgo-neon); color: #071007; border-radius: 14px; }
+.location-frame { border: 1px solid var(--gymgo-border); box-shadow: none; }
+footer { background: #050705 !important; }
+.cookie-banner { background: rgba(18,21,18,.94); border-top: 1px solid var(--gymgo-border); }
+.cookie-banner .btn-cookie-aceptar { background: var(--gymgo-neon); color: #071007; border-radius: 12px; }
+@media (max-width: 720px) { .hero-slider, .carousel-item { min-height: 720px; } .slider-content { padding: 0 28px; } .hero-title { letter-spacing: -1px; } }
+
 /*    <!-- Estilos Premium (Estética Apple/Samsung) integrados a tus clases originales --> */
 
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
