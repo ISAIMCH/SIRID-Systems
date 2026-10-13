@@ -114,6 +114,39 @@ export function deletePlan(id: string) {
   })
 }
 
+export function getPayments<T = unknown[]>() {
+  return apiClient<T>('/payments')
+}
+
+export function createPayment(paymentData: PaymentPayload) {
+  return apiClient('/payments', {
+    method: 'POST',
+    body: JSON.stringify(paymentData),
+  })
+}
+
+export function updatePayment(id: string, paymentData: PaymentPayload) {
+  return apiClient(`/payments/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(paymentData),
+  })
+}
+
+export function deletePayment(id: string) {
+  return apiClient(`/payments/${id}`, {
+    method: 'DELETE',
+  })
+}
+
+export interface PaymentPayload {
+  userId: string
+  planId: string
+  amount: number
+  paymentMethod: string
+  paymentDate: string
+  status: string
+}
+
 export function getProducts<T = unknown[]>() {
   return apiClient<T>('/products')
 }
