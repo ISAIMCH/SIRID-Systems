@@ -8,28 +8,15 @@ import {
   getUsers,
   updatePayment,
 } from '../services/api'
-import type { PaymentPayload } from '../services/api'
+import type { Payment, PaymentPayload, PaymentRelation } from '../services/api'
 import type { Plan, User } from '../types'
-
-interface Payment {
-  id?: string
-  _id?: string
-  user?: User | string
-  userId?: User | string
-  plan?: Plan | string
-  planId?: Plan | string
-  amount: number | string
-  paymentMethod: string
-  paymentDate: string
-  status: string
-}
 
 interface PaymentFormState {
   userId: string
   planId: string
   amount: string
-  paymentMethod: string
-  paymentDate: string
+  source: string
+  createdAt: string
   status: string
 }
 
@@ -37,8 +24,8 @@ const emptyForm: PaymentFormState = {
   userId: '',
   planId: '',
   amount: '',
-  paymentMethod: 'Tarjeta',
-  paymentDate: new Date().toISOString().slice(0, 10),
+  source: 'reception',
+  createdAt: new Date().toISOString().slice(0, 10),
   status: 'Completed',
 }
 
@@ -59,24 +46,29 @@ function getRecordId(record: { id?: string; _id?: string }) {
   return record.id || record._id || ''
 }
 
-function getRelatedName(value: User | Plan | string | undefined) {
-  if (!value) return 'Sin asignar'
+function getRelationId(value: PaymentRelation | string | undefined) {
   if (typeof value === 'string') return value
-  return value.name || value.nombre || value.email || 'Sin nombre'
+  return value ? getRecordId(value) : ''
 }
 
 function getPaymentUserId(payment: Payment) {
-  if (typeof payment.userId === 'string') return payment.userId
-  if (payment.userId) return getRecordId(payment.userId)
-  if (payment.user && typeof payment.user !== 'string') return getRecordId(payment.user)
-  return ''
+  return getRelationId(payment.userId || payment.user)
 }
 
-function getPaymentPlanId(payment: Payment) {
-  if (typeof payment.planId === 'string') return payment.planId
-  if (payment.planId) return getRecordId(payment.planId)
-  if (payment.plan && typeof payment.plan !== 'string') return getRecordId(payment.plan)
-  return ''
+function getPaymentPlanName(payment: Payment) {
+  if (payment.planName) return payment.planName
+  if (typeof payment.plan === 'string') return payment.plan
+  return payment.plan?.name || payment.plan?.nombre || ''
+}
+
+function formatSource(source: string | undefined) {
+  switch (source?.toLowerCase()) {
+    case 'reception': return 'Recepción'
+    case 'cash': return 'Efectivo'
+    case 'card': return 'Tarjeta'
+    case 'transfer': return 'Transferencia'
+    default: return source || 'Sin método'
+  }
 }
 
 function statusClasses(status: string) {
@@ -153,13 +145,18 @@ function Payments() {
   }
 
   function openEditModal(payment: Payment) {
+    const planName = getPaymentPlanName(payment)
+    const matchingPlan = plans.find((plan) =>
+      getRecordId(plan) === getRelationId(payment.plan)
+      || (plan.name || plan.nombre) === planName,
+    )
     setEditingPayment(payment)
     setForm({
       userId: getPaymentUserId(payment),
-      planId: getPaymentPlanId(payment),
+      planId: matchingPlan ? getRecordId(matchingPlan) : '',
       amount: String(payment.amount ?? ''),
-      paymentMethod: payment.paymentMethod || 'Tarjeta',
-      paymentDate: payment.paymentDate ? new Date(payment.paymentDate).toISOString().slice(0, 10) : '',
+      source: payment.source || 'reception',
+      createdAt: payment.createdAt ? new Date(payment.createdAt).toISOString().slice(0, 10) : '',
       status: payment.status || 'Pending',
     })
     setModalError(null)
@@ -180,12 +177,15 @@ function Payments() {
     setIsSubmitting(true)
 
     try {
+      const selectedPlan = plans.find((plan) => getRecordId(plan) === form.planId)
+      if (!selectedPlan) throw new Error('Selecciona un plan válido.')
+
       const payload: PaymentPayload = {
         userId: form.userId,
-        planId: form.planId,
+        planName: selectedPlan.name || selectedPlan.nombre || '',
         amount: Number(form.amount),
-        paymentMethod: form.paymentMethod,
-        paymentDate: form.paymentDate,
+        source: form.source,
+        createdAt: form.createdAt,
         status: form.status,
       }
       const paymentId = editingPayment ? getRecordId(editingPayment) : ''
@@ -278,23 +278,36 @@ function Payments() {
               <tbody className="divide-y divide-slate-100 text-slate-700">
                 {payments.length > 0 ? payments.map((payment, index) => {
                   const paymentId = getRecordId(payment) || `payment-${index}`
-                  const user = payment.user || payment.userId
-                  const plan = payment.plan || payment.planId
+                  const user = payment.userId || payment.user
+                  const userId = getRelationId(user)
+                  const populatedUserName = typeof user === 'object' ? user.name || user.nombre : undefined
+                  const userName = populatedUserName
+                    || users.find((candidate) => getRecordId(candidate) === userId)?.name
+                    || 'Sin asignar'
+                  const planName = getPaymentPlanName(payment)
+                  const resolvedPlanName = plans.find((candidate) =>
+                    getRecordId(candidate) === getRelationId(payment.plan)
+                    || (candidate.name || candidate.nombre) === planName,
+                  )?.name || plans.find((candidate) =>
+                    (candidate.name || candidate.nombre) === planName,
+                  )?.nombre
                   const status = payment.status || 'Sin estado'
 
                   return (
                     <tr className="transition-colors hover:bg-slate-50" key={paymentId}>
                       <td className="whitespace-nowrap px-6 py-4 font-medium text-slate-900">
-                        {getRelatedName(user)}
+                        {userName}
                       </td>
-                      <td className="whitespace-nowrap px-6 py-4 text-slate-500">{getRelatedName(plan)}</td>
+                      <td className="whitespace-nowrap px-6 py-4 text-slate-500">
+                        {resolvedPlanName || planName || 'Sin plan'}
+                      </td>
                       <td className="whitespace-nowrap px-6 py-4 text-slate-700">
                         {new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(Number(payment.amount) || 0)}
                       </td>
-                      <td className="whitespace-nowrap px-6 py-4 text-slate-500">{payment.paymentMethod || 'Sin método'}</td>
+                      <td className="whitespace-nowrap px-6 py-4 text-slate-500">{formatSource(payment.source)}</td>
                       <td className="whitespace-nowrap px-6 py-4 text-slate-500">
-                        {payment.paymentDate && !Number.isNaN(new Date(payment.paymentDate).getTime())
-                          ? new Intl.DateTimeFormat('es-MX').format(new Date(payment.paymentDate))
+                        {payment.createdAt && !Number.isNaN(new Date(payment.createdAt).getTime())
+                          ? new Intl.DateTimeFormat('es-MX').format(new Date(payment.createdAt))
                           : 'Sin fecha'}
                       </td>
                       <td className="px-6 py-4">
@@ -407,30 +420,31 @@ function Payments() {
                   />
                 </div>
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="payment-method">Método de pago</label>
+                  <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="payment-source">Método de pago</label>
                   <select
                     className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
-                    id="payment-method"
-                    value={form.paymentMethod}
-                    onChange={(event) => setForm({ ...form, paymentMethod: event.target.value })}
+                    id="payment-source"
+                    value={form.source}
+                    onChange={(event) => setForm({ ...form, source: event.target.value })}
                     required
                   >
-                    <option>Tarjeta</option>
-                    <option>Efectivo</option>
-                    <option>Transferencia</option>
+                    <option value="reception">Recepción</option>
+                    <option value="cash">Efectivo</option>
+                    <option value="card">Tarjeta</option>
+                    <option value="transfer">Transferencia</option>
                   </select>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="payment-date">Fecha</label>
+                  <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="payment-created-at">Fecha</label>
                   <input
                     className="w-full rounded-lg border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
-                    id="payment-date"
+                    id="payment-created-at"
                     type="date"
-                    value={form.paymentDate}
-                    onChange={(event) => setForm({ ...form, paymentDate: event.target.value })}
+                    value={form.createdAt}
+                    onChange={(event) => setForm({ ...form, createdAt: event.target.value })}
                     required
                   />
                 </div>

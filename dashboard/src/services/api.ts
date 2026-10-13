@@ -118,6 +118,26 @@ export function getPayments<T = unknown[]>() {
   return apiClient<T>('/payments')
 }
 
+export interface PaymentRelation {
+  id?: string
+  _id?: string
+  name?: string
+  nombre?: string
+}
+
+export interface Payment {
+  id?: string
+  _id?: string
+  user?: PaymentRelation | string
+  userId?: PaymentRelation | string
+  planName?: string
+  plan?: PaymentRelation | string
+  amount: number | string
+  source?: string
+  createdAt?: string
+  status: string
+}
+
 export function createPayment(paymentData: PaymentPayload) {
   return apiClient('/payments', {
     method: 'POST',
@@ -140,10 +160,10 @@ export function deletePayment(id: string) {
 
 export interface PaymentPayload {
   userId: string
-  planId: string
+  planName: string
   amount: number
-  paymentMethod: string
-  paymentDate: string
+  source: string
+  createdAt: string
   status: string
 }
 
