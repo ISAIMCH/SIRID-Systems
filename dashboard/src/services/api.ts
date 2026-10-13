@@ -85,7 +85,7 @@ export function createUser(userData: any) {
 
 export function updateUser(id: string, userData: any) {
   return apiClient(`/auth/users/${id}`, {
-    method: 'PATCH',
+    method: 'PUT',
     body: JSON.stringify(userData),
   })
 }

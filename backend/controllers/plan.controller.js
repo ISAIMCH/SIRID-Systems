@@ -8,16 +8,19 @@ function normalizeFeatures(value) {
 }
 
 function planPayload(body) {
-    const nombre = typeof body.nombre === 'string' ? body.nombre.trim() : '';
-    const duracion = Number(body.duracion);
+    const name = body.name ?? body.nombre;
+    const price = body.price ?? body.precio;
+    const duration = body.durationInDays ?? body.duracion;
+    const nombre = typeof name === 'string' ? name.trim() : '';
+    const duracion = Number(duration);
     const payload = {
         nombre,
-        precio: Number(body.precio),
+        precio: Number(price),
         descripcion: typeof body.descripcion === 'string' && body.descripcion.trim()
             ? body.descripcion.trim()
             : `${nombre} - ${Number.isFinite(duracion) ? duracion : ''} días`.trim(),
         tipoCobro: typeof body.tipoCobro === 'string' && body.tipoCobro.trim() ? body.tipoCobro.trim() : 'Mensual',
-        caracteristicas: normalizeFeatures(body.caracteristicas ?? body.especificaciones)
+        caracteristicas: normalizeFeatures(body.specifications ?? body.caracteristicas ?? body.especificaciones)
     };
 
     if (Number.isFinite(duracion) && duracion > 0) payload.durationInDays = duracion;

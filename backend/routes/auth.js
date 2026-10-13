@@ -332,6 +332,7 @@ router.patch('/me', authenticateToken, async (req, res) => {
 
 router.get('/users', authenticateToken, getUsers);
 router.post('/users', authenticateToken, createUser);
+router.put('/users/:id', authenticateToken, updateUser);
 router.patch('/users/:id', authenticateToken, updateUser);
 
 module.exports = router;

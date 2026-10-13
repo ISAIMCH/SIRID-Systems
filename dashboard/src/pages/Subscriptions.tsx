@@ -148,11 +148,10 @@ function Subscriptions() {
     try {
       const specifications = specificationsText.split(',').map((specification) => specification.trim()).filter(Boolean)
       const payload = {
-        nombre: form.nombre.trim(),
-        precio: Number(form.precio),
-        duracion: Number(form.duracion),
-        descripcion: `${form.nombre.trim()} - ${form.duracion} días`,
-        caracteristicas: specifications,
+        name: form.nombre.trim(),
+        price: Number(form.precio),
+        durationInDays: Number(form.duracion),
+        specifications,
       }
 
       const planId = editingPlan?._id || editingPlan?.id

@@ -119,9 +119,9 @@ function Users() {
     setIsSubmitting(true)
 
     try {
+      const fullName = `${form.firstName}${form.lastName}`.trim()
       const payload: Record<string, string> = {
-        firstName: form.firstName.trim(),
-        lastName: form.lastName.trim(),
+        name: fullName,
         email: form.email.trim(),
         role: form.role,
       }
@@ -132,7 +132,6 @@ function Users() {
       } else {
         const userId = editingUser._id || editingUser.id
         if (!userId) throw new Error('El usuario no tiene un identificador válido.')
-        if (form.password) payload.password = form.password
         await updateUser(userId, payload)
       }
 

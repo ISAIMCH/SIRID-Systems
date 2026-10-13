@@ -61,12 +61,13 @@ async function createUser(req, res) {
 async function updateUser(req, res) {
     try {
         const { id } = req.params;
-        const { firstName, lastName, email, role } = req.body;
+        const { firstName, lastName, name, email, role } = req.body;
         if (!mongoose.isValidObjectId(id)) return res.status(400).json({ msg: 'El identificador no es válido.' });
         if (role !== undefined && !USER_ROLES.includes(role)) return res.status(400).json({ msg: 'El rol no es válido.' });
 
         const updates = {};
-        if (firstName !== undefined) updates.nombre = firstName.trim();
+        if (name !== undefined) updates.nombre = name.trim();
+        else if (firstName !== undefined) updates.nombre = firstName.trim();
         if (lastName !== undefined) updates.apellidos = lastName.trim();
         if (email !== undefined) updates.email = email.trim().toLowerCase();
         if (role !== undefined) updates.role = role;
