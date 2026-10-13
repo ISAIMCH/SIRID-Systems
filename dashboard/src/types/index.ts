@@ -3,11 +3,13 @@ export type UserRole = 'Admin' | 'Coach' | 'Cliente'
 export interface User {
   id?: string
   _id?: string
-  firstName: string
-  lastName: string
+  name?: string
+  firstName?: string
+  lastName?: string
   email: string
   role: UserRole
-  status: string
+  status?: string
+  isActive?: boolean
 }
 
 export interface Plan {
@@ -24,4 +26,13 @@ export interface Plan {
   descripcion?: string
   destacado?: boolean
   caracteristicas?: string[]
+}
+
+export interface Product {
+  id?: string
+  _id?: string
+  name: string
+  category: string
+  price: number | string
+  stock: number
 }

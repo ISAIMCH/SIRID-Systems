@@ -1,6 +1,7 @@
 import {
   CreditCard,
   Dumbbell,
+  Package,
   LayoutDashboard,
   Users,
 } from 'lucide-react'
@@ -9,6 +10,7 @@ import { NavLink, Outlet } from 'react-router-dom'
 const navigation = [
   { label: 'Inicio', to: '/', icon: LayoutDashboard, end: true },
   { label: 'Gimnasios', to: '/gyms', icon: Dumbbell },
+  { label: 'Inventario', to: '/inventory', icon: Package },
   { label: 'Usuarios', to: '/users', icon: Users },
   { label: 'Suscripciones', to: '/subscriptions', icon: CreditCard },
 ]

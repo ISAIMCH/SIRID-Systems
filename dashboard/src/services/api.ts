@@ -114,6 +114,30 @@ export function deletePlan(id: string) {
   })
 }
 
+export function getProducts<T = unknown[]>() {
+  return apiClient<T>('/products')
+}
+
+export function createProduct(data: any) {
+  return apiClient('/products', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export function updateProduct(id: string, data: any) {
+  return apiClient(`/products/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  })
+}
+
+export function deleteProduct(id: string) {
+  return apiClient(`/products/${id}`, {
+    method: 'DELETE',
+  })
+}
+
 function extractArray(value: unknown, keys: string[]) {
   if (Array.isArray(value)) return value
   if (!value || typeof value !== 'object') return []

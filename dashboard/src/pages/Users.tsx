@@ -101,10 +101,11 @@ function Users() {
   }
 
   function openEditModal(user: User) {
+    const [firstName = '', ...lastNameParts] = (user.name || '').trim().split(/\s+/)
     setEditingUser(user)
     setForm({
-      firstName: user.firstName || '',
-      lastName: user.lastName || '',
+      firstName,
+      lastName: lastNameParts.join(' '),
       email: user.email || '',
       password: '',
       role: user.role || 'Cliente',
@@ -193,11 +194,12 @@ function Users() {
                     const userId = user?.id || user?._id || user?.email || `user-${index}`
                     const role = user?.role || 'Cliente'
                     const isStaff = role === 'Admin' || role === 'Coach'
+                    const isActive = user?.isActive === true
 
                     return (
                       <tr className="transition-colors hover:bg-slate-50" key={userId}>
                         <td className="whitespace-nowrap px-6 py-4 font-medium text-slate-900">
-                          {user?.firstName || 'Sin nombre'} {user?.lastName || ''}
+                          {user?.name || 'Sin nombre'}
                         </td>
                         <td className="whitespace-nowrap px-6 py-4 text-slate-500">
                           {user?.email || 'Sin correo'}
@@ -211,12 +213,20 @@ function Users() {
                             {role}
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-slate-500">{user?.status || 'Sin estado'}</td>
+                        <td className="px-6 py-4">
+                          <span
+                            className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${
+                              isActive ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-600'
+                            }`}
+                          >
+                            {isActive ? 'Activo' : 'Inactivo'}
+                          </span>
+                        </td>
                         <td className="px-6 py-4 text-right">
                           <button
                             className="cursor-pointer text-slate-400 transition hover:text-green-600"
                             type="button"
-                            aria-label={`Editar ${user?.firstName || 'usuario'}`}
+                            aria-label={`Editar ${user?.name || 'usuario'}`}
                             title="Editar"
                             onClick={() => openEditModal(user)}
                           >
