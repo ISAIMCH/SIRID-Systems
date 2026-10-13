@@ -6,6 +6,7 @@ import Inventory from './pages/Inventory'
 import Login from './pages/Login'
 import Overview from './pages/Overview'
 import Promotions from './pages/Promotions'
+import Payments from './pages/Payments'
 import Subscriptions from './pages/Subscriptions'
 import Users from './pages/Users'
 import AuthProvider from './store/AuthContext'
@@ -36,6 +37,7 @@ function App() {
               <Route path="inventory" element={<Inventory />} />
               <Route path="promotions" element={<Promotions />} />
               <Route path="users" element={<Users />} />
+              <Route path="payments" element={<Payments />} />
               <Route path="subscriptions" element={<Subscriptions />} />
             </Route>
           </Route>

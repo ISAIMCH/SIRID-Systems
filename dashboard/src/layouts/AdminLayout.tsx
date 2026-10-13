@@ -4,19 +4,21 @@ import {
   Package,
   LayoutDashboard,
   Megaphone,
+  Receipt,
   Users,
   Wrench,
 } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router-dom'
 
 const navigation = [
-  { label: 'Inicio', to: '/', icon: LayoutDashboard, end: true },
-  { label: 'Gimnasios', to: '/gyms', icon: Dumbbell },
-  { label: 'Equipo', to: '/equipment', icon: Wrench },
-  { label: 'Inventario', to: '/inventory', icon: Package },
-  { label: 'Promociones', to: '/promotions', icon: Megaphone },
-  { label: 'Usuarios', to: '/users', icon: Users },
-  { label: 'Suscripciones', to: '/subscriptions', icon: CreditCard },
+  { label: 'Inicio', to: '/', icon: LayoutDashboard, end: true, section: undefined },
+  { label: 'Gimnasios', to: '/gyms', icon: Dumbbell, section: undefined },
+  { label: 'Equipo', to: '/equipment', icon: Wrench, section: undefined },
+  { label: 'Inventario', to: '/inventory', icon: Package, section: undefined },
+  { label: 'Usuarios', to: '/users', icon: Users, section: undefined },
+  { label: 'Promociones', to: '/promotions', icon: Megaphone, section: 'Comercial' },
+  { label: 'Pagos', to: '/payments', icon: Receipt, section: 'Comercial' },
+  { label: 'Suscripciones', to: '/subscriptions', icon: CreditCard, section: 'Comercial' },
 ]
 
 function AdminLayout() {
@@ -31,22 +33,28 @@ function AdminLayout() {
         </div>
 
         <nav className="mt-8 space-y-2" aria-label="Navegación principal">
-          {navigation.map(({ label, to, icon: Icon, end }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={end}
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-3 text-sm font-medium transition-colors ${
-                  isActive
-                    ? 'bg-white/10 text-[#9BFF63]'
-                    : 'text-slate-400 hover:bg-white/5 hover:text-white'
-                }`
-              }
-            >
-              <Icon size={19} strokeWidth={1.8} />
-              <span>{label}</span>
-            </NavLink>
+          {navigation.map(({ label, to, icon: Icon, end, section }, index) => (
+            <div key={to}>
+              {section && navigation[index - 1]?.section !== section && (
+                <p className="mb-2 mt-5 px-3 text-xs font-medium uppercase tracking-[0.2em] text-slate-500">
+                  {section}
+                </p>
+              )}
+              <NavLink
+                to={to}
+                end={end}
+                className={({ isActive }) =>
+                  `flex items-center gap-3 px-3 py-3 text-sm font-medium transition-colors ${
+                    isActive
+                      ? 'bg-white/10 text-[#9BFF63]'
+                      : 'text-slate-400 hover:bg-white/5 hover:text-white'
+                  }`
+                }
+              >
+                <Icon size={19} strokeWidth={1.8} />
+                <span>{label}</span>
+              </NavLink>
+            </div>
           ))}
         </nav>
 
