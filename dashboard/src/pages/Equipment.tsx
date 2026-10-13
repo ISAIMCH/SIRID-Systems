@@ -7,18 +7,18 @@ type EquipmentResponse = Equipment[] | { data?: unknown; equipment?: unknown }
 
 interface EquipmentFormState {
   nombre: string
-  tipo: string
+  zona: string
+  marca: string
   estado: EquipmentStatus
-  ultimaMantenimiento: string
-  proximaMantenimiento: string
+  frecuenciaUso: string
 }
 
 const emptyEquipmentForm: EquipmentFormState = {
   nombre: '',
-  tipo: '',
+  zona: '',
+  marca: '',
   estado: 'operational',
-  ultimaMantenimiento: '',
-  proximaMantenimiento: '',
+  frecuenciaUso: '',
 }
 
 async function fetchEquipment() {
@@ -30,38 +30,12 @@ async function fetchEquipment() {
   return Array.isArray(equipmentCandidate) ? equipmentCandidate as Equipment[] : []
 }
 
-function toDateInputValue(value?: string) {
-  return value ? value.slice(0, 10) : ''
-}
-
-function formatDate(value?: string) {
-  if (!value) return 'Sin fecha'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return 'Fecha no válida'
-  return date.toLocaleDateString('es-MX', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  })
-}
-
-function daysUntilMaintenance(value?: string) {
-  if (!value) return null
-  const target = new Date(value)
-  if (Number.isNaN(target.getTime())) return null
-
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  target.setHours(0, 0, 0, 0)
-  return Math.ceil((target.getTime() - today.getTime()) / 86400000)
-}
-
 function EquipmentSkeleton() {
   return (
     <div className="space-y-4 p-6" aria-label="Cargando equipo" aria-busy="true">
       {Array.from({ length: 5 }).map((_, index) => (
-        <div className="grid grid-cols-6 gap-6" key={index}>
-          {Array.from({ length: 6 }).map((__, columnIndex) => (
+        <div className="grid grid-cols-7 gap-6" key={index}>
+          {Array.from({ length: 7 }).map((__, columnIndex) => (
             <div className="h-4 animate-pulse rounded bg-slate-200" key={columnIndex} />
           ))}
         </div>
@@ -120,10 +94,10 @@ function Equipment() {
     setEditingEquipment(item)
     setForm({
       nombre: item.name || '',
-      tipo: item.type || '',
+      zona: item.zone || '',
+      marca: item.brand || '',
       estado: item.status || 'operational',
-      ultimaMantenimiento: toDateInputValue(item.lastMaintenance),
-      proximaMantenimiento: toDateInputValue(item.nextMaintenance),
+      frecuenciaUso: item.usageFrequency || '',
     })
     setModalError(null)
     setIsModalOpen(true)
@@ -145,10 +119,10 @@ function Equipment() {
     try {
       const payload = {
         name: form.nombre.trim(),
-        type: form.tipo.trim(),
+        zone: form.zona.trim(),
+        brand: form.marca.trim(),
         status: form.estado,
-        lastMaintenance: form.ultimaMantenimiento,
-        nextMaintenance: form.proximaMantenimiento,
+        usageFrequency: form.frecuenciaUso.trim(),
       }
       const equipmentId = editingEquipment?._id || editingEquipment?.id
 
@@ -235,10 +209,11 @@ function Equipment() {
               <thead className="border-b border-slate-100 bg-slate-50/80 text-xs uppercase tracking-wider text-slate-500">
                 <tr>
                   <th className="px-6 py-4 font-medium">Nombre</th>
-                  <th className="px-6 py-4 font-medium">Tipo</th>
+                  <th className="px-6 py-4 font-medium">Zona</th>
+                  <th className="px-6 py-4 font-medium">Marca</th>
                   <th className="px-6 py-4 font-medium">Estado</th>
-                  <th className="px-6 py-4 font-medium">Último mantenimiento</th>
-                  <th className="px-6 py-4 font-medium">Próximo mantenimiento</th>
+                  <th className="px-6 py-4 font-medium">Frecuencia de uso</th>
+                  <th className="px-6 py-4 font-medium">Reportes</th>
                   <th className="px-6 py-4 font-medium" />
                 </tr>
               </thead>
@@ -246,31 +221,32 @@ function Equipment() {
                 {equipment.length > 0 ? (
                   equipment.map((item, index) => {
                     const equipmentId = item._id || item.id || `equipment-${index}`
-                    const days = daysUntilMaintenance(item.nextMaintenance)
-                    const needsMaintenance = days !== null && days <= 7
+                    const hasActiveReports = (item.activeReportsCount || 0) > 0
 
                     return (
                       <tr className="transition-colors hover:bg-slate-50" key={equipmentId}>
                         <td className="whitespace-nowrap px-6 py-4 font-medium text-slate-900">
                           {item.name || 'Sin nombre'}
                         </td>
-                        <td className="px-6 py-4 text-slate-500">{item.type || 'Sin tipo'}</td>
+                        <td className="px-6 py-4 text-slate-500">{item.zone || 'Sin zona'}</td>
+                        <td className="px-6 py-4 text-slate-500">{item.brand || 'Sin marca'}</td>
                         <td className="px-6 py-4">
                           <span className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${statusClass(item.status)}`}>
                             {statusLabel(item.status)}
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-slate-500">{formatDate(item.lastMaintenance)}</td>
                         <td className="px-6 py-4">
-                          <div className={`flex items-center gap-2 ${needsMaintenance ? (days !== null && days < 0 ? 'text-red-600' : 'text-amber-700') : 'text-slate-500'}`}>
-                            {needsMaintenance && <AlertTriangle size={16} aria-hidden="true" />}
-                            <span>{formatDate(item.nextMaintenance)}</span>
-                            {needsMaintenance && (
-                              <span className="text-xs font-medium">
-                                {days !== null && days < 0 ? 'Vencido' : `En ${days} días`}
-                              </span>
-                            )}
-                          </div>
+                          {item.usageFrequency || 'Sin registro'}
+                        </td>
+                        <td className="px-6 py-4">
+                          {hasActiveReports ? (
+                            <span className="inline-flex items-center gap-1.5 rounded-full bg-red-100 px-3 py-1 text-xs font-medium text-red-800">
+                              <AlertTriangle size={14} aria-hidden="true" />
+                              Reporte de Usuario
+                            </span>
+                          ) : (
+                            <span className="text-slate-400">Sin reportes</span>
+                          )}
                         </td>
                         <td className="px-6 py-4 text-right">
                           <div className="inline-flex items-center gap-3">
@@ -299,7 +275,7 @@ function Equipment() {
                   })
                 ) : (
                   <tr>
-                    <td className="px-6 py-10 text-center text-sm text-slate-500" colSpan={6}>
+                    <td className="px-6 py-10 text-center text-sm text-slate-500" colSpan={7}>
                       No hay equipo registrado.
                     </td>
                   </tr>
@@ -346,15 +322,29 @@ function Equipment() {
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="equipment-type">
-                  Tipo
+                <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="equipment-zone">
+                  Zona
                 </label>
                 <input
                   className="w-full rounded-lg border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
-                  id="equipment-type"
+                  id="equipment-zone"
                   type="text"
-                  value={form.tipo}
-                  onChange={(event) => setForm({ ...form, tipo: event.target.value })}
+                  value={form.zona}
+                  onChange={(event) => setForm({ ...form, zona: event.target.value })}
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="equipment-brand">
+                  Marca
+                </label>
+                <input
+                  className="w-full rounded-lg border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                  id="equipment-brand"
+                  type="text"
+                  value={form.marca}
+                  onChange={(event) => setForm({ ...form, marca: event.target.value })}
                   required
                 />
               </div>
@@ -376,29 +366,15 @@ function Equipment() {
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="equipment-last-maintenance">
-                  Último mantenimiento
+                <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="equipment-usage-frequency">
+                  Frecuencia de uso
                 </label>
                 <input
                   className="w-full rounded-lg border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
-                  id="equipment-last-maintenance"
-                  type="date"
-                  value={form.ultimaMantenimiento}
-                  onChange={(event) => setForm({ ...form, ultimaMantenimiento: event.target.value })}
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="equipment-next-maintenance">
-                  Próximo mantenimiento
-                </label>
-                <input
-                  className="w-full rounded-lg border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
-                  id="equipment-next-maintenance"
-                  type="date"
-                  value={form.proximaMantenimiento}
-                  onChange={(event) => setForm({ ...form, proximaMantenimiento: event.target.value })}
+                  id="equipment-usage-frequency"
+                  type="text"
+                  value={form.frecuenciaUso}
+                  onChange={(event) => setForm({ ...form, frecuenciaUso: event.target.value })}
                   required
                 />
               </div>

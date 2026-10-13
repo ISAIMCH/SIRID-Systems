@@ -43,8 +43,9 @@ export interface Equipment {
   id?: string
   _id?: string
   name: string
-  type: string
+  zone: string
+  brand: string
   status: EquipmentStatus
-  lastMaintenance?: string
-  nextMaintenance?: string
+  usageFrequency: string
+  activeReportsCount?: number
 }
