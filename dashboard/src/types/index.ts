@@ -49,3 +49,13 @@ export interface Equipment {
   usageFrequency: string
   activeReportsCount?: number
 }
+
+export interface Promotion {
+  id?: string
+  _id?: string
+  title: string
+  description: string
+  discountPercentage: number
+  validUntil: string
+  isActive: boolean
+}

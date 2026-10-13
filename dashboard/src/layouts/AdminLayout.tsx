@@ -3,6 +3,7 @@ import {
   Dumbbell,
   Package,
   LayoutDashboard,
+  Megaphone,
   Receipt,
   Users,
   Wrench,
@@ -15,6 +16,7 @@ const navigation = [
   { label: 'Equipo', to: '/equipment', icon: Wrench, section: undefined },
   { label: 'Inventario', to: '/inventory', icon: Package, section: undefined },
   { label: 'Usuarios', to: '/users', icon: Users, section: undefined },
+  { label: 'Promociones', to: '/promotions', icon: Megaphone, section: 'Comercial' },
   { label: 'Pagos', to: '/payments', icon: Receipt, section: 'Comercial' },
   { label: 'Suscripciones', to: '/subscriptions', icon: CreditCard, section: 'Comercial' },
 ]

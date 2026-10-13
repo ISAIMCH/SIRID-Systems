@@ -1,0 +1,408 @@
+import { useEffect, useState } from 'react'
+import { Pencil, Plus, Tag, Trash2 } from 'lucide-react'
+import { createPromotion, deletePromotion, getPromotions, updatePromotion } from '../services/api'
+import type { Promotion } from '../types'
+
+type PromotionsResponse = Promotion[] | { data?: unknown; promotions?: unknown }
+
+interface PromotionFormState {
+  title: string
+  description: string
+  discountPercentage: string
+  validUntil: string
+  isActive: boolean
+}
+
+const emptyPromotionForm: PromotionFormState = {
+  title: '',
+  description: '',
+  discountPercentage: '',
+  validUntil: '',
+  isActive: true,
+}
+
+async function fetchPromotions() {
+  const response = await getPromotions<PromotionsResponse>()
+  const promotionsCandidate = Array.isArray(response)
+    ? response
+    : response?.data || response?.promotions || []
+
+  return Array.isArray(promotionsCandidate) ? promotionsCandidate as Promotion[] : []
+}
+
+function formatDate(value?: string) {
+  if (!value) return 'Sin fecha'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return 'Fecha no válida'
+  return date.toLocaleDateString('es-MX', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  })
+}
+
+function toDateInputValue(value?: string) {
+  return value ? value.slice(0, 10) : ''
+}
+
+function PromotionSkeleton() {
+  return (
+    <div className="space-y-4 p-6" aria-label="Cargando promociones" aria-busy="true">
+      {Array.from({ length: 5 }).map((_, index) => (
+        <div className="grid grid-cols-6 gap-6" key={index}>
+          {Array.from({ length: 6 }).map((__, columnIndex) => (
+            <div className="h-4 animate-pulse rounded bg-slate-200" key={columnIndex} />
+          ))}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function Promotions() {
+  const [promotions, setPromotions] = useState<Promotion[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [editingPromotion, setEditingPromotion] = useState<Promotion | null>(null)
+  const [form, setForm] = useState<PromotionFormState>(emptyPromotionForm)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [modalError, setModalError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let isMounted = true
+
+    async function loadPromotions() {
+      try {
+        const promotionsArray = await fetchPromotions()
+        if (isMounted) {
+          setPromotions(promotionsArray)
+          setError(null)
+        }
+      } catch (requestError) {
+        if (isMounted) {
+          setError(
+            requestError instanceof Error
+              ? requestError.message
+              : 'No se pudieron cargar las promociones.',
+          )
+        }
+      } finally {
+        if (isMounted) setIsLoading(false)
+      }
+    }
+
+    loadPromotions()
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  function openCreateModal() {
+    setEditingPromotion(null)
+    setForm(emptyPromotionForm)
+    setModalError(null)
+    setIsModalOpen(true)
+  }
+
+  function openEditModal(promotion: Promotion) {
+    setEditingPromotion(promotion)
+    setForm({
+      title: promotion.title || '',
+      description: promotion.description || '',
+      discountPercentage: String(promotion.discountPercentage ?? ''),
+      validUntil: toDateInputValue(promotion.validUntil),
+      isActive: promotion.isActive,
+    })
+    setModalError(null)
+    setIsModalOpen(true)
+  }
+
+  function closeModal() {
+    if (isSubmitting) return
+    setEditingPromotion(null)
+    setForm(emptyPromotionForm)
+    setModalError(null)
+    setIsModalOpen(false)
+  }
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setModalError(null)
+    setIsSubmitting(true)
+
+    try {
+      const payload = {
+        title: form.title.trim(),
+        description: form.description.trim(),
+        discountPercentage: Number(form.discountPercentage),
+        validUntil: form.validUntil,
+        isActive: form.isActive,
+      }
+      const promotionId = editingPromotion?._id || editingPromotion?.id
+
+      if (editingPromotion) {
+        if (!promotionId) throw new Error('La promoción no tiene un identificador válido.')
+        await updatePromotion(promotionId, payload)
+      } else {
+        await createPromotion(payload)
+      }
+
+      setPromotions(await fetchPromotions())
+      setError(null)
+      setEditingPromotion(null)
+      setForm(emptyPromotionForm)
+      setIsModalOpen(false)
+    } catch (requestError) {
+      setModalError(
+        requestError instanceof Error ? requestError.message : 'No se pudo guardar la promoción.',
+      )
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  async function handleDelete(promotion: Promotion) {
+    const promotionId = promotion._id || promotion.id
+    if (!promotionId) {
+      setError('No se puede eliminar una promoción sin identificador.')
+      return
+    }
+    if (!window.confirm(`¿Eliminar ${promotion.title || 'esta promoción'}?`)) return
+
+    try {
+      await deletePromotion(promotionId)
+      setPromotions(await fetchPromotions())
+      setError(null)
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'No se pudo eliminar la promoción.')
+    }
+  }
+
+  return (
+    <section className="min-h-screen bg-[#F8FAFC] px-8 py-10">
+      <p className="text-sm font-medium uppercase tracking-[0.25em] text-slate-500">Marketing</p>
+      <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-4xl font-semibold tracking-tight text-slate-900">Promociones</h1>
+          <p className="mt-3 text-slate-500">Crea y administra las ofertas comerciales del gimnasio.</p>
+        </div>
+        <button
+          className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#9BFF63] px-4 py-2 font-medium text-[#0F172A] transition hover:bg-[#abff7c]"
+          type="button"
+          onClick={openCreateModal}
+        >
+          <Plus size={18} aria-hidden="true" />
+          Nueva Promoción
+        </button>
+      </div>
+
+      <div className="mt-8 overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
+        {error && (
+          <div className="border-b border-red-100 bg-red-50 px-6 py-4 text-sm text-red-700" role="alert">
+            {error}
+          </div>
+        )}
+
+        {isLoading ? (
+          <PromotionSkeleton />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-left text-sm">
+              <thead className="border-b border-slate-100 bg-slate-50/80 text-xs uppercase tracking-wider text-slate-500">
+                <tr>
+                  <th className="px-6 py-4 font-medium">Título</th>
+                  <th className="px-6 py-4 font-medium">Descuento</th>
+                  <th className="px-6 py-4 font-medium">Vigencia</th>
+                  <th className="px-6 py-4 font-medium">Estado</th>
+                  <th className="px-6 py-4 font-medium" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-slate-700">
+                {promotions.length > 0 ? (
+                  promotions.map((promotion, index) => {
+                    const promotionId = promotion._id || promotion.id || `promotion-${index}`
+                    return (
+                      <tr className="transition-colors hover:bg-slate-50" key={promotionId}>
+                        <td className="whitespace-nowrap px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
+                              <Tag size={17} aria-hidden="true" />
+                            </span>
+                            <div>
+                              <p className="font-medium text-slate-900">{promotion.title || 'Sin título'}</p>
+                              {promotion.description && (
+                                <p className="mt-1 max-w-xs truncate text-xs text-slate-500">{promotion.description}</p>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 font-medium text-slate-700">
+                          {Number(promotion.discountPercentage)}%
+                        </td>
+                        <td className="px-6 py-4 text-slate-500">{formatDate(promotion.validUntil)}</td>
+                        <td className="px-6 py-4">
+                          <span className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${promotion.isActive ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-600'}`}>
+                            {promotion.isActive ? 'Activa' : 'Inactiva'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="inline-flex items-center gap-3">
+                            <button
+                              className="cursor-pointer text-slate-400 transition hover:text-green-600"
+                              type="button"
+                              aria-label={`Editar ${promotion.title || 'promoción'}`}
+                              title="Editar"
+                              onClick={() => openEditModal(promotion)}
+                            >
+                              <Pencil size={17} aria-hidden="true" />
+                            </button>
+                            <button
+                              className="cursor-pointer text-slate-400 transition hover:text-red-600"
+                              type="button"
+                              aria-label={`Eliminar ${promotion.title || 'promoción'}`}
+                              title="Eliminar"
+                              onClick={() => handleDelete(promotion)}
+                            >
+                              <Trash2 size={17} aria-hidden="true" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })
+                ) : (
+                  <tr>
+                    <td className="px-6 py-10 text-center text-sm text-slate-500" colSpan={5}>
+                      No hay promociones registradas.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4 backdrop-blur-sm">
+          <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium uppercase tracking-[0.2em] text-emerald-700">Marketing</p>
+                <h2 className="mt-2 text-2xl font-semibold text-slate-900">
+                  {editingPromotion ? 'Editar Promoción' : 'Nueva Promoción'}
+                </h2>
+              </div>
+              <button
+                className="text-2xl leading-none text-slate-400 transition hover:text-slate-700"
+                type="button"
+                aria-label="Cerrar modal"
+                onClick={closeModal}
+              >
+                ×
+              </button>
+            </div>
+
+            <form className="mt-6 space-y-5" onSubmit={handleSubmit}>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="promotion-title">
+                  Título
+                </label>
+                <input
+                  className="w-full rounded-lg border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                  id="promotion-title"
+                  type="text"
+                  value={form.title}
+                  onChange={(event) => setForm({ ...form, title: event.target.value })}
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="promotion-description">
+                  Descripción
+                </label>
+                <textarea
+                  className="min-h-24 w-full resize-y rounded-lg border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                  id="promotion-description"
+                  value={form.description}
+                  onChange={(event) => setForm({ ...form, description: event.target.value })}
+                  rows={3}
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="promotion-discount">
+                  Descuento (%)
+                </label>
+                <input
+                  className="w-full rounded-lg border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                  id="promotion-discount"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  value={form.discountPercentage}
+                  onChange={(event) => setForm({ ...form, discountPercentage: event.target.value })}
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="promotion-valid-until">
+                  Válida hasta
+                </label>
+                <input
+                  className="w-full rounded-lg border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                  id="promotion-valid-until"
+                  type="date"
+                  value={form.validUntil}
+                  onChange={(event) => setForm({ ...form, validUntil: event.target.value })}
+                  required
+                />
+              </div>
+
+              <label className="flex items-center gap-3 text-sm font-medium text-slate-700">
+                <input
+                  className="h-4 w-4 accent-green-500"
+                  type="checkbox"
+                  checked={form.isActive}
+                  onChange={(event) => setForm({ ...form, isActive: event.target.checked })}
+                />
+                Promoción activa
+              </label>
+
+              {modalError && (
+                <p className="border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
+                  {modalError}
+                </p>
+              )}
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  className="rounded-lg px-4 py-2 font-medium text-slate-600 transition hover:bg-slate-100 disabled:opacity-50"
+                  type="button"
+                  onClick={closeModal}
+                  disabled={isSubmitting}
+                >
+                  Cancelar
+                </button>
+                <button
+                  className="rounded-lg bg-[#9BFF63] px-4 py-2 font-medium text-[#0F172A] transition hover:bg-[#abff7c] disabled:cursor-not-allowed disabled:opacity-60"
+                  type="submit"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? 'Guardando...' : editingPromotion ? 'Actualizar' : 'Guardar'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </section>
+  )
+}
+
+export default Promotions
