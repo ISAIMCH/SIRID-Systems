@@ -3,6 +3,7 @@ import {
   Dumbbell,
   Package,
   LayoutDashboard,
+  Megaphone,
   Users,
   Wrench,
 } from 'lucide-react'
@@ -13,6 +14,7 @@ const navigation = [
   { label: 'Gimnasios', to: '/gyms', icon: Dumbbell },
   { label: 'Equipo', to: '/equipment', icon: Wrench },
   { label: 'Inventario', to: '/inventory', icon: Package },
+  { label: 'Promociones', to: '/promotions', icon: Megaphone },
   { label: 'Usuarios', to: '/users', icon: Users },
   { label: 'Suscripciones', to: '/subscriptions', icon: CreditCard },
 ]

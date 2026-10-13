@@ -162,6 +162,30 @@ export function deleteEquipment(id: string) {
   })
 }
 
+export function getPromotions<T = unknown[]>() {
+  return apiClient<T>('/promotions')
+}
+
+export function createPromotion(data: any) {
+  return apiClient('/promotions', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export function updatePromotion(id: string, data: any) {
+  return apiClient(`/promotions/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  })
+}
+
+export function deletePromotion(id: string) {
+  return apiClient(`/promotions/${id}`, {
+    method: 'DELETE',
+  })
+}
+
 function extractArray(value: unknown, keys: string[]) {
   if (Array.isArray(value)) return value
   if (!value || typeof value !== 'object') return []
