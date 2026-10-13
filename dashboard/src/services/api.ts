@@ -138,6 +138,30 @@ export function deleteProduct(id: string) {
   })
 }
 
+export function getEquipment<T = unknown[]>() {
+  return apiClient<T>('/equipment')
+}
+
+export function createEquipment(data: any) {
+  return apiClient('/equipment', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export function updateEquipment(id: string, data: any) {
+  return apiClient(`/equipment/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  })
+}
+
+export function deleteEquipment(id: string) {
+  return apiClient(`/equipment/${id}`, {
+    method: 'DELETE',
+  })
+}
+
 function extractArray(value: unknown, keys: string[]) {
   if (Array.isArray(value)) return value
   if (!value || typeof value !== 'object') return []

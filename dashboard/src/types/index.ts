@@ -36,3 +36,15 @@ export interface Product {
   price: number | string
   stock: number
 }
+
+export type EquipmentStatus = 'operational' | 'maintenance' | 'broken'
+
+export interface Equipment {
+  id?: string
+  _id?: string
+  name: string
+  type: string
+  status: EquipmentStatus
+  lastMaintenance?: string
+  nextMaintenance?: string
+}

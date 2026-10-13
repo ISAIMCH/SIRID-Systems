@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom'
 import AdminLayout from './layouts/AdminLayout'
 import Gyms from './pages/Gyms'
+import Equipment from './pages/Equipment'
 import Inventory from './pages/Inventory'
 import Login from './pages/Login'
 import Overview from './pages/Overview'
@@ -30,6 +31,7 @@ function App() {
             <Route element={<AdminLayout />}>
               <Route index element={<Overview />} />
               <Route path="gyms" element={<Gyms />} />
+              <Route path="equipment" element={<Equipment />} />
               <Route path="inventory" element={<Inventory />} />
               <Route path="users" element={<Users />} />
               <Route path="subscriptions" element={<Subscriptions />} />
