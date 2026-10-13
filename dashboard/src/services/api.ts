@@ -137,6 +137,7 @@ export interface Payment {
   amount: number | string
   source?: string
   createdAt?: string
+  reference?: string
   status: string
 }
 
@@ -166,6 +167,7 @@ export interface PaymentPayload {
   amount: number
   source: string
   createdAt: string
+  reference: string
   status: string
 }
 

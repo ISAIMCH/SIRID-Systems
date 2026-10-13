@@ -35,6 +35,7 @@ export interface Product {
   category: string
   price: number | string
   stock: number
+  imageUrl?: string
 }
 
 export type EquipmentStatus = 'operational' | 'maintenance' | 'broken'
@@ -61,4 +62,5 @@ export interface Promotion {
   discountPercentage: number
   validUntil: string
   isActive: boolean
+  imageUrl?: string
 }

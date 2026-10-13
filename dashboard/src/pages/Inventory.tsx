@@ -10,6 +10,7 @@ interface ProductFormState {
   categoria: string
   precio: string
   stock: string
+  imageUrl: string
 }
 
 const emptyProductForm: ProductFormState = {
@@ -17,6 +18,7 @@ const emptyProductForm: ProductFormState = {
   categoria: '',
   precio: '',
   stock: '',
+  imageUrl: '',
 }
 
 async function fetchProducts() {
@@ -51,6 +53,7 @@ function Inventory() {
   const [form, setForm] = useState<ProductFormState>(emptyProductForm)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [modalError, setModalError] = useState<string | null>(null)
+  const [searchTerm, setSearchTerm] = useState('')
 
   useEffect(() => {
     let isMounted = true
@@ -95,6 +98,7 @@ function Inventory() {
       categoria: product.category || '',
       precio: String(product.price ?? ''),
       stock: String(product.stock ?? ''),
+      imageUrl: product.imageUrl || '',
     })
     setModalError(null)
     setIsModalOpen(true)
@@ -119,6 +123,7 @@ function Inventory() {
         category: form.categoria.trim(),
         price: Number(form.precio),
         stock: Number(form.stock),
+        imageUrl: form.imageUrl.trim(),
       }
       const productId = editingProduct?._id || editingProduct?.id
 
@@ -160,6 +165,10 @@ function Inventory() {
     }
   }
 
+  const filteredProducts = products.filter((product) =>
+    `${product.name} ${product.category}`.toLocaleLowerCase().includes(searchTerm.trim().toLocaleLowerCase()),
+  )
+
   return (
     <section className="min-h-screen bg-[#F8FAFC] px-8 py-10">
       <p className="text-sm font-medium uppercase tracking-[0.25em] text-slate-500">Operación</p>
@@ -185,6 +194,17 @@ function Inventory() {
           </div>
         )}
 
+        <div className="border-b border-slate-100 p-4">
+          <input
+            className="w-full max-w-sm rounded-lg border border-slate-200 px-4 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-100"
+            type="search"
+            placeholder="Buscar..."
+            aria-label="Buscar productos"
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
+          />
+        </div>
+
         {isLoading ? (
           <ProductSkeleton />
         ) : (
@@ -200,8 +220,8 @@ function Inventory() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-700">
-                {products.length > 0 ? (
-                  products.map((product, index) => {
+                {filteredProducts.length > 0 ? (
+                  filteredProducts.map((product, index) => {
                     const productId = product._id || product.id || `product-${index}`
                     return (
                       <tr className="transition-colors hover:bg-slate-50" key={productId}>
@@ -239,7 +259,7 @@ function Inventory() {
                 ) : (
                   <tr>
                     <td className="px-6 py-10 text-center text-sm text-slate-500" colSpan={5}>
-                      No hay productos en el inventario.
+                      {searchTerm ? 'No hay productos que coincidan con la búsqueda.' : 'No hay productos en el inventario.'}
                     </td>
                   </tr>
                 )}
@@ -327,6 +347,19 @@ function Inventory() {
                   value={form.stock}
                   onChange={(event) => setForm({ ...form, stock: event.target.value })}
                   required
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="product-image-url">
+                  URL de imagen
+                </label>
+                <input
+                  className="w-full rounded-lg border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                  id="product-image-url"
+                  type="url"
+                  value={form.imageUrl}
+                  onChange={(event) => setForm({ ...form, imageUrl: event.target.value })}
                 />
               </div>
 

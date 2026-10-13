@@ -54,6 +54,7 @@ function Users() {
   const [form, setForm] = useState<UserFormState>(emptyUserForm)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [modalError, setModalError] = useState<string | null>(null)
+  const [searchTerm, setSearchTerm] = useState('')
 
   useEffect(() => {
     let isMounted = true
@@ -150,6 +151,10 @@ function Users() {
     }
   }
 
+  const filteredUsers = users.filter((user) =>
+    `${user.name || ''} ${user.email || ''}`.toLocaleLowerCase().includes(searchTerm.trim().toLocaleLowerCase()),
+  )
+
   return (
     <section className="min-h-screen bg-[#F8FAFC] px-8 py-10">
       <p className="text-sm font-medium uppercase tracking-[0.25em] text-slate-500">Comunidad</p>
@@ -174,6 +179,17 @@ function Users() {
           </div>
         )}
 
+        <div className="border-b border-slate-100 p-4">
+          <input
+            className="w-full max-w-sm rounded-lg border border-slate-200 px-4 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-100"
+            type="search"
+            placeholder="Buscar..."
+            aria-label="Buscar usuarios"
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
+          />
+        </div>
+
         {isLoading ? (
           <UserSkeleton />
         ) : (
@@ -189,8 +205,8 @@ function Users() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-700">
-                {users && users.length > 0 ? (
-                  users.map((user, index) => {
+                {filteredUsers.length > 0 ? (
+                  filteredUsers.map((user, index) => {
                     const userId = user?.id || user?._id || user?.email || `user-${index}`
                     const role = user?.role || 'Cliente'
                     const isStaff = role === 'Admin' || role === 'Coach'
@@ -239,7 +255,7 @@ function Users() {
                 ) : (
                   <tr>
                     <td className="px-6 py-10 text-center text-sm text-slate-500" colSpan={5}>
-                      No hay usuarios encontrados o formato incorrecto.
+                      {searchTerm ? 'No hay usuarios que coincidan con la búsqueda.' : 'No hay usuarios encontrados o formato incorrecto.'}
                     </td>
                   </tr>
                 )}

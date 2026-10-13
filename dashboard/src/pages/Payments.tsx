@@ -100,6 +100,7 @@ function Payments() {
   const [form, setForm] = useState<PaymentFormState>(emptyForm)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [modalError, setModalError] = useState<string | null>(null)
+  const [reference, setReference] = useState('')
 
   async function refreshPayments() {
     const response = await getPayments<unknown>()
@@ -157,8 +158,10 @@ function Payments() {
       amount: String(payment.amount ?? ''),
       source: payment.source || 'reception',
       createdAt: payment.createdAt ? new Date(payment.createdAt).toISOString().slice(0, 10) : '',
+      reference: payment.reference || '',
       status: payment.status || 'Pending',
     })
+    setReference(payment.reference || '')
     setModalError(null)
     setIsModalOpen(true)
   }
@@ -167,6 +170,7 @@ function Payments() {
     if (isSubmitting) return
     setEditingPayment(null)
     setForm(emptyForm)
+    setReference('')
     setModalError(null)
     setIsModalOpen(false)
   }
@@ -186,6 +190,7 @@ function Payments() {
         amount: Number(form.amount),
         source: form.source,
         createdAt: form.createdAt,
+        reference: reference.trim(),
         status: form.status,
       }
       const paymentId = editingPayment ? getRecordId(editingPayment) : ''
@@ -201,6 +206,7 @@ function Payments() {
       setError(null)
       setEditingPayment(null)
       setForm(emptyForm)
+      setReference('')
       setIsModalOpen(false)
     } catch (requestError) {
       setModalError(requestError instanceof Error ? requestError.message : 'No se pudo guardar el pago.')
@@ -271,6 +277,7 @@ function Payments() {
                   <th className="px-6 py-4 font-medium">Monto</th>
                   <th className="px-6 py-4 font-medium">Método</th>
                   <th className="px-6 py-4 font-medium">Fecha</th>
+                  <th className="px-6 py-4 font-medium">Referencia / PIN</th>
                   <th className="px-6 py-4 font-medium">Estado</th>
                   <th className="px-6 py-4 font-medium" />
                 </tr>
@@ -310,6 +317,7 @@ function Payments() {
                           ? new Intl.DateTimeFormat('es-MX').format(new Date(payment.createdAt))
                           : 'Sin fecha'}
                       </td>
+                      <td className="whitespace-nowrap px-6 py-4 text-slate-500">{payment.reference || 'Sin referencia'}</td>
                       <td className="px-6 py-4">
                         <span className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${statusClasses(status)}`}>
                           {status}
@@ -339,7 +347,7 @@ function Payments() {
                   )
                 }) : (
                   <tr>
-                    <td className="px-6 py-10 text-center text-sm text-slate-500" colSpan={7}>
+                    <td className="px-6 py-10 text-center text-sm text-slate-500" colSpan={8}>
                       No hay pagos registrados.
                     </td>
                   </tr>
@@ -434,6 +442,19 @@ function Payments() {
                     <option value="transfer">Transferencia</option>
                   </select>
                 </div>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="payment-reference">
+                  Referencia / PIN
+                </label>
+                <input
+                  className="w-full rounded-lg border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                  id="payment-reference"
+                  type="text"
+                  value={reference}
+                  onChange={(event) => setReference(event.target.value)}
+                />
               </div>
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

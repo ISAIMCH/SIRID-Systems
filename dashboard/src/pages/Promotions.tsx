@@ -11,6 +11,7 @@ interface PromotionFormState {
   discountPercentage: string
   validUntil: string
   isActive: boolean
+  imageUrl: string
 }
 
 const emptyPromotionForm: PromotionFormState = {
@@ -19,6 +20,7 @@ const emptyPromotionForm: PromotionFormState = {
   discountPercentage: '',
   validUntil: '',
   isActive: true,
+  imageUrl: '',
 }
 
 async function fetchPromotions() {
@@ -113,6 +115,7 @@ function Promotions() {
       discountPercentage: String(promotion.discountPercentage ?? ''),
       validUntil: toDateInputValue(promotion.validUntil),
       isActive: promotion.isActive,
+      imageUrl: promotion.imageUrl || '',
     })
     setModalError(null)
     setIsModalOpen(true)
@@ -138,6 +141,7 @@ function Promotions() {
         discountPercentage: Number(form.discountPercentage),
         validUntil: form.validUntil,
         isActive: form.isActive,
+        imageUrl: form.imageUrl.trim(),
       }
       const promotionId = editingPromotion?._id || editingPromotion?.id
 
@@ -361,6 +365,19 @@ function Promotions() {
                   value={form.validUntil}
                   onChange={(event) => setForm({ ...form, validUntil: event.target.value })}
                   required
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="promotion-image-url">
+                  URL de imagen
+                </label>
+                <input
+                  className="w-full rounded-lg border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                  id="promotion-image-url"
+                  type="url"
+                  value={form.imageUrl}
+                  onChange={(event) => setForm({ ...form, imageUrl: event.target.value })}
                 />
               </div>
 
