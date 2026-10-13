@@ -1,3 +1,5 @@
+import type { Equipment, EquipmentStatus } from '../types'
+
 const API_BASE_URL = import.meta.env.VITE_GYMGO_API_URL
 
 if (!API_BASE_URL) {
@@ -191,18 +193,29 @@ export function deleteProduct(id: string) {
   })
 }
 
-export function getEquipment<T = unknown[]>() {
+export interface EquipmentPayload {
+  name: string
+  zone: string
+  brand: string
+  type: string
+  totalQuantity: number
+  maintenanceQuantity: number
+  status: EquipmentStatus
+  usageFrequency: string
+}
+
+export function getEquipment<T = Equipment[]>() {
   return apiClient<T>('/equipment')
 }
 
-export function createEquipment(data: any) {
+export function createEquipment(data: EquipmentPayload) {
   return apiClient('/equipment', {
     method: 'POST',
     body: JSON.stringify(data),
   })
 }
 
-export function updateEquipment(id: string, data: any) {
+export function updateEquipment(id: string, data: EquipmentPayload) {
   return apiClient(`/equipment/${id}`, {
     method: 'PUT',
     body: JSON.stringify(data),

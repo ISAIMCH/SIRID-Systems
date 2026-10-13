@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AlertTriangle, Pencil, Plus, Trash2 } from 'lucide-react'
 import { createEquipment, deleteEquipment, getEquipment, updateEquipment } from '../services/api'
+import type { EquipmentPayload } from '../services/api'
 import type { Equipment, EquipmentStatus } from '../types'
 
 type EquipmentResponse = Equipment[] | { data?: unknown; equipment?: unknown }
@@ -9,6 +10,9 @@ interface EquipmentFormState {
   nombre: string
   zona: string
   marca: string
+  tipo: string
+  cantidadTotal: string
+  cantidadMantenimiento: string
   estado: EquipmentStatus
   frecuenciaUso: string
 }
@@ -17,6 +21,9 @@ const emptyEquipmentForm: EquipmentFormState = {
   nombre: '',
   zona: '',
   marca: '',
+  tipo: 'Cardio',
+  cantidadTotal: '1',
+  cantidadMantenimiento: '0',
   estado: 'operational',
   frecuenciaUso: '',
 }
@@ -34,8 +41,8 @@ function EquipmentSkeleton() {
   return (
     <div className="space-y-4 p-6" aria-label="Cargando equipo" aria-busy="true">
       {Array.from({ length: 5 }).map((_, index) => (
-        <div className="grid grid-cols-7 gap-6" key={index}>
-          {Array.from({ length: 7 }).map((__, columnIndex) => (
+        <div className="grid grid-cols-9 gap-6" key={index}>
+          {Array.from({ length: 9 }).map((__, columnIndex) => (
             <div className="h-4 animate-pulse rounded bg-slate-200" key={columnIndex} />
           ))}
         </div>
@@ -96,6 +103,9 @@ function Equipment() {
       nombre: item.name || '',
       zona: item.zone || '',
       marca: item.brand || '',
+      tipo: item.type || 'Cardio',
+      cantidadTotal: String(item.totalQuantity ?? 1),
+      cantidadMantenimiento: String(item.maintenanceQuantity ?? 0),
       estado: item.status || 'operational',
       frecuenciaUso: item.usageFrequency || '',
     })
@@ -117,10 +127,13 @@ function Equipment() {
     setIsSubmitting(true)
 
     try {
-      const payload = {
+      const payload: EquipmentPayload = {
         name: form.nombre.trim(),
         zone: form.zona.trim(),
         brand: form.marca.trim(),
+        type: form.tipo,
+        totalQuantity: Number(form.cantidadTotal),
+        maintenanceQuantity: Number(form.cantidadMantenimiento),
         status: form.estado,
         usageFrequency: form.frecuenciaUso.trim(),
       }
@@ -211,6 +224,8 @@ function Equipment() {
                   <th className="px-6 py-4 font-medium">Nombre</th>
                   <th className="px-6 py-4 font-medium">Zona</th>
                   <th className="px-6 py-4 font-medium">Marca</th>
+                  <th className="px-6 py-4 font-medium">Tipo</th>
+                  <th className="px-6 py-4 font-medium">Cantidades</th>
                   <th className="px-6 py-4 font-medium">Estado</th>
                   <th className="px-6 py-4 font-medium">Frecuencia de uso</th>
                   <th className="px-6 py-4 font-medium">Reportes</th>
@@ -230,6 +245,12 @@ function Equipment() {
                         </td>
                         <td className="px-6 py-4 text-slate-500">{item.zone || 'Sin zona'}</td>
                         <td className="px-6 py-4 text-slate-500">{item.brand || 'Sin marca'}</td>
+                        <td className="px-6 py-4 text-slate-500">{item.type || 'Sin tipo'}</td>
+                        <td className="whitespace-nowrap px-6 py-4 text-slate-500">
+                          <span className="font-medium text-slate-700">{item.totalQuantity ?? 0}</span>
+                          <span className="mx-1.5 text-slate-300">/</span>
+                          {item.maintenanceQuantity ?? 0} mantenimiento
+                        </td>
                         <td className="px-6 py-4">
                           <span className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${statusClass(item.status)}`}>
                             {statusLabel(item.status)}
@@ -275,7 +296,7 @@ function Equipment() {
                   })
                 ) : (
                   <tr>
-                    <td className="px-6 py-10 text-center text-sm text-slate-500" colSpan={7}>
+                    <td className="px-6 py-10 text-center text-sm text-slate-500" colSpan={9}>
                       No hay equipo registrado.
                     </td>
                   </tr>
@@ -347,6 +368,56 @@ function Equipment() {
                   onChange={(event) => setForm({ ...form, marca: event.target.value })}
                   required
                 />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="equipment-type">
+                  Tipo de máquina
+                </label>
+                <select
+                  className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                  id="equipment-type"
+                  value={form.tipo}
+                  onChange={(event) => setForm({ ...form, tipo: event.target.value })}
+                  required
+                >
+                  <option value="Cardio">Cardio</option>
+                  <option value="Fuerza">Fuerza</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="equipment-total-quantity">
+                    Cantidad total
+                  </label>
+                  <input
+                    className="w-full rounded-lg border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                    id="equipment-total-quantity"
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={form.cantidadTotal}
+                    onChange={(event) => setForm({ ...form, cantidadTotal: event.target.value })}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="equipment-maintenance-quantity">
+                    En mantenimiento
+                  </label>
+                  <input
+                    className="w-full rounded-lg border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                    id="equipment-maintenance-quantity"
+                    type="number"
+                    min="0"
+                    max={form.cantidadTotal}
+                    step="1"
+                    value={form.cantidadMantenimiento}
+                    onChange={(event) => setForm({ ...form, cantidadMantenimiento: event.target.value })}
+                    required
+                  />
+                </div>
               </div>
 
               <div>

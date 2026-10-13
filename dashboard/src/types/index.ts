@@ -45,6 +45,9 @@ export interface Equipment {
   name: string
   zone: string
   brand: string
+  type?: string
+  totalQuantity?: number
+  maintenanceQuantity?: number
   status: EquipmentStatus
   usageFrequency: string
   activeReportsCount?: number
