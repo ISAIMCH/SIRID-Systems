@@ -1,4 +1,6 @@
 node_modules/
+.venv/
+graphify-out/
 .env
 backend/.env
 *.log

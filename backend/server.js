@@ -30,20 +30,15 @@ mongoose.connect(process.env.MONGO_URI)
 // ==========================================
 // Importamos el archivo auth.js que manejará el login, registro y encriptación
 const authRoutes = require('./routes/auth'); 
-const Plan = require('./models/Plan');
+const planRoutes = require('./routes/plans');
+const { getPlans } = require('./controllers/plan.controller');
 
 // Conectamos las rutas al motor principal
 app.use('/api/auth', authRoutes); 
+app.use('/api/plans', planRoutes);
 
 // Ruta para obtener los planes SaaS desde MongoDB Atlas
-app.get('/api/planes', async (req, res) => {
-    try {
-        const planes = await Plan.find();
-        res.json(planes);
-    } catch (error) {
-        res.status(500).json({ mensaje: 'Error al conectar con MongoDB', error: error.message });
-    }
-});
+app.get('/api/planes', getPlans);
 
 // Ruta de diagnóstico
 app.get('/api/status', (req, res) => {

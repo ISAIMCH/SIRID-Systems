@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 const { OAuth2Client } = require('google-auth-library');
 const User = require('../models/User');
+const { getUsers, createUser, updateUser } = require('../controllers/auth.controller');
 const router = express.Router();
 
 function authenticateToken(req, res, next) {
@@ -328,5 +329,9 @@ router.patch('/me', authenticateToken, async (req, res) => {
         res.status(500).json({ msg: 'No se pudo actualizar tu perfil.' });
     }
 });
+
+router.get('/users', authenticateToken, getUsers);
+router.post('/users', authenticateToken, createUser);
+router.patch('/users/:id', authenticateToken, updateUser);
 
 module.exports = router;
