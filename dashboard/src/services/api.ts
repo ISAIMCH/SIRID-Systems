@@ -120,6 +120,13 @@ export function getPayments<T = unknown[]>() {
   return apiClient<T>('/payments')
 }
 
+export function redeemPaymentPin(pin: string) {
+  return apiClient('/payments/redeem', {
+    method: 'PATCH',
+    body: JSON.stringify({ pin: pin.trim() }),
+  })
+}
+
 export interface PaymentRelation {
   id?: string
   _id?: string

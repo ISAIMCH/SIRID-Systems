@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
-import { Pencil, Plus, Trash2 } from 'lucide-react'
+import { Plus, Trash2 } from 'lucide-react'
 import {
   createPayment,
   deletePayment,
   getPayments,
   getPlans,
   getUsers,
-  updatePayment,
+  redeemPaymentPin,
 } from '../services/api'
 import type { Payment, PaymentPayload, PaymentRelation } from '../services/api'
 import type { Plan, User } from '../types'
@@ -51,10 +51,6 @@ function getRelationId(value: PaymentRelation | string | undefined) {
   return value ? getRecordId(value) : ''
 }
 
-function getPaymentUserId(payment: Payment) {
-  return getRelationId(payment.userId || payment.user)
-}
-
 function getPaymentPlanName(payment: Payment) {
   if (payment.planName) return payment.planName
   if (typeof payment.plan === 'string') return payment.plan
@@ -96,11 +92,13 @@ function Payments() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [editingPayment, setEditingPayment] = useState<Payment | null>(null)
   const [form, setForm] = useState<PaymentFormState>(emptyForm)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [modalError, setModalError] = useState<string | null>(null)
   const [reference, setReference] = useState('')
+  const [pin, setPin] = useState('')
+  const [isRedeemingPin, setIsRedeemingPin] = useState(false)
+  const [toast, setToast] = useState<string | null>(null)
 
   async function refreshPayments() {
     const response = await getPayments<unknown>()
@@ -139,36 +137,13 @@ function Payments() {
   }, [])
 
   function openCreateModal() {
-    setEditingPayment(null)
     setForm(emptyForm)
-    setModalError(null)
-    setIsModalOpen(true)
-  }
-
-  function openEditModal(payment: Payment) {
-    const planName = getPaymentPlanName(payment)
-    const matchingPlan = plans.find((plan) =>
-      getRecordId(plan) === getRelationId(payment.plan)
-      || (plan.name || plan.nombre) === planName,
-    )
-    setEditingPayment(payment)
-    setForm({
-      userId: getPaymentUserId(payment),
-      planId: matchingPlan ? getRecordId(matchingPlan) : '',
-      amount: String(payment.amount ?? ''),
-      source: payment.source || 'reception',
-      createdAt: payment.createdAt ? new Date(payment.createdAt).toISOString().slice(0, 10) : '',
-      reference: payment.reference || '',
-      status: payment.status || 'Pending',
-    })
-    setReference(payment.reference || '')
     setModalError(null)
     setIsModalOpen(true)
   }
 
   function closeModal() {
     if (isSubmitting) return
-    setEditingPayment(null)
     setForm(emptyForm)
     setReference('')
     setModalError(null)
@@ -193,18 +168,10 @@ function Payments() {
         reference: reference.trim(),
         status: form.status,
       }
-      const paymentId = editingPayment ? getRecordId(editingPayment) : ''
-
-      if (editingPayment) {
-        if (!paymentId) throw new Error('El pago no tiene un identificador válido.')
-        await updatePayment(paymentId, payload)
-      } else {
-        await createPayment(payload)
-      }
+      await createPayment(payload)
 
       await refreshPayments()
       setError(null)
-      setEditingPayment(null)
       setForm(emptyForm)
       setReference('')
       setIsModalOpen(false)
@@ -212,6 +179,24 @@ function Payments() {
       setModalError(requestError instanceof Error ? requestError.message : 'No se pudo guardar el pago.')
     } finally {
       setIsSubmitting(false)
+    }
+  }
+
+  async function handleRedeemPin(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!pin.trim()) return
+    setIsRedeemingPin(true)
+    setToast(null)
+    setError(null)
+    try {
+      await redeemPaymentPin(pin)
+      await refreshPayments()
+      setPin('')
+      setToast('Pago cobrado y membresía activada')
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'No se pudo canjear el PIN.')
+    } finally {
+      setIsRedeemingPin(false)
     }
   }
 
@@ -240,15 +225,40 @@ function Payments() {
           <h1 className="text-4xl font-semibold tracking-tight text-slate-900">Pagos</h1>
           <p className="mt-3 text-slate-500">Consulta y administra los pagos registrados.</p>
         </div>
-        <button
-          className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#9BFF63] px-4 py-2 font-medium text-[#0F172A] transition hover:bg-[#abff7c]"
-          type="button"
-          onClick={openCreateModal}
-        >
-          <Plus size={18} aria-hidden="true" />
-          Nuevo Pago
-        </button>
+        <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
+          <form className="flex gap-2" onSubmit={handleRedeemPin}>
+            <input
+              className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-100 sm:w-52"
+              type="text"
+              placeholder="Código PIN Membresía"
+              aria-label="Código PIN Membresía"
+              value={pin}
+              onChange={(event) => setPin(event.target.value)}
+            />
+            <button
+              className="shrink-0 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:border-green-400 hover:text-green-700 disabled:cursor-not-allowed disabled:opacity-50"
+              type="submit"
+              disabled={isRedeemingPin || !pin.trim()}
+            >
+              {isRedeemingPin ? 'Canjeando...' : 'Canjear PIN'}
+            </button>
+          </form>
+          <button
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#9BFF63] px-4 py-2 font-medium text-[#0F172A] transition hover:bg-[#abff7c]"
+            type="button"
+            onClick={openCreateModal}
+          >
+            <Plus size={18} aria-hidden="true" />
+            Nuevo Pago
+          </button>
+        </div>
       </div>
+
+      {toast && (
+        <div className="mt-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm font-medium text-green-800" role="status">
+          {toast}
+        </div>
+      )}
 
       <div className="mt-8 overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
         {error && (
@@ -299,6 +309,7 @@ function Payments() {
                     (candidate.name || candidate.nombre) === planName,
                   )?.nombre
                   const status = payment.status || 'Sin estado'
+                  const isPending = ['pending', 'pendiente'].includes(status.toLowerCase())
 
                   return (
                     <tr className="transition-colors hover:bg-slate-50" key={paymentId}>
@@ -325,14 +336,7 @@ function Payments() {
                       </td>
                       <td className="whitespace-nowrap px-6 py-4 text-right">
                         <div className="inline-flex items-center gap-3">
-                          <button
-                            className="cursor-pointer text-slate-400 transition hover:text-green-600"
-                            type="button"
-                            aria-label="Editar pago"
-                            onClick={() => openEditModal(payment)}
-                          >
-                            <Pencil className="h-4 w-4" aria-hidden="true" />
-                          </button>
+                          {isPending && <span className="text-xs font-medium text-slate-400">Requiere PIN</span>}
                           <button
                             className="cursor-pointer text-slate-400 transition hover:text-red-600"
                             type="button"
@@ -365,7 +369,7 @@ function Payments() {
               <div>
                 <p className="text-sm font-medium uppercase tracking-[0.2em] text-emerald-700">Comercial</p>
                 <h2 className="mt-2 text-2xl font-semibold text-slate-900">
-                  {editingPayment ? 'Editar pago' : 'Nuevo pago'}
+                  Nuevo pago
                 </h2>
               </div>
               <button
@@ -505,7 +509,7 @@ function Payments() {
                   type="submit"
                   disabled={isSubmitting || users.length === 0 || plans.length === 0}
                 >
-                  {isSubmitting ? 'Guardando...' : editingPayment ? 'Actualizar' : 'Guardar'}
+                  {isSubmitting ? 'Guardando...' : 'Guardar'}
                 </button>
               </div>
             </form>
