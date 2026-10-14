@@ -5,6 +5,7 @@ import {
   LayoutDashboard,
   Megaphone,
   Receipt,
+  ShoppingCart,
   Users,
   Wrench,
 } from 'lucide-react'
@@ -18,6 +19,7 @@ const navigation = [
   { label: 'Usuarios', to: '/users', icon: Users, section: undefined },
   { label: 'Promociones', to: '/promotions', icon: Megaphone, section: 'Comercial' },
   { label: 'Pagos', to: '/payments', icon: Receipt, section: 'Comercial' },
+  { label: 'Ventas', to: '/sales', icon: ShoppingCart, section: 'Comercial' },
   { label: 'Suscripciones', to: '/subscriptions', icon: CreditCard, section: 'Comercial' },
 ]
 

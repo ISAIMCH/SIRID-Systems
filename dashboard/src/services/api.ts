@@ -155,6 +155,55 @@ export function updatePayment(id: string, paymentData: PaymentPayload) {
   })
 }
 
+export interface SaleRelation {
+  id?: string
+  _id?: string
+  name?: string
+  nombre?: string
+}
+
+export interface SaleItem {
+  productId: SaleRelation | string
+  quantity: number
+  price?: number | string
+  name?: string
+}
+
+export interface Sale {
+  id?: string
+  _id?: string
+  userId?: SaleRelation | string
+  items: SaleItem[]
+  totalAmount: number | string
+  status: string
+  createdAt?: string
+  date?: string
+}
+
+export interface SalePayload {
+  userId: string
+  items: Array<{ productId: string; quantity: number }>
+  status: string
+}
+
+export function getSales<T = unknown[]>() {
+  return apiClient<T>('/sales')
+}
+
+export function createSale(data: SalePayload) {
+  return apiClient('/sales', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export function updateSale(id: string, data: Partial<SalePayload>) {
+  return apiClient(`/sales/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  })
+}
+
 export function deletePayment(id: string) {
   return apiClient(`/payments/${id}`, {
     method: 'DELETE',
