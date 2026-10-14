@@ -60,8 +60,8 @@ function relationName(value: Routine['assignedTo'], users: User[]) {
   return users.find((user) => recordId(user) === value)?.name || '-'
 }
 
-function formatRoutineType(type: string) {
-  return type.toLowerCase() === 'custom' ? 'Personalizada' : 'Plantilla'
+function formatRoutineType(type?: string) {
+  return type?.toLowerCase() === 'custom' ? 'Personalizada' : 'Plantilla'
 }
 
 function toExerciseForm(exercise: RoutineExercise): ExerciseFormState {
@@ -129,7 +129,7 @@ function Routines() {
     setForm({
       title: routine.title || '',
       description: routine.description || '',
-      type: routine.type.toLowerCase() === 'custom' ? 'custom' : 'template',
+      type: routine.type?.toLowerCase() === 'custom' ? 'custom' : 'template',
       assignedTo: relationId(routine.assignedTo),
       exercises: (routine.exercises || []).map(toExerciseForm),
     })
@@ -263,7 +263,7 @@ function Routines() {
                   const routineId = recordId(routine) || `routine-${index}`
                   return (
                     <tr className="transition-colors hover:bg-slate-50" key={routineId}>
-                      <td className="whitespace-nowrap px-6 py-4 font-medium text-slate-900">{routine.title}</td>
+                      <td className="whitespace-nowrap px-6 py-4 font-medium text-slate-900">{routine.title || 'Sin título'}</td>
                       <td className="px-6 py-4"><span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">{formatRoutineType(routine.type)}</span></td>
                       <td className="px-6 py-4 text-slate-500">{routine.assignedTo ? relationName(routine.assignedTo, users) : '-'}</td>
                       <td className="px-6 py-4 text-slate-500">{routine.exercises?.length || 0}</td>
