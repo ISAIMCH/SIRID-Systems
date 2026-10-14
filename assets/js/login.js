@@ -28,7 +28,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     localStorage.setItem('userData', JSON.stringify(data.user));
                     
                     alert('Inicio de sesión exitoso');
-                    window.location.href = '../index.html';
+                    const returnTo = new URLSearchParams(window.location.search).get('returnTo');
+                    window.location.href = returnTo && returnTo.startsWith('../') ? returnTo : '../index.html';
                 } else {
                     alert('Error: ' + data.msg);
                 }
@@ -80,7 +81,8 @@ async function handleGoogleCredential(response) {
         localStorage.setItem('token', data.token);
         localStorage.setItem('userName', data.user.nombre);
         localStorage.setItem('userData', JSON.stringify(data.user));
-        window.location.href = '../index.html';
+        const returnTo = new URLSearchParams(window.location.search).get('returnTo');
+        window.location.href = returnTo && returnTo.startsWith('../') ? returnTo : '../index.html';
     } catch (error) {
         console.error('Error de autenticación con Google:', error);
         alert(error.message || 'No se pudo iniciar sesión con Google.');

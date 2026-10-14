@@ -336,3 +336,4 @@ router.put('/users/:id', authenticateToken, updateUser);
 router.patch('/users/:id', authenticateToken, updateUser);
 
 module.exports = router;
+module.exports.authenticateToken = authenticateToken;

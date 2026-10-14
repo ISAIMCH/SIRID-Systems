@@ -31,11 +31,13 @@ mongoose.connect(process.env.MONGO_URI)
 // Importamos el archivo auth.js que manejará el login, registro y encriptación
 const authRoutes = require('./routes/auth'); 
 const planRoutes = require('./routes/plans');
+const paymentRoutes = require('./routes/payments');
 const { getPlans } = require('./controllers/plan.controller');
 
 // Conectamos las rutas al motor principal
 app.use('/api/auth', authRoutes); 
 app.use('/api/plans', planRoutes);
+app.use('/api/payments', paymentRoutes);
 
 // Ruta para obtener los planes SaaS desde MongoDB Atlas
 app.get('/api/planes', getPlans);
