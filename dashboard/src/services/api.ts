@@ -123,10 +123,21 @@ export interface RoutineRelation {
   nombre?: string
 }
 
-export interface RoutineExercise {
+export interface Exercise {
   name: string
-  sets: number | string
-  reps: number | string
+  muscleGroup: string
+  equipment: string
+  reps?: number
+  time?: number
+  suggestedWeight?: number
+  videoUrl: string
+}
+
+export interface Block {
+  structure: 'Individual' | 'Superset' | 'Circuito'
+  blockSets: number
+  restTime: number
+  exercises: Exercise[]
 }
 
 export interface Routine {
@@ -136,15 +147,23 @@ export interface Routine {
   description?: string
   type: 'template' | 'custom' | string
   assignedTo?: RoutineRelation | string | null
-  exercises: RoutineExercise[]
+  objective: string
+  durationWeeks: number
+  level: string
+  days: string[]
+  blocks: Block[]
 }
 
 export interface RoutinePayload {
   title: string
   description: string
   type: 'template' | 'custom'
+  objective: string
+  durationWeeks: number
+  level: string
+  days: string[]
   assignedTo?: string
-  exercises: RoutineExercise[]
+  blocks: Block[]
 }
 
 export function getRoutines<T = unknown[]>() {
