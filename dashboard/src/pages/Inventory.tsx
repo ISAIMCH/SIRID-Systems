@@ -197,47 +197,39 @@ function Inventory() {
   )
 
   return (
-    <section className="min-h-screen bg-[#F8FAFC] px-8 py-10">
-      <p className="text-sm font-medium uppercase tracking-[0.25em] text-slate-500">Operación</p>
-      <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+    <section className="flex min-h-screen flex-col gap-6 bg-[#F8FAFC] px-8 py-10">
+      <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
         <div>
-          <h1 className="text-4xl font-semibold tracking-tight text-slate-900">Inventario</h1>
+          <p className="text-sm font-medium uppercase tracking-[0.25em] text-slate-500">Operación</p>
+          <h1 className="mt-3 text-4xl font-semibold tracking-tight text-slate-900">Inventario</h1>
           <p className="mt-3 text-slate-500">Administra los productos disponibles en la tienda.</p>
         </div>
-        <button
-          className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#9BFF63] px-4 py-2 font-medium text-[#0F172A] transition hover:bg-[#abff7c]"
-          type="button"
-          onClick={openCreateModal}
-              <div>
-                {form.imageUrl && (
-                  <img
-                    className="mb-3 h-24 w-24 rounded-lg object-cover"
-                    src={form.imageUrl}
-                    alt="Vista previa del producto"
-                  />
-                )}
-                <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="product-image-file">
-                  Imagen del producto
-                </label>
-      </div>
-
-                  id="product-image-file"
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageChange}
-          </div>
-        )}
-
-        <div className="border-b border-slate-100 p-4">
+        <div className="flex w-full flex-col gap-4 sm:flex-row sm:items-center md:w-auto">
           <input
-            className="w-full max-w-sm rounded-lg border border-slate-200 px-4 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-100"
+            className="w-full rounded-lg border border-slate-200 px-4 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-100 sm:w-64"
             type="search"
             placeholder="Buscar..."
             aria-label="Buscar productos"
             value={searchTerm}
             onChange={(event) => setSearchTerm(event.target.value)}
           />
+          <button
+            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-[#9BFF63] px-4 py-2 font-medium text-[#0F172A] transition hover:bg-[#abff7c]"
+            type="button"
+            onClick={openCreateModal}
+          >
+            <Plus size={18} aria-hidden="true" />
+            Nuevo Producto
+          </button>
         </div>
+      </div>
+
+      <div className="w-full overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
+        {error && (
+          <div className="border-b border-red-100 bg-red-50 px-6 py-4 text-sm text-red-700" role="alert">
+            {error}
+          </div>
+        )}
 
         {isLoading ? (
           <ProductSkeleton />
@@ -400,6 +392,26 @@ function Inventory() {
                   value={form.stock}
                   onChange={(event) => setForm({ ...form, stock: event.target.value })}
                   required
+                />
+              </div>
+
+              <div>
+                {form.imageUrl && (
+                  <img
+                    className="mb-3 h-24 w-24 rounded-lg object-cover"
+                    src={form.imageUrl}
+                    alt="Vista previa del producto"
+                  />
+                )}
+                <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="product-image-file">
+                  Imagen del producto
+                </label>
+                <input
+                  className="w-full rounded-lg border border-slate-200 px-4 py-3 text-slate-900 outline-none transition file:mr-4 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-medium file:text-slate-700 hover:file:bg-slate-200"
+                  id="product-image-file"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageChange}
                 />
               </div>
 
