@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Minus, Plus, Trash2 } from 'lucide-react'
-import { createSale, getProducts, getSales, getUsers, redeemSalePin, updateSale } from '../services/api'
+import { createSale, getProducts, getSales, getUsers, redeemSalePin } from '../services/api'
 import type { Sale, SaleItem, SalePayload } from '../services/api'
 import type { Product, User } from '../types'
 
@@ -85,7 +85,6 @@ function Sales() {
   const [modalError, setModalError] = useState<string | null>(null)
   const [pin, setPin] = useState('')
   const [isRedeemingPin, setIsRedeemingPin] = useState(false)
-  const [redeemingSaleId, setRedeemingSaleId] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
 
   async function refreshSales() {
@@ -166,24 +165,6 @@ function Sales() {
     }
   }
 
-  async function handleMarkPaid(sale: Sale) {
-    const saleId = recordId(sale)
-    if (!saleId) {
-      setError('La venta no tiene un identificador válido.')
-      return
-    }
-    setRedeemingSaleId(saleId); setToast(null); setError(null)
-    try {
-      await updateSale(saleId, { status: 'paid' })
-      await refreshSales()
-      setToast('Venta cobrada y stock descontado')
-    } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : 'No se pudo marcar la venta como pagada.')
-    } finally {
-      setRedeemingSaleId(null)
-    }
-  }
-
   const formatCurrency = (value: number | string) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(Number(value) || 0)
 
   return (
@@ -206,7 +187,7 @@ function Sales() {
         {error && <div className="border-b border-red-100 bg-red-50 px-6 py-4 text-sm text-red-700" role="alert">{error}</div>}
         {isLoading ? <div className="space-y-4 p-6" aria-label="Cargando ventas" aria-busy="true">{Array.from({ length: 5 }).map((_, index) => <div className="grid grid-cols-6 gap-6" key={index}>{Array.from({ length: 6 }).map((__, columnIndex) => <div className="h-4 animate-pulse rounded bg-slate-200" key={columnIndex} />)}</div>)}</div> : (
           <div className="overflow-x-auto"><table className="min-w-full text-left text-sm"><thead className="border-b border-slate-100 bg-slate-50/80 text-xs uppercase tracking-wider text-slate-500"><tr><th className="px-6 py-4 font-medium">Usuario</th><th className="px-6 py-4 font-medium">Productos</th><th className="px-6 py-4 font-medium">Total</th><th className="px-6 py-4 font-medium">Estado</th><th className="px-6 py-4 font-medium">Fecha</th><th className="px-6 py-4" /></tr></thead><tbody className="divide-y divide-slate-100 text-slate-700">
-            {sales.length ? sales.map((sale, index) => { const id = recordId(sale) || `sale-${index}`; const date = sale.createdAt || sale.date; const userName = relationName(sale.userId) || users.find((user) => recordId(user) === relationId(sale.userId))?.name || 'Sin asignar'; const isPending = ['pending', 'pendiente'].includes(sale.status.toLowerCase()); return <tr className="transition-colors hover:bg-slate-50" key={id}><td className="whitespace-nowrap px-6 py-4 font-medium text-slate-900">{userName}</td><td className="min-w-64 px-6 py-4 text-slate-500">{sale.items?.length ? sale.items.map((item) => `${productName(item, products)} x${item.quantity}`).join(', ') : 'Sin productos'}</td><td className="whitespace-nowrap px-6 py-4">{formatCurrency(sale.totalAmount)}</td><td className="px-6 py-4"><span className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${statusClasses(sale.status)}`}>{statusLabel(sale.status)}</span></td><td className="whitespace-nowrap px-6 py-4 text-slate-500">{date && !Number.isNaN(new Date(date).getTime()) ? new Intl.DateTimeFormat('es-MX').format(new Date(date)) : 'Sin fecha'}</td><td className="whitespace-nowrap px-6 py-4 text-right">{isPending && <button className="rounded-lg bg-green-100 px-3 py-2 text-xs font-semibold text-green-800 transition hover:bg-green-200 disabled:cursor-not-allowed disabled:opacity-50" type="button" disabled={redeemingSaleId === id} onClick={() => handleMarkPaid(sale)}>{redeemingSaleId === id ? 'Guardando...' : 'Marcar Pagado'}</button>}</td></tr> }) : <tr><td className="px-6 py-10 text-center text-sm text-slate-500" colSpan={6}>No hay ventas registradas.</td></tr>}
+            {sales.length ? sales.map((sale, index) => { const id = recordId(sale) || `sale-${index}`; const date = sale.createdAt || sale.date; const userName = relationName(sale.userId) || users.find((user) => recordId(user) === relationId(sale.userId))?.name || 'Sin asignar'; const isPending = ['pending', 'pendiente'].includes(sale.status.toLowerCase()); return <tr className="transition-colors hover:bg-slate-50" key={id}><td className="whitespace-nowrap px-6 py-4 font-medium text-slate-900">{userName}</td><td className="min-w-64 px-6 py-4 text-slate-500">{sale.items?.length ? sale.items.map((item) => `${productName(item, products)} x${item.quantity}`).join(', ') : 'Sin productos'}</td><td className="whitespace-nowrap px-6 py-4">{formatCurrency(sale.totalAmount)}</td><td className="px-6 py-4"><span className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${statusClasses(sale.status)}`}>{statusLabel(sale.status)}</span></td><td className="whitespace-nowrap px-6 py-4 text-slate-500">{date && !Number.isNaN(new Date(date).getTime()) ? new Intl.DateTimeFormat('es-MX').format(new Date(date)) : 'Sin fecha'}</td><td className="whitespace-nowrap px-6 py-4 text-right text-xs font-medium text-slate-400">{isPending ? 'Requiere PIN' : ''}</td></tr> }) : <tr><td className="px-6 py-10 text-center text-sm text-slate-500" colSpan={6}>No hay ventas registradas.</td></tr>}
           </tbody></table></div>
         )}
       </div>
