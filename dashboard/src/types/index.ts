@@ -50,7 +50,6 @@ export interface Equipment {
   totalQuantity?: number
   maintenanceQuantity?: number
   status: EquipmentStatus
-  usageFrequency: string
   activeReportsCount?: number
 }
 

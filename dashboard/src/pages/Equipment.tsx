@@ -14,8 +14,10 @@ interface EquipmentFormState {
   cantidadTotal: string
   cantidadMantenimiento: string
   estado: EquipmentStatus
-  frecuenciaUso: string
 }
+
+const zoneOptions = ['Zona de piernas', 'Peso libre', 'Cardio']
+const customZoneOption = 'other'
 
 const emptyEquipmentForm: EquipmentFormState = {
   nombre: '',
@@ -25,7 +27,6 @@ const emptyEquipmentForm: EquipmentFormState = {
   cantidadTotal: '1',
   cantidadMantenimiento: '0',
   estado: 'operational',
-  frecuenciaUso: '',
 }
 
 async function fetchEquipment() {
@@ -61,6 +62,7 @@ function Equipment() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [modalError, setModalError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
+  const [customZone, setCustomZone] = useState('')
 
   useEffect(() => {
     let isMounted = true
@@ -94,22 +96,25 @@ function Equipment() {
   function openCreateModal() {
     setEditingEquipment(null)
     setForm(emptyEquipmentForm)
+    setCustomZone('')
     setModalError(null)
     setIsModalOpen(true)
   }
 
   function openEditModal(item: Equipment) {
+    const zone = item.zone || ''
+    const isPresetZone = zoneOptions.includes(zone)
     setEditingEquipment(item)
     setForm({
       nombre: item.name || '',
-      zona: item.zone || '',
+      zona: isPresetZone ? zone : customZoneOption,
       marca: item.brand || '',
       tipo: item.type || 'Cardio',
       cantidadTotal: String(item.totalQuantity ?? 1),
       cantidadMantenimiento: String(item.maintenanceQuantity ?? 0),
       estado: item.status || 'operational',
-      frecuenciaUso: item.usageFrequency || '',
     })
+    setCustomZone(isPresetZone ? '' : zone)
     setModalError(null)
     setIsModalOpen(true)
   }
@@ -118,6 +123,7 @@ function Equipment() {
     if (isSubmitting) return
     setEditingEquipment(null)
     setForm(emptyEquipmentForm)
+    setCustomZone('')
     setModalError(null)
     setIsModalOpen(false)
   }
@@ -130,14 +136,14 @@ function Equipment() {
     try {
       const payload: EquipmentPayload = {
         name: form.nombre.trim(),
-        zone: form.zona.trim(),
+        zone: (form.zona === customZoneOption ? customZone : form.zona).trim(),
         brand: form.marca.trim(),
         type: form.tipo,
         totalQuantity: Number(form.cantidadTotal),
         maintenanceQuantity: Number(form.cantidadMantenimiento),
         status: form.estado,
-        usageFrequency: form.frecuenciaUso.trim(),
       }
+      if (!payload.zone) throw new Error('Selecciona o escribe una zona.')
       const equipmentId = editingEquipment?._id || editingEquipment?.id
 
       if (editingEquipment) {
@@ -151,6 +157,7 @@ function Equipment() {
       setError(null)
       setEditingEquipment(null)
       setForm(emptyEquipmentForm)
+      setCustomZone('')
       setIsModalOpen(false)
     } catch (requestError) {
       setModalError(
@@ -245,7 +252,6 @@ function Equipment() {
                   <th className="px-6 py-4 font-medium">Tipo</th>
                   <th className="px-6 py-4 font-medium">Cantidades</th>
                   <th className="px-6 py-4 font-medium">Estado</th>
-                  <th className="px-6 py-4 font-medium">Frecuencia de uso</th>
                   <th className="px-6 py-4 font-medium">Reportes</th>
                   <th className="px-6 py-4 font-medium" />
                 </tr>
@@ -273,9 +279,6 @@ function Equipment() {
                           <span className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${statusClass(item.status)}`}>
                             {statusLabel(item.status)}
                           </span>
-                        </td>
-                        <td className="px-6 py-4">
-                          {item.usageFrequency || 'Sin registro'}
                         </td>
                         <td className="px-6 py-4">
                           {hasActiveReports ? (
@@ -314,7 +317,7 @@ function Equipment() {
                   })
                 ) : (
                   <tr>
-                    <td className="px-6 py-10 text-center text-sm text-slate-500" colSpan={9}>
+                    <td className="px-6 py-10 text-center text-sm text-slate-500" colSpan={8}>
                       {searchTerm ? 'No hay equipo que coincida con la búsqueda.' : 'No hay equipo registrado.'}
                     </td>
                   </tr>
@@ -364,15 +367,34 @@ function Equipment() {
                 <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="equipment-zone">
                   Zona
                 </label>
-                <input
-                  className="w-full rounded-lg border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                <select
+                  className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
                   id="equipment-zone"
-                  type="text"
                   value={form.zona}
                   onChange={(event) => setForm({ ...form, zona: event.target.value })}
                   required
-                />
+                >
+                  <option value="">Selecciona una zona</option>
+                  {zoneOptions.map((zone) => <option key={zone} value={zone}>{zone}</option>)}
+                  <option value={customZoneOption}>Agregar otra...</option>
+                </select>
               </div>
+
+              {form.zona === customZoneOption && (
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="equipment-custom-zone">
+                    Nueva zona
+                  </label>
+                  <input
+                    className="w-full rounded-lg border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                    id="equipment-custom-zone"
+                    type="text"
+                    value={customZone}
+                    onChange={(event) => setCustomZone(event.target.value)}
+                    required
+                  />
+                </div>
+              )}
 
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="equipment-brand">
@@ -452,20 +474,6 @@ function Equipment() {
                   <option value="maintenance">Mantenimiento</option>
                   <option value="broken">Averiado</option>
                 </select>
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="equipment-usage-frequency">
-                  Frecuencia de uso
-                </label>
-                <input
-                  className="w-full rounded-lg border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
-                  id="equipment-usage-frequency"
-                  type="text"
-                  value={form.frecuenciaUso}
-                  onChange={(event) => setForm({ ...form, frecuenciaUso: event.target.value })}
-                  required
-                />
               </div>
 
               {modalError && (

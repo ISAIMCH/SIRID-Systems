@@ -13,6 +13,9 @@ interface ProductFormState {
   imageUrl: string
 }
 
+const categoryOptions = ['Suplementos', 'Ropa', 'Accesorios']
+const customCategoryOption = 'other'
+
 const emptyProductForm: ProductFormState = {
   nombre: '',
   categoria: '',
@@ -54,6 +57,7 @@ function Inventory() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [modalError, setModalError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
+  const [customCategory, setCustomCategory] = useState('')
 
   useEffect(() => {
     let isMounted = true
@@ -87,19 +91,23 @@ function Inventory() {
   function openCreateModal() {
     setEditingProduct(null)
     setForm(emptyProductForm)
+    setCustomCategory('')
     setModalError(null)
     setIsModalOpen(true)
   }
 
   function openEditModal(product: Product) {
+    const category = product.category || ''
+    const isPresetCategory = categoryOptions.includes(category)
     setEditingProduct(product)
     setForm({
       nombre: product.name || '',
-      categoria: product.category || '',
+      categoria: isPresetCategory ? category : customCategoryOption,
       precio: String(product.price ?? ''),
       stock: String(product.stock ?? ''),
       imageUrl: product.imageUrl || '',
     })
+    setCustomCategory(isPresetCategory ? '' : category)
     setModalError(null)
     setIsModalOpen(true)
   }
@@ -108,6 +116,7 @@ function Inventory() {
     if (isSubmitting) return
     setEditingProduct(null)
     setForm(emptyProductForm)
+    setCustomCategory('')
     setModalError(null)
     setIsModalOpen(false)
   }
@@ -120,11 +129,12 @@ function Inventory() {
     try {
       const payload = {
         name: form.nombre.trim(),
-        category: form.categoria.trim(),
+        category: (form.categoria === customCategoryOption ? customCategory : form.categoria).trim(),
         price: Number(form.precio),
         stock: Number(form.stock),
         imageUrl: form.imageUrl.trim(),
       }
+      if (!payload.category) throw new Error('Selecciona o escribe una categoría.')
       const productId = editingProduct?._id || editingProduct?.id
 
       if (editingProduct) {
@@ -138,6 +148,7 @@ function Inventory() {
       setError(null)
       setEditingProduct(null)
       setForm(emptyProductForm)
+      setCustomCategory('')
       setIsModalOpen(false)
     } catch (requestError) {
       setModalError(
@@ -308,15 +319,34 @@ function Inventory() {
                 <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="product-category">
                   Categoría
                 </label>
-                <input
-                  className="w-full rounded-lg border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                <select
+                  className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
                   id="product-category"
-                  type="text"
                   value={form.categoria}
                   onChange={(event) => setForm({ ...form, categoria: event.target.value })}
                   required
-                />
+                >
+                  <option value="">Selecciona una categoría</option>
+                  {categoryOptions.map((category) => <option key={category} value={category}>{category}</option>)}
+                  <option value={customCategoryOption}>Agregar otra...</option>
+                </select>
               </div>
+
+              {form.categoria === customCategoryOption && (
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="product-custom-category">
+                    Nueva categoría
+                  </label>
+                  <input
+                    className="w-full rounded-lg border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                    id="product-custom-category"
+                    type="text"
+                    value={customCategory}
+                    onChange={(event) => setCustomCategory(event.target.value)}
+                    required
+                  />
+                </div>
+              )}
 
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="product-price">

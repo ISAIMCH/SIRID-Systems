@@ -203,7 +203,6 @@ export interface EquipmentPayload {
   totalQuantity: number
   maintenanceQuantity: number
   status: EquipmentStatus
-  usageFrequency: string
 }
 
 export function getEquipment<T = Equipment[]>() {
