@@ -129,6 +129,22 @@ function Promotions() {
     setIsModalOpen(false)
   }
 
+  function handleImageChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setForm((currentForm) => ({ ...currentForm, imageUrl: reader.result as string }))
+      } else {
+        setModalError('No se pudo leer la imagen seleccionada.')
+      }
+    }
+    reader.onerror = () => setModalError('No se pudo leer la imagen seleccionada.')
+    reader.readAsDataURL(file)
+  }
+
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setModalError(null)
@@ -369,15 +385,22 @@ function Promotions() {
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="promotion-image-url">
-                  URL de imagen
+                {form.imageUrl && (
+                  <img
+                    className="mb-3 h-24 w-24 rounded-lg object-cover"
+                    src={form.imageUrl}
+                    alt="Vista previa de la promoción"
+                  />
+                )}
+                <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="promotion-image-file">
+                  Imagen de la promoción
                 </label>
                 <input
-                  className="w-full rounded-lg border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
-                  id="promotion-image-url"
-                  type="url"
-                  value={form.imageUrl}
-                  onChange={(event) => setForm({ ...form, imageUrl: event.target.value })}
+                  className="w-full rounded-lg border border-slate-200 px-4 py-3 text-slate-900 outline-none transition file:mr-4 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-medium file:text-slate-700 hover:file:bg-slate-200"
+                  id="promotion-image-file"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageChange}
                 />
               </div>
 

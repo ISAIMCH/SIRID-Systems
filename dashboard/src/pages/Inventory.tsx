@@ -121,6 +121,22 @@ function Inventory() {
     setIsModalOpen(false)
   }
 
+  function handleImageChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setForm((currentForm) => ({ ...currentForm, imageUrl: reader.result as string }))
+      } else {
+        setModalError('No se pudo leer la imagen seleccionada.')
+      }
+    }
+    reader.onerror = () => setModalError('No se pudo leer la imagen seleccionada.')
+    reader.readAsDataURL(file)
+  }
+
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setModalError(null)
@@ -192,16 +208,23 @@ function Inventory() {
           className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#9BFF63] px-4 py-2 font-medium text-[#0F172A] transition hover:bg-[#abff7c]"
           type="button"
           onClick={openCreateModal}
-        >
-          <Plus size={18} aria-hidden="true" />
-          Nuevo Producto
-        </button>
+              <div>
+                {form.imageUrl && (
+                  <img
+                    className="mb-3 h-24 w-24 rounded-lg object-cover"
+                    src={form.imageUrl}
+                    alt="Vista previa del producto"
+                  />
+                )}
+                <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="product-image-file">
+                  Imagen del producto
+                </label>
       </div>
 
-      <div className="mt-8 overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
-        {error && (
-          <div className="border-b border-red-100 bg-red-50 px-6 py-4 text-sm text-red-700" role="alert">
-            {error}
+                  id="product-image-file"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageChange}
           </div>
         )}
 
@@ -377,19 +400,6 @@ function Inventory() {
                   value={form.stock}
                   onChange={(event) => setForm({ ...form, stock: event.target.value })}
                   required
-                />
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="product-image-url">
-                  URL de imagen
-                </label>
-                <input
-                  className="w-full rounded-lg border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
-                  id="product-image-url"
-                  type="url"
-                  value={form.imageUrl}
-                  onChange={(event) => setForm({ ...form, imageUrl: event.target.value })}
                 />
               </div>
 
