@@ -190,6 +190,13 @@ export function getSales<T = unknown[]>() {
   return apiClient<T>('/sales')
 }
 
+export function redeemSalePin(pin: string) {
+  return apiClient('/sales/redeem', {
+    method: 'PATCH',
+    body: JSON.stringify({ pin: pin.trim() }),
+  })
+}
+
 export function createSale(data: SalePayload) {
   return apiClient('/sales', {
     method: 'POST',
