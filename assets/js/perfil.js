@@ -1,4 +1,4 @@
-const API_URL = 'https://sirid-systems.onrender.com/api/auth';
+const API_URL = `${window.SIRID_API_URL}/api/auth`;
 const token = localStorage.getItem('token');
 const loading = document.getElementById('profileLoading');
 const content = document.getElementById('profileContent');

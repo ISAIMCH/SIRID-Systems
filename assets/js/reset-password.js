@@ -23,7 +23,7 @@ resetForm.addEventListener('submit', async (event) => {
     resetStatus.className = 'small mb-3 text-secondary';
     resetStatus.textContent = 'Actualizando contraseña...';
     try {
-        const response = await fetch('https://sirid-systems.onrender.com/api/auth/reset-password', {
+        const response = await fetch(`${window.SIRID_API_URL}/api/auth/reset-password`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ token: resetToken, password })

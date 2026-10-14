@@ -1,10 +1,18 @@
 // backend/server.js
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
+const dns = require('dns');
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors'); // Necesario para que tu frontend (puerto 5500) pueda hablar con tu backend (puerto 3000)
 
 const app = express();
+
+const dnsServers = (process.env.DNS_SERVERS || '8.8.8.8,1.1.1.1')
+    .split(',')
+    .map((server) => server.trim())
+    .filter(Boolean);
+dns.setServers(dnsServers);
 
 // ==========================================
 // 1. MIDDLEWARES (Configuraciones de seguridad y datos)
@@ -17,7 +25,7 @@ app.use(express.json()); // Permite que el servidor lea los datos en formato JSO
 // ==========================================
 const PORT = process.env.PORT || 3000;
 
-mongoose.connect(process.env.MONGO_URI)
+mongoose.connect(process.env.MONGO_URI, { serverSelectionTimeoutMS: 10000 })
     .then(() => {
         console.log('✅ Conexión exitosa a la bóveda en la nube de MongoDB Atlas');
     })

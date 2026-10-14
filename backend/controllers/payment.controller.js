@@ -51,6 +51,10 @@ async function createPayment(req, res) {
             return res.status(401).json({ msg: 'La sesión no pertenece a un usuario válido.' });
         }
 
+        const expectedTotal = Number((subtotal + tax).toFixed(2));
+        if (Math.abs(expectedTotal - total) > 0.01) {
+            return res.status(400).json({ msg: 'El total de la orden no coincide con el subtotal y el IVA.' });
+        }
         const payment = await Payment.create({
             orderId: id.trim(),
             user: req.userId,

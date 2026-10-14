@@ -11,7 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             try {
                 // Petición al backend local (cambiar a URL de Railway al subir a producción)
-                const response = await fetch('https://sirid-systems.onrender.com/api/auth/login', {
+                const response = await fetch(`${window.SIRID_API_URL}/api/auth/login`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -49,7 +49,7 @@ document.addEventListener('DOMContentLoaded', () => {
             status.className = 'small mt-3 text-secondary';
             status.textContent = 'Enviando enlace...';
             try {
-                const response = await fetch('https://sirid-systems.onrender.com/api/auth/forgot-password', {
+                const response = await fetch(`${window.SIRID_API_URL}/api/auth/forgot-password`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email: document.getElementById('forgotEmail').value })
@@ -69,7 +69,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function handleGoogleCredential(response) {
     try {
-        const result = await fetch('https://sirid-systems.onrender.com/api/auth/google', {
+        const result = await fetch(`${window.SIRID_API_URL}/api/auth/google`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ credential: response.credential })

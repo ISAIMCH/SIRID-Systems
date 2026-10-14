@@ -29,7 +29,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (contenedorPlanes) {
         try {
             // Petición al backend
-            const respuesta = await fetch('https://sirid-systems.onrender.com/api/planes');
+            const respuesta = await fetch(`${window.SIRID_API_URL}/api/planes`);
             const planes = await respuesta.json();
             
             contenedorPlanes.innerHTML = ''; // Limpiamos el spinner
