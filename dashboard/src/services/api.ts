@@ -198,9 +198,19 @@ export function createSale(data: SalePayload) {
 }
 
 export function updateSale(id: string, data: Partial<SalePayload>) {
+  const statusMap: Record<string, string> = {
+    pagado: 'paid',
+    pendiente: 'pending',
+    cancelado: 'cancelled',
+    cancelada: 'cancelled',
+  }
+  const normalizedData = data.status
+    ? { ...data, status: statusMap[data.status.toLowerCase()] || data.status }
+    : data
+
   return apiClient(`/sales/${id}`, {
-    method: 'PUT',
-    body: JSON.stringify(data),
+    method: 'PATCH',
+    body: JSON.stringify(normalizedData),
   })
 }
 
