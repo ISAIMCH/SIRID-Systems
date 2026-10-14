@@ -137,6 +137,7 @@ const paymentRequest=async(path='',options={})=>{let response;
  try{response=await fetch(API+path,{...options,headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`}})}
  catch(error){throw new Error('No se pudo conectar con Express. Verifica que el backend esté activo en http://localhost:3000.')}
  const data=await response.json().catch(()=>({}));
+ if(response.status===401){localStorage.removeItem('token');localStorage.removeItem('userData');location.href='login.html?returnTo=pagos.html';throw new Error(data.msg||'Tu sesión expiró. Inicia sesión nuevamente.')}
  if(!response.ok)throw new Error(`${data.msg||'El servidor rechazó la orden.'} (HTTP ${response.status})`);
  return data};
 const sub=()=>S.cart.reduce((a,i)=>a+i.price*i.qty,0), tot=()=>+(sub()*1.16).toFixed(2), qtyN=()=>S.cart.reduce((a,i)=>a+i.qty,0);
