@@ -5,7 +5,8 @@
   "description": "Plataforma B2B SaaS para gimnasios",
   "main": "backend/server.js",
   "scripts": {
-    "start": "node backend/server.js"
+    "start": "node backend/server.js",
+    "local:user": "node backend/seed-local.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

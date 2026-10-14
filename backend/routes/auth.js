@@ -7,6 +7,7 @@ const { OAuth2Client } = require('google-auth-library');
 const User = require('../models/User');
 const { getUsers, createUser, updateUser } = require('../controllers/auth.controller');
 const router = express.Router();
+const localMode = process.env.LOCAL_MODE === 'true';
 
 function authenticateToken(req, res, next) {
     const authorization = req.headers.authorization || '';
@@ -124,7 +125,7 @@ router.post('/register', async (req, res) => {
             fechaNacimiento,
             email: normalizedEmail,
             password: hashedPassword,
-            verificado: false, 
+            verificado: localMode,
             tokenVerificacion
         });
 
@@ -132,13 +133,19 @@ router.post('/register', async (req, res) => {
 
         const urlVerificacion = `${process.env.API_PUBLIC_URL || 'https://sirid-systems.onrender.com'}/api/auth/verificar/${tokenVerificacion}`;
         
-        await sendVerificationEmail({
-            recipient: normalizedEmail,
-            name: nombre,
-            verificationUrl: urlVerificacion
-        });
+        if (!localMode) {
+            await sendVerificationEmail({
+                recipient: normalizedEmail,
+                name: nombre,
+                verificationUrl: urlVerificacion
+            });
+        }
 
-        res.status(201).json({ msg: 'Usuario registrado. Revisa tu correo para verificar la cuenta.' });
+        res.status(201).json({
+            msg: localMode
+                ? 'Usuario registrado. Ya puedes iniciar sesión localmente.'
+                : 'Usuario registrado. Revisa tu correo para verificar la cuenta.'
+        });
     } catch (err) {
         if (createdUser?._id) {
             await User.deleteOne({ _id: createdUser._id }).catch((cleanupError) => {
@@ -180,7 +187,7 @@ router.post('/login', async (req, res) => {
         const user = await User.findOne({ email: email.trim().toLowerCase() });
         
         if (!user) return res.status(400).json({ msg: 'Usuario no encontrado' });
-        if (!user.verificado) return res.status(403).json({ msg: 'Verifica tu correo electrónico para ingresar.' });
+        if (!user.verificado && !localMode) return res.status(403).json({ msg: 'Verifica tu correo electrónico para ingresar.' });
 
         // Si el usuario se registró con Google, no tendrá contraseña tradicional
         if (!user.password) return res.status(400).json({ msg: 'Inicia sesión con Google.' });

@@ -13,11 +13,23 @@ Plataforma B2B SaaS para gimnasios: monitorea afluencia, automatiza el acceso y 
 ## Uso local
 
 ```bash
-npm install express cors dotenv bcryptjs jsonwebtoken mongoose
-node backend/server.js
+npm install
+npm run local:user
+npm start
 ```
 
-El frontend puede abrirse directamente desde `index.html` o servirse con cualquier servidor estatico. Copia las variables de `backend/.env.example` a `backend/.env` antes de iniciar la API.
+Abre `http://localhost:3000/pages/login.html`. Express sirve el frontend y la API desde el mismo puerto, por lo que no necesitas Live Server.
+
+Copia `backend/.env.example` a `backend/.env`, configura `MONGO_URI` y `JWT_SECRET`, y cambia `LOCAL_MODE=true` para las pruebas locales. En producción debe permanecer en `false`.
+
+El usuario de prueba se crea con `npm run local:user`:
+
+```text
+Correo: demo@gymgo.local
+Contraseña: GymGoLocal123!
+```
+
+Para producción, elimina `LOCAL_MODE` o configúralo como `false`, y usa valores reales para las URLs públicas y las credenciales.
 
 ## Estado
 

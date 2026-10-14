@@ -29,7 +29,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     
                     alert('Inicio de sesión exitoso');
                     const returnTo = new URLSearchParams(window.location.search).get('returnTo');
-                    window.location.href = returnTo && returnTo.startsWith('../') ? returnTo : '../index.html';
+                    window.location.href = returnTo && /^(?:\.\.\/|[a-zA-Z0-9_-]+\.html(?:\?.*)?)$/.test(returnTo)
+                        ? returnTo
+                        : '../index.html';
                 } else {
                     alert('Error: ' + data.msg);
                 }
@@ -82,7 +84,9 @@ async function handleGoogleCredential(response) {
         localStorage.setItem('userName', data.user.nombre);
         localStorage.setItem('userData', JSON.stringify(data.user));
         const returnTo = new URLSearchParams(window.location.search).get('returnTo');
-        window.location.href = returnTo && returnTo.startsWith('../') ? returnTo : '../index.html';
+        window.location.href = returnTo && /^(?:\.\.\/|[a-zA-Z0-9_-]+\.html(?:\?.*)?)$/.test(returnTo)
+            ? returnTo
+            : '../index.html';
     } catch (error) {
         console.error('Error de autenticación con Google:', error);
         alert(error.message || 'No se pudo iniciar sesión con Google.');

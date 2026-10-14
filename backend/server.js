@@ -7,6 +7,7 @@ const mongoose = require('mongoose');
 const cors = require('cors'); // Necesario para que tu frontend (puerto 5500) pueda hablar con tu backend (puerto 3000)
 
 const app = express();
+const frontendRoot = path.join(__dirname, '..');
 
 const dnsServers = (process.env.DNS_SERVERS || '8.8.8.8,1.1.1.1')
     .split(',')
@@ -19,6 +20,7 @@ dns.setServers(dnsServers);
 // ==========================================
 app.use(cors()); // Permite peticiones HTTP entre el cliente y el servidor intermedio seguro
 app.use(express.json()); // Permite que el servidor lea los datos en formato JSON enviados por fetch()
+app.use(express.static(frontendRoot));
 
 // ==========================================
 // 2. CONEXIÓN A LA BASE DE DATOS
