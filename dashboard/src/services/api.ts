@@ -116,6 +116,61 @@ export function deletePlan(id: string) {
   })
 }
 
+export interface RoutineRelation {
+  id?: string
+  _id?: string
+  name?: string
+  nombre?: string
+}
+
+export interface RoutineExercise {
+  name: string
+  sets: number | string
+  reps: number | string
+}
+
+export interface Routine {
+  id?: string
+  _id?: string
+  title: string
+  description?: string
+  type: 'template' | 'custom' | string
+  assignedTo?: RoutineRelation | string | null
+  exercises: RoutineExercise[]
+}
+
+export interface RoutinePayload {
+  title: string
+  description: string
+  type: 'template' | 'custom'
+  assignedTo?: string
+  exercises: RoutineExercise[]
+}
+
+export function getRoutines<T = unknown[]>() {
+  return apiClient<T>('/routines')
+}
+
+export function createRoutine(data: RoutinePayload) {
+  return apiClient('/routines', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export function updateRoutine(id: string, data: RoutinePayload) {
+  return apiClient(`/routines/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  })
+}
+
+export function deleteRoutine(id: string) {
+  return apiClient(`/routines/${id}`, {
+    method: 'DELETE',
+  })
+}
+
 export function getPayments<T = unknown[]>() {
   return apiClient<T>('/payments')
 }

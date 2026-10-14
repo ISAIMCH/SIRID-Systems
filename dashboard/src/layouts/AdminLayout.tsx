@@ -1,5 +1,6 @@
 import {
   CreditCard,
+  ClipboardList,
   Dumbbell,
   Package,
   LayoutDashboard,
@@ -17,6 +18,7 @@ const navigation = [
   { label: 'Equipo', to: '/equipment', icon: Wrench, section: undefined },
   { label: 'Inventario', to: '/inventory', icon: Package, section: undefined },
   { label: 'Usuarios', to: '/users', icon: Users, section: undefined },
+  { label: 'Rutinas', to: '/routines', icon: ClipboardList, section: 'Entrenamiento' },
   { label: 'Promociones', to: '/promotions', icon: Megaphone, section: 'Comercial' },
   { label: 'Pagos', to: '/payments', icon: Receipt, section: 'Comercial' },
   { label: 'Ventas', to: '/sales', icon: ShoppingCart, section: 'Comercial' },
