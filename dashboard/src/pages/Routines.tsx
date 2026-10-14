@@ -1,20 +1,40 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { Pencil, Plus, Trash2, X } from 'lucide-react'
+import { Pencil, Plus, Trash2, UserRoundPlus, X } from 'lucide-react'
 import {
+  assignTemplateToClient,
   createRoutine,
+  createTemplate,
   deleteRoutine,
+  deleteTemplate,
+  getEquipment,
   getRoutines,
+  getTemplates,
   getUsers,
   updateRoutine,
+  updateTemplate,
 } from '../services/api'
-import type { Block, Exercise, Routine, RoutinePayload } from '../services/api'
-import type { User } from '../types'
+import type {
+  Routine,
+  RoutineBlock,
+  RoutineExercise,
+  RoutinePayload,
+  RoutineTemplate,
+  RoutineTemplatePayload,
+} from '../services/api'
+import type { Equipment, User } from '../types'
 
-type RoutineResponse = Routine[] | { data?: unknown; routines?: unknown; rutinas?: unknown }
-type UserResponse = User[] | { data?: unknown; users?: unknown }
-type RoutineType = 'template' | 'custom'
+type ArrayResponse<T> = T[] | {
+  data?: unknown
+  routines?: unknown
+  rutinas?: unknown
+  templates?: unknown
+  routineTemplates?: unknown
+  users?: unknown
+  equipment?: unknown
+}
+type BuilderMode = 'template' | 'routine'
 type ExerciseMode = 'Fuerza' | 'Cardio'
-type BlockStructure = Block['structure']
+type BlockStructure = RoutineBlock['structure']
 
 interface ExerciseFormState {
   name: string
@@ -22,8 +42,8 @@ interface ExerciseFormState {
   equipment: string
   mode: ExerciseMode
   reps: string
+  weight: string
   time: string
-  suggestedWeight: string
   videoUrl: string
 }
 
@@ -36,40 +56,35 @@ interface BlockFormState {
 
 interface RoutineFormState {
   title: string
-  description: string
-  type: RoutineType
-  assignedTo: string
   objective: string
-  durationWeeks: string
   level: string
-  days: string[]
+  durationWeeks: string
+  scheduleDays: string[]
+  assignedTo: string
   blocks: BlockFormState[]
 }
 
 const daysOfWeek = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
+const inputClassName = 'w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100'
+const labelClassName = 'mb-1.5 block text-sm font-medium text-slate-700'
 
 const emptyForm: RoutineFormState = {
   title: '',
-  description: '',
-  type: 'template',
-  assignedTo: '',
   objective: '',
-  durationWeeks: '',
   level: '',
-  days: [],
+  durationWeeks: '',
+  scheduleDays: [],
+  assignedTo: '',
   blocks: [],
 }
-
-const inputClassName = 'w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100'
-const labelClassName = 'mb-1.5 block text-sm font-medium text-slate-700'
 
 function extractArray<T>(value: unknown, keys: string[]): T[] {
   if (Array.isArray(value)) return value as T[]
   if (!value || typeof value !== 'object') return []
 
   const record = value as Record<string, unknown>
-  const candidate = keys.map((key) => record[key]).find((item) => Array.isArray(item))
-    ?? Object.values(record).find((item) => Array.isArray(item))
+  const candidate = keys.map((key) => record[key]).find(Array.isArray)
+    ?? Object.values(record).find(Array.isArray)
 
   return Array.isArray(candidate) ? candidate as T[] : []
 }
@@ -78,33 +93,40 @@ function recordId(record: { id?: string; _id?: string }) {
   return record.id || record._id || ''
 }
 
-function relationId(value: Routine['assignedTo']) {
-  return typeof value === 'string' ? value : value ? recordId(value) : ''
-}
-
 function relationName(value: Routine['assignedTo'], users: User[]) {
-  if (typeof value === 'object' && value) return value.name || value.nombre || value.email || '-'
-  return users.find((user) => recordId(user) === value)?.name || '-'
+  if (typeof value === 'object' && value) {
+    if ('email' in value) {
+      return [value.name || value.firstName, value.lastName].filter(Boolean).join(' ') || value.email
+    }
+    return value.name || value.nombre || '-'
+  }
+  return users.find((user) => recordId(user) === value)
+    ?.name || users.find((user) => recordId(user) === value)?.email || '-'
 }
 
-function formatRoutineType(type?: string) {
-  return type?.toLowerCase() === 'custom' ? 'Personalizada' : 'Plantilla'
+function userLabel(user: User) {
+  return [user.name || user.firstName, user.lastName].filter(Boolean).join(' ') || user.email
 }
 
-function toExerciseForm(exercise: Exercise): ExerciseFormState {
+function isClient(user: User) {
+  return user.role.toLowerCase() === 'cliente' || user.role.toLowerCase() === 'client'
+}
+
+function toExerciseForm(exercise: RoutineExercise): ExerciseFormState {
+  const isCardio = exercise.isCardio ?? exercise.time !== undefined
   return {
     name: exercise.name || '',
     muscleGroup: exercise.muscleGroup || '',
     equipment: exercise.equipment || '',
-    mode: exercise.time !== undefined && exercise.reps === undefined ? 'Cardio' : 'Fuerza',
+    mode: isCardio ? 'Cardio' : 'Fuerza',
     reps: String(exercise.reps ?? ''),
+    weight: String(exercise.weight ?? ''),
     time: String(exercise.time ?? ''),
-    suggestedWeight: String(exercise.suggestedWeight ?? ''),
     videoUrl: exercise.videoUrl || '',
   }
 }
 
-function toBlockForm(block: Block): BlockFormState {
+function toBlockForm(block: RoutineBlock): BlockFormState {
   return {
     structure: block.structure || 'Individual',
     blockSets: String(block.blockSets ?? 3),
@@ -120,35 +142,64 @@ function createExerciseForm(): ExerciseFormState {
     equipment: '',
     mode: 'Fuerza',
     reps: '',
+    weight: '',
     time: '',
-    suggestedWeight: '',
     videoUrl: '',
   }
 }
 
 function createBlockForm(): BlockFormState {
-  return {
-    structure: 'Individual',
-    blockSets: '3',
-    restTime: '60',
-    exercises: [],
-  }
+  return { structure: 'Individual', blockSets: '3', restTime: '60', exercises: [] }
+}
+
+function exerciseCount(blocks: RoutineBlock[] | undefined) {
+  return blocks?.reduce((total, block) => total + (block.exercises?.length || 0), 0) || 0
+}
+
+function RoutineSkeleton() {
+  return (
+    <div className="space-y-4 p-6" aria-label="Cargando rutinas" aria-busy="true">
+      {Array.from({ length: 4 }).map((_, index) => (
+        <div className="grid grid-cols-5 gap-6" key={index}>
+          {Array.from({ length: 5 }).map((__, columnIndex) => <div className="h-4 animate-pulse rounded bg-slate-200" key={columnIndex} />)}
+        </div>
+      ))}
+    </div>
+  )
 }
 
 function Routines() {
+  const [templates, setTemplates] = useState<RoutineTemplate[]>([])
   const [routines, setRoutines] = useState<Routine[]>([])
-  const [users, setUsers] = useState<User[]>([])
+  const [clients, setClients] = useState<User[]>([])
+  const [equipment, setEquipment] = useState<Equipment[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [activeTab, setActiveTab] = useState<BuilderMode>('template')
+  const [isBuilderOpen, setIsBuilderOpen] = useState(false)
+  const [builderMode, setBuilderMode] = useState<BuilderMode>('template')
+  const [editingTemplate, setEditingTemplate] = useState<RoutineTemplate | null>(null)
   const [editingRoutine, setEditingRoutine] = useState<Routine | null>(null)
   const [form, setForm] = useState<RoutineFormState>(emptyForm)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [modalError, setModalError] = useState<string | null>(null)
+  const [assigningTemplate, setAssigningTemplate] = useState<RoutineTemplate | null>(null)
+  const [selectedClientId, setSelectedClientId] = useState('')
+  const [isAssigning, setIsAssigning] = useState(false)
+  const [assignmentError, setAssignmentError] = useState<string | null>(null)
+
+  async function refreshTemplates() {
+    const response = await getTemplates<ArrayResponse<RoutineTemplate>>()
+    setTemplates(extractArray<RoutineTemplate>(response, ['data', 'templates', 'routineTemplates']))
+  }
 
   async function refreshRoutines() {
-    const response = await getRoutines<RoutineResponse>()
+    const response = await getRoutines<ArrayResponse<Routine>>()
     setRoutines(extractArray<Routine>(response, ['data', 'routines', 'rutinas']))
+  }
+
+  async function refreshAssignedRoutines() {
+    await refreshRoutines()
   }
 
   useEffect(() => {
@@ -156,60 +207,86 @@ function Routines() {
 
     async function loadData() {
       try {
-        const [routinesResponse, usersResponse] = await Promise.all([
-          getRoutines<RoutineResponse>(),
-          getUsers<UserResponse>(),
+        const [templatesResponse, routinesResponse, usersResponse, equipmentResponse] = await Promise.all([
+          getTemplates<ArrayResponse<RoutineTemplate>>(),
+          getRoutines<ArrayResponse<Routine>>(),
+          getUsers<ArrayResponse<User>>(),
+          getEquipment<ArrayResponse<Equipment>>(),
         ])
         if (!isMounted) return
 
+        setTemplates(extractArray<RoutineTemplate>(templatesResponse, ['data', 'templates', 'routineTemplates']))
         setRoutines(extractArray<Routine>(routinesResponse, ['data', 'routines', 'rutinas']))
-        setUsers(extractArray<User>(usersResponse, ['data', 'users']))
+        setClients(extractArray<User>(usersResponse, ['data', 'users']).filter(isClient))
+        setEquipment(extractArray<Equipment>(equipmentResponse, ['data', 'equipment']))
         setError(null)
       } catch (requestError) {
         if (isMounted) {
-          setError(requestError instanceof Error ? requestError.message : 'No se pudieron cargar las rutinas.')
+          setError(requestError instanceof Error ? requestError.message : 'No se pudieron cargar los datos de rutinas.')
         }
       } finally {
         if (isMounted) setIsLoading(false)
       }
     }
 
-    loadData()
+    void loadData()
     return () => {
       isMounted = false
     }
   }, [])
 
-  function openCreateModal() {
+  function startCreate(mode: BuilderMode) {
+    setBuilderMode(mode)
+    setEditingTemplate(null)
     setEditingRoutine(null)
     setForm(emptyForm)
     setModalError(null)
-    setIsModalOpen(true)
+    setIsBuilderOpen(true)
   }
 
-  function openEditModal(routine: Routine) {
+  function startEditTemplate(template: RoutineTemplate) {
+    setBuilderMode('template')
+    setEditingTemplate(template)
+    setEditingRoutine(null)
+    setForm({
+      title: template.title || '',
+      objective: template.objective || '',
+      level: template.level || '',
+      durationWeeks: String(template.durationWeeks ?? ''),
+      scheduleDays: template.scheduleDays || [],
+      assignedTo: '',
+      blocks: (template.blocks || []).map(toBlockForm),
+    })
+    setModalError(null)
+    setIsBuilderOpen(true)
+  }
+
+  function startEditRoutine(routine: Routine) {
+    setBuilderMode('routine')
+    setEditingTemplate(null)
     setEditingRoutine(routine)
     setForm({
       title: routine.title || '',
-      description: routine.description || '',
-      type: routine.type?.toLowerCase() === 'custom' ? 'custom' : 'template',
-      assignedTo: relationId(routine.assignedTo),
       objective: routine.objective || '',
-      durationWeeks: String(routine.durationWeeks ?? ''),
       level: routine.level || '',
-      days: routine.days || [],
+      durationWeeks: String(routine.durationWeeks ?? ''),
+      scheduleDays: routine.scheduleDays || [],
+      assignedTo: typeof routine.assignedTo === 'string'
+        ? routine.assignedTo
+        : routine.assignedTo ? recordId(routine.assignedTo) : '',
       blocks: (routine.blocks || []).map(toBlockForm),
     })
     setModalError(null)
-    setIsModalOpen(true)
+    setIsBuilderOpen(true)
   }
 
-  function closeModal() {
+  function closeBuilder() {
     if (isSubmitting) return
+    setEditingTemplate(null)
     setEditingRoutine(null)
     setForm(emptyForm)
     setModalError(null)
-    setIsModalOpen(false)
+    setIsBuilderOpen(false)
   }
 
   function updateBlock(index: number, field: keyof Omit<BlockFormState, 'exercises'>, value: string) {
@@ -272,9 +349,31 @@ function Routines() {
   function toggleDay(day: string) {
     setForm((current) => ({
       ...current,
-      days: current.days.includes(day)
-        ? current.days.filter((selectedDay) => selectedDay !== day)
-        : [...current.days, day],
+      scheduleDays: current.scheduleDays.includes(day)
+        ? current.scheduleDays.filter((selectedDay) => selectedDay !== day)
+        : [...current.scheduleDays, day],
+    }))
+  }
+
+  function buildBlocks(): RoutineBlock[] {
+    return form.blocks.map((block, blockIndex) => ({
+      structure: block.structure,
+      blockSets: Number(block.blockSets) || 0,
+      restTime: Number(block.restTime) || 0,
+      order: blockIndex,
+      exercises: block.exercises.map((exercise): RoutineExercise => ({
+        name: exercise.name.trim(),
+        muscleGroup: exercise.muscleGroup.trim(),
+        equipment: exercise.equipment,
+        videoUrl: exercise.videoUrl.trim(),
+        isCardio: exercise.mode === 'Cardio',
+        ...(exercise.mode === 'Cardio'
+          ? { time: Number(exercise.time) || 0 }
+          : {
+              reps: Number(exercise.reps) || 0,
+              weight: Number(exercise.weight) || 0,
+            }),
+      })),
     }))
   }
 
@@ -285,50 +384,47 @@ function Routines() {
 
     try {
       if (!form.title.trim()) throw new Error('Escribe un título para la rutina.')
-      if (form.type === 'custom' && !form.assignedTo) throw new Error('Selecciona un cliente para la rutina personalizada.')
+      if (builderMode === 'routine' && !form.assignedTo) {
+        throw new Error('Selecciona un cliente para la rutina asignada.')
+      }
 
-      const payload: RoutinePayload = {
+      const definition: RoutineTemplatePayload = {
         title: form.title.trim(),
-        description: form.description.trim(),
-        type: form.type,
         objective: form.objective.trim(),
-        durationWeeks: Number(form.durationWeeks) || 0,
         level: form.level,
-        days: form.days,
-        blocks: form.blocks.map((block) => ({
-          structure: block.structure,
-          blockSets: Number(block.blockSets) || 0,
-          restTime: Number(block.restTime) || 0,
-          exercises: block.exercises.map((exercise) => ({
-            name: exercise.name.trim(),
-            muscleGroup: exercise.muscleGroup.trim(),
-            equipment: exercise.equipment.trim(),
-            videoUrl: exercise.videoUrl.trim(),
-            ...(exercise.mode === 'Cardio'
-              ? { time: Number(exercise.time) || 0 }
-              : {
-                  reps: Number(exercise.reps) || 0,
-                  suggestedWeight: Number(exercise.suggestedWeight) || 0,
-                }),
-          })),
-        })),
-        ...(form.type === 'custom' ? { assignedTo: form.assignedTo } : {}),
+        durationWeeks: Number(form.durationWeeks) || 0,
+        scheduleDays: form.scheduleDays,
+        blocks: buildBlocks(),
       }
 
-      const routineId = editingRoutine && recordId(editingRoutine)
-      if (editingRoutine) {
-        if (!routineId) throw new Error('La rutina no tiene un identificador válido.')
-        await updateRoutine(routineId, payload)
+      if (builderMode === 'template') {
+        const templateId = editingTemplate && recordId(editingTemplate)
+        if (editingTemplate) {
+          if (!templateId) throw new Error('La plantilla no tiene un identificador válido.')
+          await updateTemplate(templateId, definition)
+        } else {
+          await createTemplate(definition)
+        }
+        await refreshTemplates()
+        setActiveTab('template')
       } else {
-        await createRoutine(payload)
+        const routineId = editingRoutine && recordId(editingRoutine)
+        const routinePayload: RoutinePayload = { ...definition, assignedTo: form.assignedTo }
+        if (editingRoutine) {
+          if (!routineId) throw new Error('La rutina no tiene un identificador válido.')
+          await updateRoutine(routineId, routinePayload)
+        } else {
+          await createRoutine(routinePayload)
+        }
+        await refreshAssignedRoutines()
+        setActiveTab('routine')
       }
 
-      await refreshRoutines()
       setError(null)
+      setEditingTemplate(null)
       setEditingRoutine(null)
       setForm(emptyForm)
-      setModalError(null)
-      setIsModalOpen(false)
+      setIsBuilderOpen(false)
     } catch (requestError) {
       setModalError(requestError instanceof Error ? requestError.message : 'No se pudo guardar la rutina.')
     } finally {
@@ -336,24 +432,84 @@ function Routines() {
     }
   }
 
-  async function handleDelete(routine: Routine) {
+  function startAssign(template: RoutineTemplate) {
+    setAssigningTemplate(template)
+    setSelectedClientId('')
+    setAssignmentError(null)
+  }
+
+  function closeAssign() {
+    if (isAssigning) return
+    setAssigningTemplate(null)
+    setSelectedClientId('')
+    setAssignmentError(null)
+  }
+
+  async function handleAssign(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!assigningTemplate) return
+    const templateId = recordId(assigningTemplate)
+    if (!templateId) {
+      setAssignmentError('La plantilla no tiene un identificador válido.')
+      return
+    }
+    if (!selectedClientId) {
+      setAssignmentError('Selecciona un cliente.')
+      return
+    }
+
+    setIsAssigning(true)
+    setAssignmentError(null)
+    try {
+      await assignTemplateToClient(templateId, selectedClientId)
+      await refreshAssignedRoutines()
+      setError(null)
+      setAssigningTemplate(null)
+      setSelectedClientId('')
+    } catch (requestError) {
+      setAssignmentError(requestError instanceof Error ? requestError.message : 'No se pudo asignar la plantilla.')
+    } finally {
+      setIsAssigning(false)
+    }
+  }
+
+  async function handleDeleteTemplate(template: RoutineTemplate) {
+    const templateId = recordId(template)
+    if (!templateId) {
+      setError('No se puede eliminar una plantilla sin identificador.')
+      return
+    }
+    if (!window.confirm(`¿Eliminar la plantilla "${template.title}"?`)) return
+    try {
+      await deleteTemplate(templateId)
+      await refreshTemplates()
+      setError(null)
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'No se pudo eliminar la plantilla.')
+    }
+  }
+
+  async function handleDeleteRoutine(routine: Routine) {
     const routineId = recordId(routine)
     if (!routineId) {
       setError('No se puede eliminar una rutina sin identificador.')
       return
     }
-    if (!window.confirm(`¿Eliminar ${routine.title || 'esta rutina'}?`)) return
-
+    if (!window.confirm(`¿Eliminar la rutina "${routine.title}"?`)) return
     try {
       await deleteRoutine(routineId)
-      await refreshRoutines()
+      await refreshAssignedRoutines()
       setError(null)
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'No se pudo eliminar la rutina.')
     }
   }
 
-  const controlClassName = inputClassName
+  const tabButtonClass = (tab: BuilderMode) => `border-b-2 px-4 py-3 text-sm font-medium transition ${
+    activeTab === tab
+      ? 'border-green-500 text-slate-900'
+      : 'border-transparent text-slate-500 hover:text-slate-800'
+  }`
 
   return (
     <section className="min-h-screen bg-[#F8FAFC] px-8 py-10">
@@ -361,117 +517,168 @@ function Routines() {
       <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-4xl font-semibold tracking-tight text-slate-900">Rutinas</h1>
-          <p className="mt-3 text-slate-500">Crea plantillas y asigna rutinas personalizadas.</p>
+          <p className="mt-3 text-slate-500">Diseña plantillas y asígnalas a tus clientes.</p>
         </div>
         <button
           className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#9BFF63] px-4 py-2 font-medium text-[#0F172A] transition hover:bg-[#abff7c]"
           type="button"
-          onClick={openCreateModal}
+          onClick={() => startCreate(activeTab)}
         >
           <Plus size={18} aria-hidden="true" />
-          Nueva Rutina
+          {activeTab === 'template' ? 'Nueva plantilla' : 'Crear rutina asignada'}
         </button>
       </div>
 
       <div className="mt-8 overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
         {error && <div className="border-b border-red-100 bg-red-50 px-6 py-4 text-sm text-red-700" role="alert">{error}</div>}
-        {isLoading ? (
-          <div className="space-y-4 p-6" aria-label="Cargando rutinas" aria-busy="true">
-            {Array.from({ length: 5 }).map((_, index) => (
-              <div className="grid grid-cols-5 gap-6" key={index}>
-                {Array.from({ length: 5 }).map((__, columnIndex) => <div className="h-4 animate-pulse rounded bg-slate-200" key={columnIndex} />)}
-              </div>
-            ))}
-          </div>
-        ) : (
+        <div className="flex border-b border-slate-100 px-4" role="tablist" aria-label="Secciones de rutinas">
+          <button className={tabButtonClass('template')} type="button" role="tab" aria-selected={activeTab === 'template'} onClick={() => setActiveTab('template')}>
+            Plantillas Base <span className="ml-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs">{templates.length}</span>
+          </button>
+          <button className={tabButtonClass('routine')} type="button" role="tab" aria-selected={activeTab === 'routine'} onClick={() => setActiveTab('routine')}>
+            Rutinas Asignadas <span className="ml-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs">{routines.length}</span>
+          </button>
+        </div>
+
+        {isLoading ? <RoutineSkeleton /> : (
           <div className="overflow-x-auto">
-            <table className="min-w-full text-left text-sm">
-              <thead className="border-b border-slate-100 bg-slate-50/80 text-xs uppercase tracking-wider text-slate-500">
-                <tr><th className="px-6 py-4 font-medium">Título</th><th className="px-6 py-4 font-medium">Tipo</th><th className="px-6 py-4 font-medium">Cliente</th><th className="px-6 py-4 font-medium">Ejercicios</th><th className="px-6 py-4" /></tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-slate-700">
-                {routines.length > 0 ? routines.map((routine, index) => {
-                  const routineId = recordId(routine) || `routine-${index}`
-                  const exerciseCount = routine.blocks?.reduce((total, block) => total + (block.exercises?.length || 0), 0) || 0
-                  return (
-                    <tr className="transition-colors hover:bg-slate-50" key={routineId}>
-                      <td className="whitespace-nowrap px-6 py-4 font-medium text-slate-900">{routine.title || 'Sin título'}</td>
-                      <td className="px-6 py-4"><span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">{formatRoutineType(routine.type)}</span></td>
-                      <td className="px-6 py-4 text-slate-500">{routine.assignedTo ? relationName(routine.assignedTo, users) : '-'}</td>
-                      <td className="px-6 py-4 text-slate-500">{exerciseCount}</td>
-                      <td className="whitespace-nowrap px-6 py-4 text-right"><div className="inline-flex items-center gap-3"><button className="text-slate-400 transition hover:text-green-600" type="button" aria-label="Editar rutina" onClick={() => openEditModal(routine)}><Pencil className="h-4 w-4" aria-hidden="true" /></button><button className="text-slate-400 transition hover:text-red-600" type="button" aria-label="Eliminar rutina" onClick={() => handleDelete(routine)}><Trash2 className="h-4 w-4" aria-hidden="true" /></button></div></td>
-                    </tr>
-                  )
-                }) : <tr><td className="px-6 py-10 text-center text-sm text-slate-500" colSpan={5}>No hay rutinas registradas.</td></tr>}
-              </tbody>
-            </table>
+            {activeTab === 'template' ? (
+              <table className="min-w-full text-left text-sm">
+                <thead className="border-b border-slate-100 bg-slate-50/80 text-xs uppercase tracking-wider text-slate-500">
+                  <tr>
+                    <th className="px-6 py-4 font-medium">Plantilla</th>
+                    <th className="px-6 py-4 font-medium">Objetivo</th>
+                    <th className="px-6 py-4 font-medium">Nivel</th>
+                    <th className="px-6 py-4 font-medium">Bloques / ejercicios</th>
+                    <th className="px-6 py-4 font-medium">Días</th>
+                    <th className="px-6 py-4 font-medium text-right">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-slate-700">
+                  {templates.length ? templates.map((template, index) => {
+                    const templateId = recordId(template) || `template-${index}`
+                    return (
+                      <tr className="transition-colors hover:bg-slate-50" key={templateId}>
+                        <td className="px-6 py-4 font-medium text-slate-900">{template.title || 'Sin título'}</td>
+                        <td className="px-6 py-4 text-slate-500">{template.objective || '-'}</td>
+                        <td className="px-6 py-4 text-slate-500">{template.level || '-'}</td>
+                        <td className="px-6 py-4 text-slate-500">{template.blocks?.length || 0} / {exerciseCount(template.blocks)}</td>
+                        <td className="px-6 py-4 text-slate-500">{template.scheduleDays?.join(', ') || '-'}</td>
+                        <td className="whitespace-nowrap px-6 py-4 text-right">
+                          <div className="inline-flex items-center justify-end gap-2">
+                            <button className="inline-flex items-center gap-1 rounded-lg bg-[#9BFF63] px-2.5 py-2 text-xs font-semibold text-slate-900 transition hover:bg-[#abff7c]" type="button" onClick={() => startAssign(template)} aria-label={`Asignar ${template.title} a un cliente`}>
+                              <UserRoundPlus size={15} aria-hidden="true" />Asignar a Cliente
+                            </button>
+                            <button className="rounded p-2 text-slate-400 transition hover:bg-green-50 hover:text-green-700" type="button" aria-label={`Editar plantilla ${template.title}`} onClick={() => startEditTemplate(template)}>
+                              <Pencil size={16} aria-hidden="true" />
+                            </button>
+                            <button className="rounded p-2 text-slate-400 transition hover:bg-red-50 hover:text-red-600" type="button" aria-label={`Eliminar plantilla ${template.title}`} onClick={() => handleDeleteTemplate(template)}>
+                              <Trash2 size={16} aria-hidden="true" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  }) : <tr><td className="px-6 py-10 text-center text-sm text-slate-500" colSpan={6}>No hay plantillas base. Crea una para empezar.</td></tr>}
+                </tbody>
+              </table>
+            ) : (
+              <table className="min-w-full text-left text-sm">
+                <thead className="border-b border-slate-100 bg-slate-50/80 text-xs uppercase tracking-wider text-slate-500">
+                  <tr>
+                    <th className="px-6 py-4 font-medium">Rutina</th>
+                    <th className="px-6 py-4 font-medium">Cliente</th>
+                    <th className="px-6 py-4 font-medium">Objetivo</th>
+                    <th className="px-6 py-4 font-medium">Estado</th>
+                    <th className="px-6 py-4 font-medium">Bloques / ejercicios</th>
+                    <th className="px-6 py-4 font-medium text-right">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-slate-700">
+                  {routines.length ? routines.map((routine, index) => {
+                    const routineId = recordId(routine) || `routine-${index}`
+                    return (
+                      <tr className="transition-colors hover:bg-slate-50" key={routineId}>
+                        <td className="px-6 py-4 font-medium text-slate-900">{routine.title || 'Sin título'}</td>
+                        <td className="px-6 py-4 text-slate-500">{routine.assignedTo ? relationName(routine.assignedTo, clients) : '-'}</td>
+                        <td className="px-6 py-4 text-slate-500">{routine.objective || '-'}</td>
+                        <td className="px-6 py-4 text-slate-500">{routine.status || 'Activa'}</td>
+                        <td className="px-6 py-4 text-slate-500">{routine.blocks?.length || 0} / {exerciseCount(routine.blocks)}</td>
+                        <td className="whitespace-nowrap px-6 py-4 text-right">
+                          <div className="inline-flex items-center justify-end gap-2">
+                            <button className="rounded p-2 text-slate-400 transition hover:bg-green-50 hover:text-green-700" type="button" aria-label={`Editar rutina ${routine.title}`} onClick={() => startEditRoutine(routine)}>
+                              <Pencil size={16} aria-hidden="true" />
+                            </button>
+                            <button className="rounded p-2 text-slate-400 transition hover:bg-red-50 hover:text-red-600" type="button" aria-label={`Eliminar rutina ${routine.title}`} onClick={() => handleDeleteRoutine(routine)}>
+                              <Trash2 size={16} aria-hidden="true" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  }) : <tr><td className="px-6 py-10 text-center text-sm text-slate-500" colSpan={6}>No hay rutinas asignadas a clientes.</td></tr>}
+                </tbody>
+              </table>
+            )}
           </div>
         )}
       </div>
 
-      {isModalOpen && (
+      {isBuilderOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-900/50 px-4 py-8 backdrop-blur-sm">
-          <div className="my-auto w-full max-w-4xl rounded-xl bg-white p-6 shadow-xl">
+          <div className="my-auto max-h-[calc(100vh-4rem)] w-full max-w-4xl overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-sm font-medium uppercase tracking-[0.2em] text-emerald-700">Entrenamiento</p>
-                <h2 className="mt-2 text-2xl font-semibold text-slate-900">{editingRoutine ? 'Editar rutina' : 'Nueva rutina'}</h2>
+                <h2 className="mt-2 text-2xl font-semibold text-slate-900">
+                  {editingTemplate || editingRoutine ? 'Editar' : 'Crear'} {builderMode === 'template' ? 'plantilla' : 'rutina asignada'}
+                </h2>
               </div>
-              <button className="text-slate-400 transition hover:text-slate-700" type="button" aria-label="Cerrar modal" onClick={closeModal}><X size={22} /></button>
+              <button className="text-slate-400 transition hover:text-slate-700" type="button" aria-label="Cerrar editor" onClick={closeBuilder}><X size={22} /></button>
             </div>
 
             <form className="mt-6 space-y-6" onSubmit={handleSubmit}>
               <section className="space-y-4">
-                <h3 className="text-base font-semibold text-slate-900">Información de la rutina</h3>
+                <h3 className="text-base font-semibold text-slate-900">Información general</h3>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
                     <label className={labelClassName} htmlFor="routine-title">Título</label>
-                    <input className={controlClassName} id="routine-title" value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} required />
-                  </div>
-                  <div>
-                    <label className={labelClassName} htmlFor="routine-type">Tipo</label>
-                    <select className={controlClassName} id="routine-type" value={form.type} onChange={(event) => setForm({ ...form, type: event.target.value as RoutineType, assignedTo: '' })}>
-                      <option value="template">Plantilla</option>
-                      <option value="custom">Personalizada</option>
-                    </select>
+                    <input className={inputClassName} id="routine-title" value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} required />
                   </div>
                   <div>
                     <label className={labelClassName} htmlFor="routine-objective">Objetivo</label>
-                    <input className={controlClassName} id="routine-objective" value={form.objective} onChange={(event) => setForm({ ...form, objective: event.target.value })} placeholder="Ej. Ganancia muscular" />
+                    <input className={inputClassName} id="routine-objective" value={form.objective} onChange={(event) => setForm({ ...form, objective: event.target.value })} placeholder="Ej. Ganancia muscular" />
                   </div>
                   <div>
                     <label className={labelClassName} htmlFor="routine-duration">Duración (semanas)</label>
-                    <input className={controlClassName} id="routine-duration" type="number" min="1" value={form.durationWeeks} onChange={(event) => setForm({ ...form, durationWeeks: event.target.value })} />
+                    <input className={inputClassName} id="routine-duration" type="number" min="1" value={form.durationWeeks} onChange={(event) => setForm({ ...form, durationWeeks: event.target.value })} />
                   </div>
                   <div>
                     <label className={labelClassName} htmlFor="routine-level">Nivel</label>
-                    <select className={controlClassName} id="routine-level" value={form.level} onChange={(event) => setForm({ ...form, level: event.target.value })}>
+                    <select className={inputClassName} id="routine-level" value={form.level} onChange={(event) => setForm({ ...form, level: event.target.value })}>
                       <option value="">Selecciona un nivel</option>
                       <option value="Principiante">Principiante</option>
                       <option value="Intermedio">Intermedio</option>
                       <option value="Avanzado">Avanzado</option>
                     </select>
                   </div>
-                  {form.type === 'custom' && (
+                  {builderMode === 'routine' && (
                     <div>
-                      <label className={labelClassName} htmlFor="routine-assigned-to">Cliente</label>
-                      <select className={controlClassName} id="routine-assigned-to" value={form.assignedTo} onChange={(event) => setForm({ ...form, assignedTo: event.target.value })} required>
+                      <label className={labelClassName} htmlFor="routine-client">Cliente</label>
+                      <select className={inputClassName} id="routine-client" value={form.assignedTo} onChange={(event) => setForm({ ...form, assignedTo: event.target.value })} required>
                         <option value="">Selecciona un cliente</option>
-                        {users.map((user, index) => <option key={recordId(user) || `user-${index}`} value={recordId(user)}>{user.name || user.firstName || user.email}</option>)}
+                        {clients.map((client, index) => <option key={recordId(client) || `client-${index}`} value={recordId(client)}>{userLabel(client)}</option>)}
                       </select>
+                      {clients.length === 0 && <p className="mt-1 text-xs text-amber-700">No hay clientes disponibles para asignar.</p>}
                     </div>
                   )}
-                </div>
-                <div>
-                  <label className={labelClassName} htmlFor="routine-description">Descripción</label>
-                  <textarea className={`${controlClassName} min-h-20`} id="routine-description" value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} />
                 </div>
                 <fieldset>
                   <legend className={labelClassName}>Días de entrenamiento</legend>
                   <div className="flex flex-wrap gap-x-5 gap-y-2">
                     {daysOfWeek.map((day) => (
                       <label className="inline-flex items-center gap-2 text-sm text-slate-700" key={day}>
-                        <input className="h-4 w-4 accent-green-600" type="checkbox" checked={form.days.includes(day)} onChange={() => toggleDay(day)} />
+                        <input className="h-4 w-4 accent-green-600" type="checkbox" checked={form.scheduleDays.includes(day)} onChange={() => toggleDay(day)} />
                         {day}
                       </label>
                     ))}
@@ -483,7 +690,7 @@ function Routines() {
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <h3 className="text-base font-semibold text-slate-900">Bloques de entrenamiento</h3>
-                    <p className="mt-1 text-sm text-slate-500">Organiza los ejercicios en bloques individuales, superseries o circuitos.</p>
+                    <p className="mt-1 text-sm text-slate-500">Organiza los ejercicios por estructura, series y descanso.</p>
                   </div>
                   <button className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 transition hover:border-green-400 hover:text-green-700" type="button" onClick={addBlock}>
                     <Plus size={16} aria-hidden="true" />Agregar Bloque
@@ -491,11 +698,11 @@ function Routines() {
                 </div>
 
                 {form.blocks.length === 0 ? (
-                  <p className="rounded-lg border border-dashed border-slate-200 px-4 py-6 text-center text-sm text-slate-500">Agrega un bloque para comenzar a construir la rutina.</p>
+                  <p className="rounded-lg border border-dashed border-slate-200 px-4 py-6 text-center text-sm text-slate-500">Agrega un bloque para construir el entrenamiento.</p>
                 ) : (
                   <div className="space-y-4">
                     {form.blocks.map((block, blockIndex) => (
-                      <article className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 sm:p-5" key={blockIndex}>
+                      <article className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 sm:p-5" key={`block-${blockIndex}`}>
                         <div className="mb-4 flex items-center justify-between gap-3">
                           <h4 className="font-semibold text-slate-900">Bloque {blockIndex + 1}</h4>
                           <button className="inline-flex items-center gap-1 rounded px-2 py-1 text-sm text-slate-400 transition hover:bg-red-50 hover:text-red-600" type="button" onClick={() => removeBlock(blockIndex)} aria-label={`Eliminar bloque ${blockIndex + 1}`}>
@@ -505,19 +712,19 @@ function Routines() {
                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                           <div>
                             <label className={labelClassName} htmlFor={`block-structure-${blockIndex}`}>Estructura</label>
-                            <select className={controlClassName} id={`block-structure-${blockIndex}`} value={block.structure} onChange={(event) => updateBlock(blockIndex, 'structure', event.target.value)}>
+                            <select className={inputClassName} id={`block-structure-${blockIndex}`} value={block.structure} onChange={(event) => updateBlock(blockIndex, 'structure', event.target.value)}>
                               <option value="Individual">Individual</option>
                               <option value="Superset">Superset</option>
                               <option value="Circuito">Circuito</option>
                             </select>
                           </div>
                           <div>
-                            <label className={labelClassName} htmlFor={`block-sets-${blockIndex}`}>Series del bloque</label>
-                            <input className={controlClassName} id={`block-sets-${blockIndex}`} type="number" min="1" value={block.blockSets} onChange={(event) => updateBlock(blockIndex, 'blockSets', event.target.value)} />
+                            <label className={labelClassName} htmlFor={`block-sets-${blockIndex}`}>Series</label>
+                            <input className={inputClassName} id={`block-sets-${blockIndex}`} type="number" min="1" value={block.blockSets} onChange={(event) => updateBlock(blockIndex, 'blockSets', event.target.value)} />
                           </div>
                           <div>
                             <label className={labelClassName} htmlFor={`block-rest-${blockIndex}`}>Descanso (segundos)</label>
-                            <input className={controlClassName} id={`block-rest-${blockIndex}`} type="number" min="0" value={block.restTime} onChange={(event) => updateBlock(blockIndex, 'restTime', event.target.value)} />
+                            <input className={inputClassName} id={`block-rest-${blockIndex}`} type="number" min="0" value={block.restTime} onChange={(event) => updateBlock(blockIndex, 'restTime', event.target.value)} />
                           </div>
                         </div>
 
@@ -525,7 +732,7 @@ function Routines() {
                           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                             <h5 className="text-sm font-semibold text-slate-800">Ejercicios del bloque</h5>
                             <button className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:border-green-400 hover:text-green-700" type="button" onClick={() => addExercise(blockIndex)}>
-                              <Plus size={15} aria-hidden="true" />Agregar Ejercicio al Bloque
+                              <Plus size={15} aria-hidden="true" />Agregar Ejercicio
                             </button>
                           </div>
 
@@ -534,7 +741,7 @@ function Routines() {
                           ) : (
                             <div className="space-y-3">
                               {block.exercises.map((exercise, exerciseIndex) => (
-                                <div className="rounded-lg border border-slate-200 bg-white p-4" key={exerciseIndex}>
+                                <div className="rounded-lg border border-slate-200 bg-white p-4" key={`exercise-${blockIndex}-${exerciseIndex}`}>
                                   <div className="mb-4 flex items-center justify-between gap-3">
                                     <h6 className="text-sm font-medium text-slate-800">Ejercicio {exerciseIndex + 1}</h6>
                                     <button className="rounded p-1.5 text-slate-400 transition hover:bg-red-50 hover:text-red-600" type="button" aria-label={`Eliminar ejercicio ${exerciseIndex + 1}`} onClick={() => removeExercise(blockIndex, exerciseIndex)}>
@@ -544,43 +751,49 @@ function Routines() {
                                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                     <div>
                                       <label className={labelClassName} htmlFor={`exercise-name-${blockIndex}-${exerciseIndex}`}>Nombre</label>
-                                      <input className={controlClassName} id={`exercise-name-${blockIndex}-${exerciseIndex}`} value={exercise.name} onChange={(event) => updateExercise(blockIndex, exerciseIndex, 'name', event.target.value)} placeholder="Ej. Sentadilla" />
+                                      <input className={inputClassName} id={`exercise-name-${blockIndex}-${exerciseIndex}`} value={exercise.name} onChange={(event) => updateExercise(blockIndex, exerciseIndex, 'name', event.target.value)} placeholder="Ej. Sentadilla" />
                                     </div>
                                     <div>
                                       <label className={labelClassName} htmlFor={`exercise-muscle-${blockIndex}-${exerciseIndex}`}>Grupo muscular</label>
-                                      <input className={controlClassName} id={`exercise-muscle-${blockIndex}-${exerciseIndex}`} value={exercise.muscleGroup} onChange={(event) => updateExercise(blockIndex, exerciseIndex, 'muscleGroup', event.target.value)} placeholder="Ej. Piernas" />
+                                      <input className={inputClassName} id={`exercise-muscle-${blockIndex}-${exerciseIndex}`} value={exercise.muscleGroup} onChange={(event) => updateExercise(blockIndex, exerciseIndex, 'muscleGroup', event.target.value)} placeholder="Ej. Piernas" />
                                     </div>
                                     <div>
                                       <label className={labelClassName} htmlFor={`exercise-equipment-${blockIndex}-${exerciseIndex}`}>Equipo</label>
-                                      <input className={controlClassName} id={`exercise-equipment-${blockIndex}-${exerciseIndex}`} value={exercise.equipment} onChange={(event) => updateExercise(blockIndex, exerciseIndex, 'equipment', event.target.value)} placeholder="Ej. Barra" />
+                                      <select className={inputClassName} id={`exercise-equipment-${blockIndex}-${exerciseIndex}`} value={exercise.equipment} onChange={(event) => updateExercise(blockIndex, exerciseIndex, 'equipment', event.target.value)}>
+                                        <option value="">Selecciona equipo</option>
+                                        {equipment.map((item, index) => {
+                                          const value = item.name || recordId(item)
+                                          return <option key={recordId(item) || `equipment-${index}`} value={value}>{item.name}</option>
+                                        })}
+                                      </select>
                                     </div>
                                     <div>
-                                      <label className={labelClassName} htmlFor={`exercise-video-${blockIndex}-${exerciseIndex}`}>Video (enlace de GitHub)</label>
-                                      <input className={controlClassName} id={`exercise-video-${blockIndex}-${exerciseIndex}`} type="url" value={exercise.videoUrl} onChange={(event) => updateExercise(blockIndex, exerciseIndex, 'videoUrl', event.target.value)} placeholder="https://github.com/..." />
+                                      <label className={labelClassName} htmlFor={`exercise-video-${blockIndex}-${exerciseIndex}`}>URL del video</label>
+                                      <input className={inputClassName} id={`exercise-video-${blockIndex}-${exerciseIndex}`} type="url" value={exercise.videoUrl} onChange={(event) => updateExercise(blockIndex, exerciseIndex, 'videoUrl', event.target.value)} placeholder="https://..." />
                                     </div>
                                     <div>
-                                      <label className={labelClassName} htmlFor={`exercise-mode-${blockIndex}-${exerciseIndex}`}>Tipo de ejercicio</label>
-                                      <select className={controlClassName} id={`exercise-mode-${blockIndex}-${exerciseIndex}`} value={exercise.mode} onChange={(event) => updateExercise(blockIndex, exerciseIndex, 'mode', event.target.value)}>
+                                      <label className={labelClassName} htmlFor={`exercise-mode-${blockIndex}-${exerciseIndex}`}>Modalidad</label>
+                                      <select className={inputClassName} id={`exercise-mode-${blockIndex}-${exerciseIndex}`} value={exercise.mode} onChange={(event) => updateExercise(blockIndex, exerciseIndex, 'mode', event.target.value)}>
                                         <option value="Fuerza">Fuerza</option>
                                         <option value="Cardio">Cardio</option>
                                       </select>
                                     </div>
-                                    {exercise.mode === 'Fuerza' ? (
+                                    {exercise.mode === 'Cardio' ? (
+                                      <div>
+                                        <label className={labelClassName} htmlFor={`exercise-time-${blockIndex}-${exerciseIndex}`}>Tiempo (minutos)</label>
+                                        <input className={inputClassName} id={`exercise-time-${blockIndex}-${exerciseIndex}`} type="number" min="1" value={exercise.time} onChange={(event) => updateExercise(blockIndex, exerciseIndex, 'time', event.target.value)} />
+                                      </div>
+                                    ) : (
                                       <>
                                         <div>
                                           <label className={labelClassName} htmlFor={`exercise-reps-${blockIndex}-${exerciseIndex}`}>Repeticiones</label>
-                                          <input className={controlClassName} id={`exercise-reps-${blockIndex}-${exerciseIndex}`} type="number" min="1" value={exercise.reps} onChange={(event) => updateExercise(blockIndex, exerciseIndex, 'reps', event.target.value)} />
+                                          <input className={inputClassName} id={`exercise-reps-${blockIndex}-${exerciseIndex}`} type="number" min="1" value={exercise.reps} onChange={(event) => updateExercise(blockIndex, exerciseIndex, 'reps', event.target.value)} />
                                         </div>
                                         <div>
-                                          <label className={labelClassName} htmlFor={`exercise-weight-${blockIndex}-${exerciseIndex}`}>Peso sugerido (kg)</label>
-                                          <input className={controlClassName} id={`exercise-weight-${blockIndex}-${exerciseIndex}`} type="number" min="0" step="0.5" value={exercise.suggestedWeight} onChange={(event) => updateExercise(blockIndex, exerciseIndex, 'suggestedWeight', event.target.value)} />
+                                          <label className={labelClassName} htmlFor={`exercise-weight-${blockIndex}-${exerciseIndex}`}>Peso (kg)</label>
+                                          <input className={inputClassName} id={`exercise-weight-${blockIndex}-${exerciseIndex}`} type="number" min="0" step="0.5" value={exercise.weight} onChange={(event) => updateExercise(blockIndex, exerciseIndex, 'weight', event.target.value)} />
                                         </div>
                                       </>
-                                    ) : (
-                                      <div>
-                                        <label className={labelClassName} htmlFor={`exercise-time-${blockIndex}-${exerciseIndex}`}>Tiempo (minutos)</label>
-                                        <input className={controlClassName} id={`exercise-time-${blockIndex}-${exerciseIndex}`} type="number" min="1" value={exercise.time} onChange={(event) => updateExercise(blockIndex, exerciseIndex, 'time', event.target.value)} />
-                                      </div>
                                     )}
                                   </div>
                                 </div>
@@ -596,8 +809,38 @@ function Routines() {
 
               {modalError && <p className="border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">{modalError}</p>}
               <div className="flex justify-end gap-3 border-t border-slate-100 pt-4">
-                <button className="rounded-lg px-4 py-2 font-medium text-slate-600 transition hover:bg-slate-100" type="button" onClick={closeModal} disabled={isSubmitting}>Cancelar</button>
-                <button className="rounded-lg bg-[#9BFF63] px-4 py-2 font-medium text-[#0F172A] transition hover:bg-[#abff7c] disabled:cursor-not-allowed disabled:opacity-60" type="submit" disabled={isSubmitting}>{isSubmitting ? 'Guardando...' : 'Guardar rutina'}</button>
+                <button className="rounded-lg px-4 py-2 font-medium text-slate-600 transition hover:bg-slate-100" type="button" onClick={closeBuilder} disabled={isSubmitting}>Cancelar</button>
+                <button className="rounded-lg bg-[#9BFF63] px-4 py-2 font-medium text-[#0F172A] transition hover:bg-[#abff7c] disabled:cursor-not-allowed disabled:opacity-60" type="submit" disabled={isSubmitting}>{isSubmitting ? 'Guardando...' : 'Guardar'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {assigningTemplate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-900/50 px-4 py-8 backdrop-blur-sm">
+          <div className="my-auto w-full max-w-lg rounded-xl bg-white p-6 shadow-xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium uppercase tracking-[0.2em] text-emerald-700">Asignación</p>
+                <h2 className="mt-2 text-2xl font-semibold text-slate-900">Asignar a Cliente</h2>
+                <p className="mt-1 text-sm text-slate-500">{assigningTemplate.title}</p>
+              </div>
+              <button className="text-slate-400 transition hover:text-slate-700" type="button" aria-label="Cerrar asignación" onClick={closeAssign}><X size={22} /></button>
+            </div>
+            <form className="mt-6 space-y-4" onSubmit={handleAssign}>
+              <div>
+                <label className={labelClassName} htmlFor="assignment-client">Cliente</label>
+                <select className={inputClassName} id="assignment-client" value={selectedClientId} onChange={(event) => setSelectedClientId(event.target.value)} required>
+                  <option value="">Selecciona un cliente</option>
+                  {clients.map((client, index) => <option key={recordId(client) || `client-${index}`} value={recordId(client)}>{userLabel(client)}</option>)}
+                </select>
+                {clients.length === 0 && <p className="mt-1 text-xs text-amber-700">No hay clientes disponibles para asignar.</p>}
+              </div>
+              {assignmentError && <p className="border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">{assignmentError}</p>}
+              <div className="flex justify-end gap-3 pt-2">
+                <button className="rounded-lg px-4 py-2 font-medium text-slate-600 transition hover:bg-slate-100" type="button" onClick={closeAssign} disabled={isAssigning}>Cancelar</button>
+                <button className="rounded-lg bg-[#9BFF63] px-4 py-2 font-medium text-[#0F172A] transition hover:bg-[#abff7c] disabled:cursor-not-allowed disabled:opacity-60" type="submit" disabled={isAssigning || clients.length === 0}>{isAssigning ? 'Asignando...' : 'Asignar rutina'}</button>
               </div>
             </form>
           </div>

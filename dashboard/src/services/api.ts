@@ -1,4 +1,4 @@
-import type { Equipment, EquipmentStatus } from '../types'
+import type { Equipment, EquipmentStatus, User } from '../types'
 
 const API_BASE_URL = import.meta.env.VITE_GYMGO_API_URL
 
@@ -121,49 +121,87 @@ export interface RoutineRelation {
   _id?: string
   name?: string
   nombre?: string
+  firstName?: string
+  lastName?: string
+  email?: string
 }
 
-export interface Exercise {
+export interface RoutineExercise {
   name: string
   muscleGroup: string
   equipment: string
   reps?: number
+  weight?: number
   time?: number
-  suggestedWeight?: number
   videoUrl: string
+  isCardio: boolean
 }
 
-export interface Block {
+export interface RoutineBlock {
   structure: 'Individual' | 'Superset' | 'Circuito'
   blockSets: number
   restTime: number
-  exercises: Exercise[]
+  order: number
+  exercises: RoutineExercise[]
 }
 
-export interface Routine {
+export interface RoutineDefinition {
+  title: string
+  objective: string
+  level: string
+  durationWeeks: number
+  scheduleDays: string[]
+  blocks: RoutineBlock[]
+}
+
+export interface RoutineTemplate extends RoutineDefinition {
   id?: string
   _id?: string
-  title: string
-  description?: string
-  type: 'template' | 'custom' | string
-  assignedTo?: RoutineRelation | string | null
-  objective: string
-  durationWeeks: number
-  level: string
-  days: string[]
-  blocks: Block[]
 }
 
-export interface RoutinePayload {
-  title: string
-  description: string
-  type: 'template' | 'custom'
-  objective: string
-  durationWeeks: number
-  level: string
-  days: string[]
-  assignedTo?: string
-  blocks: Block[]
+export interface Routine extends RoutineDefinition {
+  id?: string
+  _id?: string
+  assignedTo?: User | RoutineRelation | string | null
+  status?: string
+}
+
+export type RoutineTemplatePayload = RoutineDefinition
+
+export interface RoutinePayload extends RoutineDefinition {
+  assignedTo: string
+  status?: string
+}
+
+export function getTemplates<T = RoutineTemplate[]>() {
+  return apiClient<T>('/routine-templates')
+}
+
+export function createTemplate(data: RoutineTemplatePayload) {
+  return apiClient('/routine-templates', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export function updateTemplate(id: string, data: RoutineTemplatePayload) {
+  return apiClient(`/routine-templates/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  })
+}
+
+export function deleteTemplate(id: string) {
+  return apiClient(`/routine-templates/${id}`, {
+    method: 'DELETE',
+  })
+}
+
+export function assignTemplateToClient(templateId: string, clientId: string) {
+  return apiClient(`/routine-templates/${templateId}/assign`, {
+    method: 'POST',
+    body: JSON.stringify({ clientId }),
+  })
 }
 
 export function getRoutines<T = unknown[]>() {
