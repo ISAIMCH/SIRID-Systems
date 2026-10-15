@@ -567,7 +567,9 @@ function Routines() {
         muscleGroup: (exercise.muscleGroup === customMuscleGroupOption
           ? exercise.customMuscleGroup
           : exercise.muscleGroup).trim(),
-        equipment: exercise.equipment,
+        equipment: exercise.equipment && exercise.equipment !== 'Selecciona equipo'
+          ? exercise.equipment
+          : null,
         videoUrl: exercise.videoUrl.trim(),
         isCardio: exercise.mode === 'Cardio',
         ...(exercise.mode === 'Cardio'
