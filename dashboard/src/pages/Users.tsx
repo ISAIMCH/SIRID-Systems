@@ -7,7 +7,15 @@ import type { Plan, User, UserReference } from '../types'
 type UsersResponse = User[] | { data?: unknown; users?: unknown }
 type PlansResponse = Plan[] | { data?: unknown; plans?: unknown; planes?: unknown }
 
-const trainingDays = ['L', 'M', 'X', 'J', 'V', 'S', 'D']
+const trainingDays = [
+  { label: 'L', value: 1 },
+  { label: 'M', value: 2 },
+  { label: 'X', value: 3 },
+  { label: 'J', value: 4 },
+  { label: 'V', value: 5 },
+  { label: 'S', value: 6 },
+  { label: 'D', value: 0 },
+]
 
 interface UserFormState {
   firstName: string
@@ -18,7 +26,7 @@ interface UserFormState {
   phone: string
   goal: string
   experienceLevel: string
-  availableTrainingDays: string[]
+  availableTrainingDays: number[]
   assignedCoach: string
   planId: string
   observations: string
@@ -105,7 +113,7 @@ function Users() {
       const errors: string[] = []
       if (usersResult.status === 'fulfilled') {
         setUsers(usersResult.value)
-        setCoaches(usersResult.value.filter((user) => user.role === 'Coach'))
+        setCoaches(usersResult.value.filter((user) => user.role === 'Coach' && Boolean(user.id || user._id)))
       } else {
         errors.push(usersResult.reason instanceof Error ? usersResult.reason.message : 'No se pudo cargar el directorio de usuarios.')
       }
@@ -152,7 +160,7 @@ function Users() {
       phone: user.phone || '',
       goal: user.goal || '',
       experienceLevel: user.experienceLevel || '',
-      availableTrainingDays: user.availableTrainingDays || [],
+      availableTrainingDays: user.availableTrainingDays ?? [],
       assignedCoach: recordId(user.assignedCoach),
       planId: recordId(user.planId),
       observations: user.observations || '',
@@ -472,25 +480,25 @@ function Users() {
                   <fieldset>
                     <legend className="mb-2 block text-sm font-medium text-slate-700">Días disponibles</legend>
                     <div className="flex flex-wrap gap-3">
-                      {trainingDays.map((day) => (
-                        <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700" key={day}>
+                      {trainingDays.map(({ label, value }) => (
+                        <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700" key={value}>
                           <input
                             className="accent-green-600"
                             type="checkbox"
-                            checked={form.availableTrainingDays?.includes(day) ?? false}
+                            checked={form.availableTrainingDays?.includes(value) ?? false}
                             onChange={(event) => {
                               setForm((currentForm) => {
                                 const selectedDays = currentForm.availableTrainingDays || []
                                 return {
                                   ...currentForm,
                                   availableTrainingDays: event.target.checked
-                                    ? selectedDays.includes(day) ? selectedDays : [...selectedDays, day]
-                                    : selectedDays.filter((selectedDay) => selectedDay !== day),
+                                    ? selectedDays.includes(value) ? selectedDays : [...selectedDays, value]
+                                    : selectedDays.filter((selectedDay) => selectedDay !== value),
                                 }
                               })
                             }}
                           />
-                          {day}
+                          {label}
                         </label>
                       ))}
                     </div>
@@ -530,10 +538,10 @@ function Users() {
                         onChange={(event) => setForm({ ...form, assignedCoach: event.target.value })}
                       >
                         <option value="">Sin coach asignado</option>
-                        {coaches.map((coach, index) => {
+                        {coaches.map((coach) => {
                           const coachId = coach.id || coach._id
                           return (
-                            <option key={coachId || `coach-${index}`} value={coachId || ''}>
+                            <option key={coachId} value={coachId}>
                               {userDisplayName(coach)}
                             </option>
                           )

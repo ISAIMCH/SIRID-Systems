@@ -97,7 +97,7 @@ export interface UserPayload {
   phone?: string
   goal?: string
   experienceLevel?: string
-  availableTrainingDays?: string[]
+  availableTrainingDays?: number[]
   assignedCoach?: string
   planId?: string
   observations?: string

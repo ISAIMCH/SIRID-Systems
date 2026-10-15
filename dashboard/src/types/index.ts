@@ -13,7 +13,7 @@ export interface User {
   phone?: string
   goal?: string
   experienceLevel?: string
-  availableTrainingDays?: string[]
+  availableTrainingDays?: number[]
   assignedCoach?: string | UserReference
   planId?: string | UserReference
   observations?: string
