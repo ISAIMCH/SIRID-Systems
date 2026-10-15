@@ -64,9 +64,15 @@
         .carousel-control-next-icon { background-color: rgba(0, 0, 0, 0.5); border-radius: 50%; padding: 22px; background-size: 55%;}
 
         /* ESTILOS DE LAS TARJETAS DE PRECIOS */
-        .pricing-card { background: #ffffff; border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); transition: transform 0.3s ease; padding: 40px 30px; height: 100%; position: relative; }
+        .pricing-card { background: #ffffff; border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); transition: transform 0.3s ease; padding: 40px 30px; height: 100%; position: relative; display: flex; flex-direction: column; }
         .pricing-card:hover { transform: translateY(-5px); }
         .pricing-card.destacado { border: 2px solid #1d1d1f; }
+        .pricing-card .eyebrow { min-height: 2.2rem; display: flex; align-items: center; justify-content: center; }
+        .pricing-card h3 { min-height: 2.4rem; display: flex; align-items: center; justify-content: center; }
+        .pricing-description { min-height: 3.6rem; margin-bottom: 0; display: flex; align-items: flex-start; justify-content: center; }
+        .pricing-price { min-height: 5.2rem; margin-top: 1.5rem; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .pricing-price .price-text { line-height: 1; }
+        .pricing-price .price-period { color: #515154; font-size: .95rem; }
         .location-frame { display: block; width: 100%; height: 600px; border: 0; border-radius: 24px; overflow: hidden; box-shadow: 0 12px 30px rgba(0,0,0,.08); }
         @media (max-width: 720px) { .location-frame { height: 760px; border-radius: 18px; } }
         .badge-popular { position: absolute; top: -12px; left: 50%; transform: translateX(-50%); background: #1d1d1f; color: #ffffff; padding: 4px 16px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; }
@@ -76,6 +82,10 @@
         .feature-list li::before { content: "✓"; color: #1d1d1f; font-weight: bold; margin-right: 10px; }
         .btn-buy { background-color: #1d1d1f; color: #ffffff; border-radius: 20px; padding: 10px 24px; font-weight: 600; width: 100%; border: none; margin-top: 20px; display: block; text-align: center; text-decoration: none;}
         .btn-buy:hover { background-color: #333336; color: #ffffff; }
+        .pricing-actions { display: flex; flex-direction: column; gap: 10px; }
+        .pricing-actions .btn-buy { margin-top: 20px; }
+        .btn-contact { background-color: #ffffff; color: #1d1d1f; border: 1px solid #1d1d1f; border-radius: 20px; padding: 10px 24px; font-weight: 600; width: 100%; display: block; text-align: center; text-decoration: none; }
+        .btn-contact:hover { background-color: #f5f5f7; color: #1d1d1f; }
 
         /* Banner de cookies */
 .cookie-banner {
@@ -375,15 +385,21 @@
                     <article class="pricing-card">
                         <span class="eyebrow">PARA EMPEZAR</span>
                         <h3 class="fw-semibold">Básico</h3>
-                        <p class="text-muted small">La base digital para dejar atrás hojas de cálculo y operación dispersa.</p>
-                        <div class="mt-4"><span class="price-text">A medida</span></div>
-                        <ul class="feature-list">
+                        <p class="pricing-description text-muted small">La base digital para dejar atrás hojas de cálculo y operación dispersa.</p>
+                        <div class="pricing-price">
+                            <span class="price-text">$99</span>
+                            <span class="price-period">MXN / mes</span>
+                        </div>
+                        <ul class="feature-list flex-grow-1">
                             <li>Panel administrativo web</li>
                             <li>Gestión de clientes y membresías</li>
                             <li>Rutinas digitales para tus socios</li>
                             <li>Reportes operativos esenciales</li>
                         </ul>
-                        <a href="https://wa.me/527721050282?text=Hola,%20me%20interesa%20el%20plan%20B%C3%A1sico%20de%20GymGo%20para%20mi%20gimnasio." target="_blank" rel="noopener" class="btn btn-buy whatsapp-cta">Hablar con un asesor</a>
+                        <div class="pricing-actions mt-auto">
+                            <button type="button" class="btn btn-buy add-to-cart" data-product-id="esencial">Añadir al carrito</button>
+                            <a href="https://wa.me/527721050282?text=Hola,%20me%20interesa%20el%20plan%20B%C3%A1sico%20de%20GymGo%20para%20mi%20gimnasio." target="_blank" rel="noopener" class="btn btn-contact whatsapp-cta">Hablar con un asesor</a>
+                        </div>
                     </article>
                 </div>
                 <div class="col-lg-4 col-md-6 fade-in-up">
@@ -391,32 +407,44 @@
                         <span class="badge-popular">MÁS ELEGIDO</span>
                         <span class="eyebrow">PARA GIMNASIOS EN CRECIMIENTO</span>
                         <h3 class="fw-semibold">Pro con Hardware IoT</h3>
-                        <p class="text-muted small">La experiencia completa: acceso ágil, app que retiene y control en tiempo real.</p>
-                        <div class="mt-4"><span class="price-text">A medida</span></div>
-                        <ul class="feature-list">
+                        <p class="pricing-description text-muted small">La experiencia completa: acceso ágil, app que retiene y control en tiempo real.</p>
+                        <div class="pricing-price">
+                            <span class="price-text">$199</span>
+                            <span class="price-period">MXN / mes</span>
+                        </div>
+                        <ul class="feature-list flex-grow-1">
                             <li>Todo lo incluido en Básico</li>
                             <li>Torniquete y control de acceso IoT</li>
                             <li>QR offline para horas pico</li>
                             <li>Gamificación con XP, rangos y rachas</li>
                             <li>Pagos y membresías desde la app</li>
                         </ul>
-                        <a href="https://wa.me/527721050282?text=Hola,%20me%20interesa%20el%20plan%20Pro%20con%20Hardware%20IoT%20de%20GymGo." target="_blank" rel="noopener" class="btn btn-buy whatsapp-cta">Agendar demostración</a>
+                        <div class="pricing-actions mt-auto">
+                            <button type="button" class="btn btn-buy add-to-cart" data-product-id="pro">Añadir al carrito</button>
+                            <a href="https://wa.me/527721050282?text=Hola,%20me%20interesa%20el%20plan%20Pro%20con%20Hardware%20IoT%20de%20GymGo." target="_blank" rel="noopener" class="btn btn-contact whatsapp-cta">Agendar demostración</a>
+                        </div>
                     </article>
                 </div>
                 <div class="col-lg-4 col-md-6 fade-in-up">
                     <article class="pricing-card">
-                        <span class="eyebrow">PARA REDES Y OPERACIONES COMPLEJAS</span>
+                        <span class="eyebrow">PARA OPERACIONES MULTISEDE</span>
                         <h3 class="fw-semibold">Enterprise</h3>
-                        <p class="text-muted small">Gobierna múltiples sedes con una experiencia consistente y datos comparables.</p>
-                        <div class="mt-4"><span class="price-text">A medida</span></div>
-                        <ul class="feature-list">
+                        <p class="pricing-description text-muted small">Para multiples sedes con una experiencia consistente y datos comparables.</p>
+                        <div class="pricing-price">
+                            <span class="price-text">$250</span>
+                            <span class="price-period">MXN pago único</span>
+                        </div>
+                        <ul class="feature-list flex-grow-1">
                             <li>Todo lo incluido en Pro</li>
                             <li>Analítica de capacidad por sede y zona</li>
                             <li>Roles para Admin, Coach y Staff</li>
                             <li>Inventario, mantenimiento y operaciones</li>
                             <li>Acompañamiento de implementación</li>
                         </ul>
-                        <a href="https://wa.me/527721050282?text=Hola,%20me%20interesa%20el%20plan%20Enterprise%20de%20GymGo%20para%20mi%20red%20de%20gimnasios." target="_blank" rel="noopener" class="btn btn-buy whatsapp-cta">Diseñar mi solución</a>
+                        <div class="pricing-actions mt-auto">
+                            <button type="button" class="btn btn-buy add-to-cart" data-product-id="hw">Añadir al carrito</button>
+                            <a href="https://wa.me/527721050282?text=Hola,%20me%20interesa%20el%20plan%20Enterprise%20de%20GymGo%20para%20mi%20red%20de%20gimnasios." target="_blank" rel="noopener" class="btn btn-contact whatsapp-cta">Diseñar mi solución</a>
+                        </div>
                     </article>
                 </div>
             </div>
