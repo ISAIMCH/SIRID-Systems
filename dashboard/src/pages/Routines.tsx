@@ -22,6 +22,11 @@ import type {
   RoutineTemplatePayload,
 } from '../services/api'
 import type { Equipment, User } from '../types'
+import {
+  fetchAndFilterExercises,
+  filterExerciseSuggestions,
+  type SuggestedExercise,
+} from '../utils/exerciseDictionary'
 
 type ArrayResponse<T> = T[] | {
   data?: unknown
@@ -190,11 +195,104 @@ function RoutineSkeleton() {
   )
 }
 
+interface ExerciseNameAutocompleteProps {
+  id: string
+  value: string
+  suggestions: SuggestedExercise[]
+  isLoading: boolean
+  error: string | null
+  onChange: (value: string) => void
+  onSelect: (exercise: SuggestedExercise) => void
+}
+
+function ExerciseNameAutocomplete({
+  id,
+  value,
+  suggestions,
+  isLoading,
+  error,
+  onChange,
+  onSelect,
+}: ExerciseNameAutocompleteProps) {
+  const [isOpen, setIsOpen] = useState(false)
+  const matches = filterExerciseSuggestions(suggestions, value)
+
+  return (
+    <div className="relative">
+      <input
+        className={inputClassName}
+        id={id}
+        type="text"
+        role="combobox"
+        aria-autocomplete="list"
+        aria-expanded={isOpen && value.trim().length > 0}
+        aria-controls={`${id}-suggestions`}
+        autoComplete="off"
+        value={value}
+        onFocus={() => setIsOpen(true)}
+        onChange={(event) => {
+          onChange(event.target.value)
+          setIsOpen(true)
+        }}
+        onBlur={() => setIsOpen(false)}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') setIsOpen(false)
+        }}
+        placeholder="Busca un ejercicio o escribe uno propio"
+      />
+      {isOpen && value.trim().length > 0 && (
+        <div
+          className="absolute left-0 right-0 top-full z-30 mt-1 max-h-64 overflow-y-auto rounded-lg border border-slate-200 bg-white py-1 shadow-lg"
+          id={`${id}-suggestions`}
+          role="listbox"
+        >
+          {isLoading ? (
+            <p className="px-3 py-3 text-sm text-slate-500">Cargando ejercicios compatibles...</p>
+          ) : matches.length > 0 ? (
+            matches.map((exercise) => (
+              <button
+                className="flex w-full flex-col items-start px-3 py-2 text-left transition hover:bg-green-50 focus:bg-green-50 focus:outline-none"
+                key={exercise.id}
+                type="button"
+                role="option"
+                aria-selected="false"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => {
+                  onSelect(exercise)
+                  setIsOpen(false)
+                }}
+              >
+                <span className="text-sm font-medium text-slate-900">{exercise.name}</span>
+                <span className="text-xs text-slate-500">
+                  {exercise.originalName !== exercise.name ? `${exercise.originalName} · ` : ''}
+                  {exercise.equipment || 'Peso corporal'}
+                </span>
+              </button>
+            ))
+          ) : (
+            <p className="px-3 py-3 text-sm text-slate-500">
+              {error || 'Sin coincidencias. Puedes escribir el nombre manualmente.'}
+            </p>
+          )}
+          {error && !isLoading && (
+            <p className="border-t border-amber-100 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              No se pudo cargar el catálogo externo; puedes capturar el nombre manualmente.
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function Routines() {
   const [templates, setTemplates] = useState<RoutineTemplate[]>([])
   const [routines, setRoutines] = useState<Routine[]>([])
   const [clients, setClients] = useState<User[]>([])
   const [equipment, setEquipment] = useState<Equipment[]>([])
+  const [exerciseSuggestions, setExerciseSuggestions] = useState<SuggestedExercise[]>([])
+  const [isExerciseCatalogLoading, setIsExerciseCatalogLoading] = useState(true)
+  const [exerciseCatalogError, setExerciseCatalogError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<BuilderMode>('template')
@@ -240,11 +338,31 @@ function Routines() {
         setTemplates(extractArray<RoutineTemplate>(templatesResponse, ['data', 'templates', 'routineTemplates']))
         setRoutines(extractArray<Routine>(routinesResponse, ['data', 'routines', 'rutinas']))
         setClients(extractArray<User>(usersResponse, ['data', 'users']).filter(isClient))
-        setEquipment(extractArray<Equipment>(equipmentResponse, ['data', 'equipment']))
+        const equipmentList = extractArray<Equipment>(equipmentResponse, ['data', 'equipment'])
+        setEquipment(equipmentList)
+        void fetchAndFilterExercises(equipmentList)
+          .then((suggestions) => {
+            if (!isMounted) return
+            setExerciseSuggestions(suggestions)
+            setExerciseCatalogError(null)
+          })
+          .catch((catalogError: unknown) => {
+            if (!isMounted) return
+            setExerciseCatalogError(catalogError instanceof Error
+              ? catalogError.message
+              : 'No se pudo cargar el catálogo de ejercicios.')
+          })
+          .finally(() => {
+            if (isMounted) setIsExerciseCatalogLoading(false)
+          })
         setError(null)
       } catch (requestError) {
         if (isMounted) {
           setError(requestError instanceof Error ? requestError.message : 'No se pudieron cargar los datos de rutinas.')
+          setExerciseCatalogError(requestError instanceof Error
+            ? requestError.message
+            : 'No se pudo cargar el catálogo de ejercicios.')
+          setIsExerciseCatalogLoading(false)
         }
       } finally {
         if (isMounted) setIsLoading(false)
@@ -354,6 +472,37 @@ function Routines() {
             ),
           }
         : block),
+    }))
+  }
+
+  function selectSuggestedExercise(
+    blockIndex: number,
+    exerciseIndex: number,
+    suggestion: SuggestedExercise,
+  ) {
+    const isPresetMuscleGroup = muscleGroupOptions.includes(suggestion.muscleGroup)
+    setForm((current) => ({
+      ...current,
+      blocks: current.blocks.map((block, currentBlockIndex) =>
+        currentBlockIndex === blockIndex
+          ? {
+              ...block,
+              exercises: block.exercises.map((exercise, currentExerciseIndex) =>
+                currentExerciseIndex === exerciseIndex
+                  ? {
+                      ...exercise,
+                      name: suggestion.name,
+                      videoUrl: suggestion.videoUrl,
+                      muscleGroup: isPresetMuscleGroup ? suggestion.muscleGroup : customMuscleGroupOption,
+                      customMuscleGroup: isPresetMuscleGroup ? '' : suggestion.muscleGroup,
+                      equipment: suggestion.equipment,
+                      ...(suggestion.muscleGroup === 'Cardio' ? { mode: 'Cardio' as const } : {}),
+                    }
+                  : exercise,
+              ),
+            }
+          : block,
+      ),
     }))
   }
 
@@ -809,7 +958,15 @@ function Routines() {
                                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                     <div>
                                       <label className={labelClassName} htmlFor={`exercise-name-${blockIndex}-${exerciseIndex}`}>Nombre</label>
-                                      <input className={inputClassName} id={`exercise-name-${blockIndex}-${exerciseIndex}`} value={exercise.name} onChange={(event) => updateExercise(blockIndex, exerciseIndex, 'name', event.target.value)} placeholder="Ej. Sentadilla" />
+                                      <ExerciseNameAutocomplete
+                                        id={`exercise-name-${blockIndex}-${exerciseIndex}`}
+                                        value={exercise.name}
+                                        suggestions={exerciseSuggestions}
+                                        isLoading={isExerciseCatalogLoading}
+                                        error={exerciseCatalogError}
+                                        onChange={(value) => updateExercise(blockIndex, exerciseIndex, 'name', value)}
+                                        onSelect={(suggestion) => selectSuggestedExercise(blockIndex, exerciseIndex, suggestion)}
+                                      />
                                     </div>
                                     <div>
                                       <label className={labelClassName} htmlFor={`exercise-muscle-${blockIndex}-${exerciseIndex}`}>Grupo muscular</label>
