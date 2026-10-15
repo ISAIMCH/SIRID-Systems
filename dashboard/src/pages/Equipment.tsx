@@ -18,6 +18,23 @@ interface EquipmentFormState {
 
 const zoneOptions = ['Zona de piernas', 'Peso libre', 'Cardio']
 const customZoneOption = 'other'
+const equipmentStatusMap: Record<string, EquipmentPayload['status']> = {
+  operativo: 'available',
+  operational: 'available',
+  available: 'available',
+  mantenimiento: 'maintenance',
+  maintenance: 'maintenance',
+  'en mantenimiento': 'maintenance',
+  averiado: 'unavailable',
+  broken: 'unavailable',
+  unavailable: 'unavailable',
+  'fuera de servicio': 'unavailable',
+}
+const equipmentTypeMap: Record<string, string> = {
+  cardio: 'cardio',
+  fuerza: 'strength',
+  strength: 'strength',
+}
 
 const emptyEquipmentForm: EquipmentFormState = {
   nombre: '',
@@ -138,11 +155,12 @@ function Equipment() {
         name: form.nombre.trim(),
         zone: (form.zona === customZoneOption ? customZone : form.zona).trim(),
         brand: form.marca.trim(),
-        type: form.tipo,
+        type: equipmentTypeMap[form.tipo.trim().toLowerCase()] || form.tipo.trim().toLowerCase(),
         totalQuantity: Number(form.cantidadTotal),
         maintenanceQuantity: Number(form.cantidadMantenimiento),
-        status: form.estado,
+        status: equipmentStatusMap[form.estado.trim().toLowerCase()],
       }
+      if (!payload.status) throw new Error('Selecciona un estado válido para el equipo.')
       if (!payload.zone) throw new Error('Selecciona o escribe una zona.')
       const equipmentId = editingEquipment?._id || editingEquipment?.id
 

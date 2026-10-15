@@ -387,7 +387,7 @@ export interface EquipmentPayload {
   type: string
   totalQuantity: number
   maintenanceQuantity: number
-  status: EquipmentStatus
+  status: 'available' | 'maintenance' | 'unavailable'
 }
 
 export function getEquipment<T = Equipment[]>() {
