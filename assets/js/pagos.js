@@ -74,14 +74,35 @@ function dash(){
  $('#txs').innerHTML=S.orders.length?S.orders.map(o=>`<div class="d-flex justify-content-between align-items-center border-bottom py-2">
   <div><i class="bi ${ic[o.method]} me-2"></i><b>${o.id}</b><div class="small text-muted">${new Date(o.date).toLocaleString('es-MX')} · ${o.method}${o.last4?' ····'+o.last4:''}</div></div>
   <div class="text-end"><div class="fw-semibold">${money(o.total)}</div>
-  ${o.status=='pagado'?'<span class="badge text-bg-success">Pagado</span>':`<button class="btn btn-sm btn-outline-dark" onclick="ficha('${o.id}')">Ver ficha</button>`}</div></div>`).join(''):'<p class="text-muted text-center">Aún no hay transacciones.</p>'}
+  <div class="d-flex flex-column align-items-end gap-1">
+  ${o.status=='pagado'?'<span class="badge text-bg-success">Pagado</span>':`<button class="btn btn-sm btn-outline-dark" onclick="ficha('${o.id}')">Ver ficha</button>`}
+  <button class="btn btn-sm btn-outline-light" data-receipt-order="${o.id}"><i class="bi bi-file-earmark-pdf me-1"></i>Recibo PDF</button>
+  </div></div></div>`).join(''):'<p class="text-muted text-center">Aún no hay transacciones.</p>'}
 
 /* ===== Órdenes ===== */
 async function order(method,status,ex={}){const o={id:'GG-'+Date.now().toString(36).toUpperCase(),method,status,total:tot(),items:qtyN(),date:new Date().toISOString(),...ex};
  const subtotal=+sub().toFixed(2), tax=+(subtotal*.16).toFixed(2);
  const data=await paymentRequest('',{method:'POST',body:JSON.stringify({id:o.id,method,status,subtotal,tax,total:o.total,last4:o.last4,ref:o.ref,exp:o.exp,items:S.cart.map(item=>({productId:item.pid,title:item.title,unitPrice:item.price,quantity:item.qty}))})});
  S.orders.unshift(data.payment||o);S.cart=[];save();return data.payment||o}
-const ok=(t,o)=>modal(`<div class="text-center"><i class="bi bi-check-circle-fill text-success" style="font-size:3rem"></i><h5 class="fw-bold mt-2">${t}</h5><p class="mb-1">Orden <b>${o.id}</b></p><p class="text-muted">${money(o.total)}</p><button class="btn btn-d w-100" data-bs-dismiss="modal">Listo</button></div>`);
+const ok=(t,o)=>modal(`<div class="text-center"><i class="bi bi-check-circle-fill text-success" style="font-size:3rem"></i><h5 class="fw-bold mt-2">${t}</h5><p class="mb-1">Orden <b>${o.id}</b></p><p class="text-muted">${money(o.total)}</p><button class="btn btn-d w-100 mb-2" data-receipt-order="${o.id}"><i class="bi bi-file-earmark-pdf me-1"></i> Descargar recibo PDF</button><button class="btn btn-light w-100" data-bs-dismiss="modal">Listo</button></div>`);
+
+async function downloadReceipt(orderId, button) {
+ const originalText=button.innerHTML;
+ button.disabled=true;
+ button.innerHTML='<span class="spinner-border spinner-border-sm"></span> Generando recibo…';
+ try {
+  const response=await fetch(`${API}/${encodeURIComponent(orderId)}/receipt`,{headers:{Authorization:`Bearer ${token}`}});
+  if(!response.ok){const data=await response.json().catch(()=>({}));throw new Error(data.msg||'No se pudo descargar el recibo.')}
+  const blob=await response.blob(),url=URL.createObjectURL(blob),link=document.createElement('a');
+  link.href=url;link.download=`recibo-${orderId}.pdf`;link.click();URL.revokeObjectURL(url);
+ } catch(error) { toast(error.message); }
+ finally { button.disabled=false;button.innerHTML=originalText; }
+}
+
+document.addEventListener('click',(event)=>{
+ const button=event.target.closest('[data-receipt-order]');
+ if(button) downloadReceipt(button.dataset.receiptOrder,button);
+});
 
 /* ===== STRIPE ===== */
 const luhn=n=>{let s=0,d=0;for(let i=n.length-1;i>=0;i--){let x=+n[i];if(d++%2){x*=2;if(x>9)x-=9}s+=x}return s%10==0};
@@ -102,7 +123,7 @@ $('#payStripe').onclick=()=>{
  setTimeout(()=>{b.innerHTML='Pagar con tarjeta';b.disabled=!S.cart.length;
   if(d=='4000000000000002')return er.textContent='Tu tarjeta fue rechazada.';
   if(d=='4000000000009995')return er.textContent='Fondos insuficientes.';
-  const fin=async()=>{try{const saved=await order('stripe','pagado',{last4:d.slice(-4)});gm.hide();ok('Pago exitoso con Stripe',saved)}catch(error){er.textContent=error.message}};
+  const fin=async()=>{try{const saved=await order('stripe','pagado',{last4:d.slice(-4)});ok('Pago exitoso con Stripe',saved)}catch(error){er.textContent=error.message}};
   if(d=='4000002500003155')modal(`<div class="text-center"><i class="bi bi-shield-lock fs-1"></i><h5 class="fw-bold">Verificación 3D Secure</h5><p class="small text-muted">Tu banco (simulado) solicita autenticar ${money(tot())}.</p><button id="a3" class="btn btn-d w-100 mb-2">Autenticar</button><button class="btn btn-light w-100" data-bs-dismiss="modal">Cancelar</button></div>`),$('#a3').onclick=()=>setTimeout(fin,500);
   else fin()},1200)};
 
@@ -115,14 +136,14 @@ $('#payPaynet').onclick=async()=>{const ref=Array.from({length:16},()=>Math.floo
 function ficha(id){const o=S.orders.find(x=>x.id==id);if(!o)return;
  modal(`<div class="ficha"><div class="fw-bold">Paynet · Pago en tienda</div>${barcode(o.ref)}<div style="font-family:monospace;letter-spacing:2px">${o.ref.replace(/(.{4})/g,'$1 ').trim()}</div>
   <div class="mt-2">Monto: <b>${money(o.total)}</b></div><div class="small text-muted">Vence: ${new Date(o.exp).toLocaleString('es-MX')}</div></div>
-  ${o.status=='pagado'?'<div class="alert alert-success mt-3 mb-0 text-center">Pagado</div>':`<button id="pn" class="btn btn-d w-100 mt-3">Simular pago en tienda</button>`}`);
- const b=$('#pn');if(b)b.onclick=async()=>{b.disabled=true;b.textContent='Validando en tienda…';setTimeout(async()=>{try{const data=await paymentRequest(`/${encodeURIComponent(o.id)}/status`,{method:'PATCH',body:JSON.stringify({status:'pagado'})});o.status=data.payment.status;save();gm.hide();ok('Pago Paynet recibido',o)}catch(error){b.disabled=false;b.textContent='Simular pago en tienda';toast(error.message)}},1200)}}
+  ${o.status=='pagado'?'<div class="alert alert-success mt-3 mb-2 text-center">Pagado</div><button class="btn btn-d w-100" data-receipt-order="'+o.id+'"><i class="bi bi-file-earmark-pdf me-1"></i> Descargar recibo PDF</button>':`<button id="pn" class="btn btn-d w-100 mt-3">Simular pago en tienda</button>`}`);
+ const b=$('#pn');if(b)b.onclick=async()=>{b.disabled=true;b.textContent='Validando en tienda…';setTimeout(async()=>{try{const data=await paymentRequest(`/${encodeURIComponent(o.id)}/status`,{method:'PATCH',body:JSON.stringify({status:'pagado'})});o.status=data.payment.status;save();ok('Pago Paynet recibido',o)}catch(error){b.disabled=false;b.textContent='Simular pago en tienda';toast(error.message)}},1200)}}
 
 /* ===== PAYPAL ===== */
 $('#payPP').onclick=()=>modal(`<div class="text-center"><i class="bi bi-paypal fs-1 text-primary"></i><h5 class="fw-bold">Inicia sesión en PayPal</h5></div>
  <input class="form-control mb-2" value="comprador@gymgo.test"><input class="form-control mb-3" type="password" value="sandbox123">
  <div class="small text-muted mb-3">Pagarás ${money(tot())} a Project-GymGo.</div><button id="ppo" class="pp w-100">Aprobar y pagar</button>`);
-document.addEventListener('click',e=>{if(e.target.closest('#ppo')){const b=$('#ppo');b.innerHTML='<span class="spinner-border spinner-border-sm"></span>';setTimeout(async()=>{try{const saved=await order('paypal','pagado');gm.hide();ok('Pago aprobado en PayPal',saved)}catch(error){b.textContent=error.message;b.disabled=false}},1000)}});
+document.addEventListener('click',e=>{if(e.target.closest('#ppo')){const b=$('#ppo');b.innerHTML='<span class="spinner-border spinner-border-sm"></span>';setTimeout(async()=>{try{const saved=await order('paypal','pagado');ok('Pago aprobado en PayPal',saved)}catch(error){b.textContent=error.message;b.disabled=false}},1000)}});
 
 /* ===== Varios ===== */
 $('#share').onclick=async()=>{const u=shareURL();

@@ -138,6 +138,16 @@ body.payments-page {
   background: var(--payments-accent);
   border-color: var(--payments-accent);
 }
+.payments-page .btn-outline-light {
+  color: var(--payments-text);
+  border-color: rgba(255, 255, 255, .55);
+}
+.payments-page .btn-outline-light:hover,
+.payments-page .btn-outline-light:focus {
+  color: #1d1d1f;
+  background: var(--payments-accent);
+  border-color: var(--payments-accent);
+}
 .payments-page .cart-note { font-size: .72rem; }
 .payments-page .modal-content { border-radius: 24px; }
 .payments-page .modal-content .text-muted { color: #6c757d !important; }
