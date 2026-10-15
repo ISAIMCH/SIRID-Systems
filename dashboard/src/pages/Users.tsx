@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Pencil } from 'lucide-react'
 import { createUser, getPlans, getUsers, updateUser } from '../services/api'
+import type { UserPayload } from '../services/api'
 import type { Plan, User, UserReference } from '../types'
 
 type UsersResponse = User[] | { data?: unknown; users?: unknown }
@@ -166,7 +167,7 @@ function Users() {
     setIsSubmitting(true)
 
     try {
-      const payload = {
+      const payload: UserPayload = {
         firstName: form.firstName.trim(),
         lastName: form.lastName.trim(),
         email: form.email.trim(),
@@ -440,20 +441,14 @@ function Users() {
                       <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="user-goal">
                         Objetivo deportivo
                       </label>
-                      <select
+                      <input
                         className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
                         id="user-goal"
+                        type="text"
+                        placeholder="Ej. Ganar masa, dormir mejor..."
                         value={form.goal}
                         onChange={(event) => setForm({ ...form, goal: event.target.value })}
-                      >
-                        <option value="">Selecciona un objetivo</option>
-                        <option value="ganar masa muscular">Ganar masa muscular</option>
-                        <option value="perder grasa">Perder grasa</option>
-                        <option value="definición">Definición</option>
-                        <option value="fuerza">Fuerza</option>
-                        <option value="acondicionamiento">Acondicionamiento</option>
-                        <option value="otro">Otro</option>
-                      </select>
+                      />
                     </div>
 
                     <div>
