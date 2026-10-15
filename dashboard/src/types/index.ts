@@ -10,6 +10,22 @@ export interface User {
   role: UserRole
   status?: string
   isActive?: boolean
+  phone?: string
+  goal?: string
+  experienceLevel?: string
+  availableTrainingDays?: string[]
+  assignedCoach?: string | UserReference
+  planId?: string | UserReference
+  observations?: string
+}
+
+export interface UserReference {
+  id?: string
+  _id?: string
+  name?: string
+  nombre?: string
+  firstName?: string
+  lastName?: string
 }
 
 export interface Plan {

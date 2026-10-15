@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Pencil } from 'lucide-react'
-import { createUser, getUsers, updateUser } from '../services/api'
-import type { User } from '../types'
+import { createUser, getPlans, getUsers, updateUser } from '../services/api'
+import type { Plan, User, UserReference } from '../types'
 
 type UsersResponse = User[] | { data?: unknown; users?: unknown }
+type PlansResponse = Plan[] | { data?: unknown; plans?: unknown; planes?: unknown }
+
+const trainingDays = ['L', 'M', 'X', 'J', 'V', 'S', 'D']
 
 interface UserFormState {
   firstName: string
@@ -11,6 +14,13 @@ interface UserFormState {
   email: string
   password: string
   role: 'Admin' | 'Coach' | 'Cliente'
+  phone: string
+  goal: string
+  experienceLevel: string
+  availableTrainingDays: string[]
+  assignedCoach: string
+  planId: string
+  observations: string
 }
 
 const emptyUserForm: UserFormState = {
@@ -19,6 +29,13 @@ const emptyUserForm: UserFormState = {
   email: '',
   password: '',
   role: 'Cliente',
+  phone: '',
+  goal: '',
+  experienceLevel: '',
+  availableTrainingDays: [],
+  assignedCoach: '',
+  planId: '',
+  observations: '',
 }
 
 function UserSkeleton() {
@@ -36,17 +53,38 @@ function UserSkeleton() {
   )
 }
 
-async function fetchUsers() {
-  const response = await getUsers<UsersResponse>()
-  const usersCandidate = Array.isArray(response)
-    ? response
-    : response?.data || response?.users || []
+function extractArray<T>(response: unknown, keys: string[]) {
+  if (Array.isArray(response)) return response as T[]
+  if (!response || typeof response !== 'object') return []
+  const record = response as Record<string, unknown>
+  const candidate = keys.map((key) => record[key]).find(Array.isArray)
+    ?? Object.values(record).find(Array.isArray)
+  return Array.isArray(candidate) ? candidate as T[] : []
+}
 
-  return Array.isArray(usersCandidate) ? usersCandidate as User[] : []
+async function fetchUsers() {
+  return extractArray<User>(await getUsers<UsersResponse>(), ['data', 'users'])
+}
+
+async function fetchPlans() {
+  return extractArray<Plan>(await getPlans<PlansResponse>(), ['data', 'plans', 'planes'])
+}
+
+function recordId(value: string | UserReference | undefined) {
+  if (typeof value === 'string') return value
+  return value?.id || value?._id || ''
+}
+
+function userDisplayName(user: User) {
+  return user.name
+    || [user.firstName, user.lastName].filter(Boolean).join(' ')
+    || user.email
 }
 
 function Users() {
   const [users, setUsers] = useState<User[]>([])
+  const [plans, setPlans] = useState<Plan[]>([])
+  const [coaches, setCoaches] = useState<User[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -59,28 +97,28 @@ function Users() {
   useEffect(() => {
     let isMounted = true
 
-    async function loadUsers() {
-      try {
-        const usersArray = await fetchUsers()
+    async function loadFormData() {
+      const [usersResult, plansResult] = await Promise.allSettled([fetchUsers(), fetchPlans()])
+      if (!isMounted) return
 
-        if (isMounted) {
-          setUsers(usersArray)
-          setError(null)
-        }
-      } catch (requestError) {
-        if (isMounted) {
-          setError(
-            requestError instanceof Error
-              ? requestError.message
-              : 'No se pudo cargar el directorio de usuarios.',
-          )
-        }
-      } finally {
-        if (isMounted) setIsLoading(false)
+      const errors: string[] = []
+      if (usersResult.status === 'fulfilled') {
+        setUsers(usersResult.value)
+        setCoaches(usersResult.value.filter((user) => user.role === 'Coach'))
+      } else {
+        errors.push(usersResult.reason instanceof Error ? usersResult.reason.message : 'No se pudo cargar el directorio de usuarios.')
       }
+
+      if (plansResult.status === 'fulfilled') {
+        setPlans(plansResult.value.filter((plan) => plan.isActive !== false))
+      } else {
+        errors.push(plansResult.reason instanceof Error ? plansResult.reason.message : 'No se pudieron cargar los planes.')
+      }
+      setError(errors.length ? errors.join(' ') : null)
+      setIsLoading(false)
     }
 
-    loadUsers()
+    loadFormData()
     return () => {
       isMounted = false
     }
@@ -102,14 +140,21 @@ function Users() {
   }
 
   function openEditModal(user: User) {
-    const [firstName = '', ...lastNameParts] = (user.name || '').trim().split(/\s+/)
+    const [fallbackFirstName = '', ...fallbackLastNameParts] = (user.name || '').trim().split(/\s+/)
     setEditingUser(user)
     setForm({
-      firstName,
-      lastName: lastNameParts.join(' '),
+      firstName: user.firstName || fallbackFirstName,
+      lastName: user.lastName || fallbackLastNameParts.join(' '),
       email: user.email || '',
       password: '',
       role: user.role || 'Cliente',
+      phone: user.phone || '',
+      goal: user.goal || '',
+      experienceLevel: user.experienceLevel || '',
+      availableTrainingDays: user.availableTrainingDays || [],
+      assignedCoach: recordId(user.assignedCoach),
+      planId: recordId(user.planId),
+      observations: user.observations || '',
     })
     setModalError(null)
     setIsModalOpen(true)
@@ -121,16 +166,24 @@ function Users() {
     setIsSubmitting(true)
 
     try {
-      const fullName = `${form.firstName}${form.lastName}`.trim()
-      const payload: Record<string, string> = {
-        name: fullName,
+      const payload = {
+        firstName: form.firstName.trim(),
+        lastName: form.lastName.trim(),
         email: form.email.trim(),
         role: form.role,
+        ...(form.role === 'Cliente' && {
+          phone: form.phone.trim(),
+          goal: form.goal,
+          experienceLevel: form.experienceLevel,
+          availableTrainingDays: form.availableTrainingDays,
+          assignedCoach: form.assignedCoach,
+          planId: form.planId,
+          observations: form.observations.trim(),
+        }),
       }
 
       if (!editingUser) {
-        payload.password = form.password
-        await createUser(payload)
+        await createUser({ ...payload, password: form.password })
       } else {
         const userId = editingUser._id || editingUser.id
         if (!userId) throw new Error('El usuario no tiene un identificador válido.')
@@ -152,7 +205,7 @@ function Users() {
   }
 
   const filteredUsers = users.filter((user) =>
-    `${user.name || ''} ${user.email || ''}`.toLocaleLowerCase().includes(searchTerm.trim().toLocaleLowerCase()),
+    `${userDisplayName(user)} ${user.email || ''}`.toLocaleLowerCase().includes(searchTerm.trim().toLocaleLowerCase()),
   )
 
   return (
@@ -215,7 +268,7 @@ function Users() {
                     return (
                       <tr className="transition-colors hover:bg-slate-50" key={userId}>
                         <td className="whitespace-nowrap px-6 py-4 font-medium text-slate-900">
-                          {user?.name || 'Sin nombre'}
+                          {userDisplayName(user) || 'Sin nombre'}
                         </td>
                         <td className="whitespace-nowrap px-6 py-4 text-slate-500">
                           {user?.email || 'Sin correo'}
@@ -267,7 +320,7 @@ function Users() {
 
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-sm font-medium uppercase tracking-[0.2em] text-emerald-700">Comunidad</p>
@@ -361,6 +414,148 @@ function Users() {
                   <option value="Coach">Coach</option>
                 </select>
               </div>
+
+              {form.role === 'Cliente' && (
+                <section className="space-y-5 rounded-xl border border-slate-200 bg-slate-50 p-5">
+                  <div>
+                    <h3 className="text-lg font-semibold text-slate-900">Perfil Deportivo y Membresía</h3>
+                    <p className="mt-1 text-sm text-slate-500">Información de entrenamiento y asignación del cliente.</p>
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="user-phone">
+                      Teléfono
+                    </label>
+                    <input
+                      className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                      id="user-phone"
+                      type="tel"
+                      value={form.phone}
+                      onChange={(event) => setForm({ ...form, phone: event.target.value })}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="user-goal">
+                        Objetivo deportivo
+                      </label>
+                      <select
+                        className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                        id="user-goal"
+                        value={form.goal}
+                        onChange={(event) => setForm({ ...form, goal: event.target.value })}
+                      >
+                        <option value="">Selecciona un objetivo</option>
+                        <option value="ganar masa muscular">Ganar masa muscular</option>
+                        <option value="perder grasa">Perder grasa</option>
+                        <option value="definición">Definición</option>
+                        <option value="fuerza">Fuerza</option>
+                        <option value="acondicionamiento">Acondicionamiento</option>
+                        <option value="otro">Otro</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="user-experience">
+                        Nivel de experiencia
+                      </label>
+                      <select
+                        className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                        id="user-experience"
+                        value={form.experienceLevel}
+                        onChange={(event) => setForm({ ...form, experienceLevel: event.target.value })}
+                      >
+                        <option value="">Selecciona un nivel</option>
+                        <option value="principiante">Principiante</option>
+                        <option value="intermedio">Intermedio</option>
+                        <option value="avanzado">Avanzado</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <fieldset>
+                    <legend className="mb-2 block text-sm font-medium text-slate-700">Días disponibles</legend>
+                    <div className="flex flex-wrap gap-3">
+                      {trainingDays.map((day) => (
+                        <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700" key={day}>
+                          <input
+                            className="accent-green-600"
+                            type="checkbox"
+                            checked={form.availableTrainingDays.includes(day)}
+                            onChange={(event) => setForm({
+                              ...form,
+                              availableTrainingDays: event.target.checked
+                                ? [...form.availableTrainingDays, day]
+                                : form.availableTrainingDays.filter((selectedDay) => selectedDay !== day),
+                            })}
+                          />
+                          {day}
+                        </label>
+                      ))}
+                    </div>
+                  </fieldset>
+
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="user-plan">
+                        Plan de membresía
+                      </label>
+                      <select
+                        className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                        id="user-plan"
+                        value={form.planId}
+                        onChange={(event) => setForm({ ...form, planId: event.target.value })}
+                      >
+                        <option value="">Sin plan asignado</option>
+                        {plans.map((plan, index) => {
+                          const planId = plan.id || plan._id
+                          return (
+                            <option key={planId || `plan-${index}`} value={planId || ''}>
+                              {plan.name || plan.nombre || 'Plan sin nombre'}
+                            </option>
+                          )
+                        })}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="user-coach">
+                        Coach asignado
+                      </label>
+                      <select
+                        className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                        id="user-coach"
+                        value={form.assignedCoach}
+                        onChange={(event) => setForm({ ...form, assignedCoach: event.target.value })}
+                      >
+                        <option value="">Sin coach asignado</option>
+                        {coaches.map((coach, index) => {
+                          const coachId = coach.id || coach._id
+                          return (
+                            <option key={coachId || `coach-${index}`} value={coachId || ''}>
+                              {userDisplayName(coach)}
+                            </option>
+                          )
+                        })}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="user-observations">
+                      Observaciones médicas o técnicas
+                    </label>
+                    <textarea
+                      className="min-h-24 w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                      id="user-observations"
+                      value={form.observations}
+                      onChange={(event) => setForm({ ...form, observations: event.target.value })}
+                      rows={3}
+                    />
+                  </div>
+                </section>
+              )}
 
               {modalError && (
                 <p className="border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">

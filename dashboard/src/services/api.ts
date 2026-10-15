@@ -1,4 +1,4 @@
-import type { Equipment, EquipmentStatus, User } from '../types'
+import type { Equipment, EquipmentStatus, User, UserRole } from '../types'
 
 const API_BASE_URL = import.meta.env.VITE_GYMGO_API_URL
 
@@ -88,14 +88,29 @@ export function getUsers<T = AuthUser[]>() {
   return apiClient<T>('/auth/users')
 }
 
-export function createUser(userData: any) {
+export interface UserPayload {
+  firstName: string
+  lastName: string
+  email: string
+  password?: string
+  role: UserRole
+  phone?: string
+  goal?: string
+  experienceLevel?: string
+  availableTrainingDays?: string[]
+  assignedCoach?: string
+  planId?: string
+  observations?: string
+}
+
+export function createUser(userData: UserPayload) {
   return apiClient('/auth/users', {
     method: 'POST',
     body: JSON.stringify(userData),
   })
 }
 
-export function updateUser(id: string, userData: any) {
+export function updateUser(id: string, userData: UserPayload) {
   return apiClient(`/auth/users/${id}`, {
     method: 'PUT',
     body: JSON.stringify(userData),
