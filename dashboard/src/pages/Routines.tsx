@@ -364,7 +364,9 @@ function Routines() {
       exercises: block.exercises.map((exercise): RoutineExercise => ({
         name: exercise.name.trim(),
         muscleGroup: exercise.muscleGroup.trim(),
-        equipment: exercise.equipment,
+        equipment: exercise.equipment && exercise.equipment !== 'Selecciona equipo'
+          ? exercise.equipment
+          : null,
         videoUrl: exercise.videoUrl.trim(),
         isCardio: exercise.mode === 'Cardio',
         ...(exercise.mode === 'Cardio'

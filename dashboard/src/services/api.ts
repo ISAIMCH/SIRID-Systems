@@ -129,7 +129,7 @@ export interface RoutineRelation {
 export interface RoutineExercise {
   name: string
   muscleGroup: string
-  equipment: string
+  equipment: string | null
   reps?: number
   weight?: number
   time?: number
