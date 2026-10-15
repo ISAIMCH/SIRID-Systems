@@ -340,7 +340,7 @@ function Routines() {
         setClients(extractArray<User>(usersResponse, ['data', 'users']).filter(isClient))
         const equipmentList = extractArray<Equipment>(equipmentResponse, ['data', 'equipment'])
         setEquipment(equipmentList)
-        void fetchAndFilterExercises(equipmentList)
+        void fetchAndFilterExercises()
           .then((suggestions) => {
             if (!isMounted) return
             setExerciseSuggestions(suggestions)
@@ -573,10 +573,10 @@ function Routines() {
         videoUrl: exercise.videoUrl.trim(),
         isCardio: exercise.mode === 'Cardio',
         ...(exercise.mode === 'Cardio'
-          ? { time: Number(exercise.time) || 0 }
+          ? { time: exercise.time === '' ? null : Number(exercise.time) }
           : {
-              reps: Number(exercise.reps) || 0,
-              weight: Number(exercise.weight) || 0,
+              reps: exercise.reps === '' ? null : Number(exercise.reps),
+              weight: exercise.weight === '' ? null : Number(exercise.weight),
             }),
       })),
     }))
@@ -597,7 +597,7 @@ function Routines() {
         title: form.title.trim(),
         objective: form.objective.trim(),
         level: form.level,
-        durationWeeks: Number(form.durationWeeks) || 0,
+        durationWeeks: Number(form.durationWeeks),
         blocks: buildBlocks(),
       }
 

@@ -1,5 +1,3 @@
-import type { Equipment } from '../types'
-
 const EXERCISE_DATA_URL = 'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/dist/exercises.json'
 const EXERCISE_IMAGE_BASE_URL = 'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/'
 
@@ -57,21 +55,6 @@ const mexicanExerciseNames: Record<string, string> = {
   'standing calf raises': 'Elevación de pantorrillas de pie',
 }
 
-const equipmentAliases: Record<string, string[]> = {
-  'body only': ['body weight', 'bodyweight', 'body only', 'peso corporal'],
-  barbell: ['barbell', 'barra', 'barras'],
-  dumbbell: ['dumbbell', 'mancuerna', 'mancuernas'],
-  cable: ['cable', 'polea', 'poleas'],
-  machine: ['machine', 'máquina', 'maquina', 'máquinas', 'maquinas'],
-  bands: ['band', 'bands', 'banda', 'bandas', 'liga', 'ligas'],
-  kettlebell: ['kettlebell', 'pesa rusa', 'pesas rusas'],
-  'medicine ball': ['medicine ball', 'balón medicinal', 'balon medicinal'],
-  'exercise ball': ['exercise ball', 'fitball', 'pelota de ejercicio'],
-  'foam roll': ['foam roll', 'rodillo', 'foam roller'],
-  'e-z curl bar': ['e-z curl bar', 'barra z', 'barra ez'],
-  'pull-up bar': ['pull-up bar', 'barra de dominadas', 'barra fija'],
-}
-
 const muscleGroupTranslations: Record<string, string> = {
   abdominals: 'Core',
   abductors: 'Piernas',
@@ -126,59 +109,6 @@ function translateExerciseName(name: string) {
   return mexicanExerciseNames[name.toLocaleLowerCase().trim()] || name
 }
 
-function equipmentKeywords(gymEquipmentList: readonly (Equipment | string)[]) {
-  const keywords = new Set<string>()
-
-  for (const item of gymEquipmentList) {
-    const inventoryText = typeof item === 'string'
-      ? item
-      : [item.name, item.type, item.zone].filter(Boolean).join(' ')
-    const normalizedInventory = normalize(inventoryText)
-    if (!normalizedInventory) continue
-
-    keywords.add(normalizedInventory)
-    for (const [equipment, aliases] of Object.entries(equipmentAliases)) {
-      if (aliases.some((alias) => normalizedInventory.includes(normalize(alias)))) {
-        keywords.add(normalize(equipment))
-        for (const alias of aliases) keywords.add(normalize(alias))
-      }
-    }
-  }
-
-  return [...keywords]
-}
-
-function hasMatchingEquipment(exerciseEquipment: string, keywords: string[]) {
-  const normalizedEquipment = normalize(exerciseEquipment)
-  if (!normalizedEquipment) return false
-  if (normalizedEquipment === 'none' || normalizedEquipment === 'body only' || normalizedEquipment === 'body weight') {
-    return true
-  }
-
-  return keywords.some((keyword) =>
-    normalizedEquipment === keyword
-    || normalizedEquipment.includes(keyword)
-    || keyword.includes(normalizedEquipment),
-  )
-}
-
-function gymEquipmentMatch(exerciseEquipment: string, equipmentList: readonly (Equipment | string)[]) {
-  const normalizedEquipment = normalize(exerciseEquipment)
-  if (!normalizedEquipment || ['none', 'body only', 'body weight'].includes(normalizedEquipment)) return ''
-
-  for (const item of equipmentList) {
-    if (typeof item === 'string') {
-      if (hasMatchingEquipment(exerciseEquipment, equipmentKeywords([item]))) return item
-      continue
-    }
-
-    if (hasMatchingEquipment(exerciseEquipment, equipmentKeywords([item]))) {
-      return item.name
-    }
-  }
-  return ''
-}
-
 function translateMuscleGroup(muscles: string[] | null | undefined, category?: string | null) {
   for (const muscle of muscles || []) {
     const translated = muscleGroupTranslations[normalize(muscle).replaceAll(' ', '_')]
@@ -193,9 +123,7 @@ function imageUrl(image: string) {
   return `${EXERCISE_IMAGE_BASE_URL}${image.split('/').map(encodeURIComponent).join('/')}`
 }
 
-export async function fetchAndFilterExercises(
-  gymEquipmentList: readonly (Equipment | string)[],
-): Promise<SuggestedExercise[]> {
+export async function fetchAndFilterExercises(): Promise<SuggestedExercise[]> {
   const response = await fetch(EXERCISE_DATA_URL)
   if (!response.ok) {
     throw new Error(`No se pudo cargar el catálogo de ejercicios (HTTP ${response.status}).`)
@@ -206,13 +134,8 @@ export async function fetchAndFilterExercises(
     throw new Error('El catálogo de ejercicios tiene un formato inesperado.')
   }
 
-  const keywords = equipmentKeywords(gymEquipmentList)
-
   return (data as FreeExercise[])
-    .filter((exercise) => (
-      typeof exercise.name === 'string'
-      && hasMatchingEquipment(exercise.equipment || '', keywords)
-    ))
+    .filter((exercise) => typeof exercise.name === 'string')
     .map((exercise) => {
       const originalName = exercise.name || ''
       const muscleGroup = translateMuscleGroup(exercise.primaryMuscles, exercise.category)
@@ -221,7 +144,7 @@ export async function fetchAndFilterExercises(
         id: exercise.id || originalName,
         name: translateExerciseName(originalName),
         originalName,
-        equipment: gymEquipmentMatch(exercise.equipment || '', gymEquipmentList),
+        equipment: exercise.equipment || '',
         muscleGroup,
         videoUrl: exercise.gifUrl || exercise.videoUrl || (firstImage ? imageUrl(firstImage) : ''),
       }

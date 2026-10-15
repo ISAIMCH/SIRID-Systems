@@ -130,9 +130,9 @@ export interface RoutineExercise {
   name: string
   muscleGroup: string
   equipment: string | null
-  reps?: number
-  weight?: number
-  time?: number
+  reps?: number | null
+  weight?: number | null
+  time?: number | null
   videoUrl: string
   isCardio: boolean
 }
