@@ -1,5 +1,6 @@
 const Payment = require('../models/Payment');
 const User = require('../models/User');
+const { createReceipt } = require('../services/receipt.service');
 
 const METHODS = new Set(['stripe', 'paypal', 'paynet']);
 const STATUSES = new Set(['pagado', 'pendiente']);
@@ -92,4 +93,23 @@ async function updatePaymentStatus(req, res) {
     }
 }
 
-module.exports = { getPayments, createPayment, updatePaymentStatus };
+async function downloadReceipt(req, res) {
+    try {
+        const payment = await Payment.findOne({ orderId: req.params.orderId, user: req.userId });
+        if (!payment) return res.status(404).json({ msg: 'Orden no encontrada.' });
+
+        const user = await User.findById(req.userId).select('nombre apellidos email').lean();
+        if (!user) return res.status(401).json({ msg: 'La sesión no pertenece a un usuario válido.' });
+
+        const safeOrderId = payment.orderId.replace(/[^a-zA-Z0-9_-]/g, '');
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="recibo-${safeOrderId}.pdf"`);
+        res.setHeader('Cache-Control', 'no-store');
+        createReceipt(payment, user, res);
+    } catch (error) {
+        console.error('Error generando recibo:', error.message);
+        if (!res.headersSent) res.status(500).json({ msg: 'No se pudo generar el recibo.' });
+    }
+}
+
+module.exports = { getPayments, createPayment, updatePaymentStatus, downloadReceipt };
