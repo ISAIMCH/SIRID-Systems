@@ -22,6 +22,11 @@ import type {
   RoutineTemplatePayload,
 } from '../services/api'
 import type { Equipment, User } from '../types'
+import {
+  fetchAndFilterExercises,
+  filterExerciseSuggestions,
+  type SuggestedExercise,
+} from '../utils/exerciseDictionary'
 
 type ArrayResponse<T> = T[] | {
   data?: unknown
@@ -36,9 +41,22 @@ type BuilderMode = 'template' | 'routine'
 type ExerciseMode = 'Fuerza' | 'Cardio'
 type BlockStructure = RoutineBlock['structure']
 
+const muscleGroupOptions = [
+  'Pecho',
+  'Espalda',
+  'Piernas',
+  'Brazos',
+  'Hombros',
+  'Core',
+  'Cardio',
+  'Cuerpo Completo',
+]
+const customMuscleGroupOption = 'other'
+
 interface ExerciseFormState {
   name: string
   muscleGroup: string
+  customMuscleGroup: string
   equipment: string
   mode: ExerciseMode
   reps: string
@@ -51,6 +69,7 @@ interface BlockFormState {
   structure: BlockStructure
   blockSets: string
   restTime: string
+  scheduleDays: string[]
   exercises: ExerciseFormState[]
 }
 
@@ -59,12 +78,12 @@ interface RoutineFormState {
   objective: string
   level: string
   durationWeeks: string
-  scheduleDays: string[]
   assignedTo: string
   blocks: BlockFormState[]
 }
 
 const daysOfWeek = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
+const dayAbbreviations = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
 const inputClassName = 'w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100'
 const labelClassName = 'mb-1.5 block text-sm font-medium text-slate-700'
 
@@ -73,7 +92,6 @@ const emptyForm: RoutineFormState = {
   objective: '',
   level: '',
   durationWeeks: '',
-  scheduleDays: [],
   assignedTo: '',
   blocks: [],
 }
@@ -114,9 +132,12 @@ function isClient(user: User) {
 
 function toExerciseForm(exercise: RoutineExercise): ExerciseFormState {
   const isCardio = exercise.isCardio ?? exercise.time !== undefined
+  const muscleGroup = exercise.muscleGroup || ''
+  const isPresetMuscleGroup = muscleGroupOptions.includes(muscleGroup)
   return {
     name: exercise.name || '',
-    muscleGroup: exercise.muscleGroup || '',
+    muscleGroup: isPresetMuscleGroup ? muscleGroup : customMuscleGroupOption,
+    customMuscleGroup: isPresetMuscleGroup ? '' : muscleGroup,
     equipment: exercise.equipment || '',
     mode: isCardio ? 'Cardio' : 'Fuerza',
     reps: String(exercise.reps ?? ''),
@@ -131,6 +152,7 @@ function toBlockForm(block: RoutineBlock): BlockFormState {
     structure: block.structure || 'Individual',
     blockSets: String(block.blockSets ?? 3),
     restTime: String(block.restTime ?? 60),
+    scheduleDays: block.scheduleDays || [],
     exercises: (block.exercises || []).map(toExerciseForm),
   }
 }
@@ -139,6 +161,7 @@ function createExerciseForm(): ExerciseFormState {
   return {
     name: '',
     muscleGroup: '',
+    customMuscleGroup: '',
     equipment: '',
     mode: 'Fuerza',
     reps: '',
@@ -149,11 +172,15 @@ function createExerciseForm(): ExerciseFormState {
 }
 
 function createBlockForm(): BlockFormState {
-  return { structure: 'Individual', blockSets: '3', restTime: '60', exercises: [] }
+  return { structure: 'Individual', blockSets: '3', restTime: '60', scheduleDays: [], exercises: [] }
 }
 
 function exerciseCount(blocks: RoutineBlock[] | undefined) {
   return blocks?.reduce((total, block) => total + (block.exercises?.length || 0), 0) || 0
+}
+
+function routineScheduleDays(blocks: RoutineBlock[] | undefined) {
+  return [...new Set(blocks?.flatMap((block) => block.scheduleDays || []) || [])]
 }
 
 function RoutineSkeleton() {
@@ -168,11 +195,104 @@ function RoutineSkeleton() {
   )
 }
 
+interface ExerciseNameAutocompleteProps {
+  id: string
+  value: string
+  suggestions: SuggestedExercise[]
+  isLoading: boolean
+  error: string | null
+  onChange: (value: string) => void
+  onSelect: (exercise: SuggestedExercise) => void
+}
+
+function ExerciseNameAutocomplete({
+  id,
+  value,
+  suggestions,
+  isLoading,
+  error,
+  onChange,
+  onSelect,
+}: ExerciseNameAutocompleteProps) {
+  const [isOpen, setIsOpen] = useState(false)
+  const matches = filterExerciseSuggestions(suggestions, value)
+
+  return (
+    <div className="relative">
+      <input
+        className={inputClassName}
+        id={id}
+        type="text"
+        role="combobox"
+        aria-autocomplete="list"
+        aria-expanded={isOpen && value.trim().length > 0}
+        aria-controls={`${id}-suggestions`}
+        autoComplete="off"
+        value={value}
+        onFocus={() => setIsOpen(true)}
+        onChange={(event) => {
+          onChange(event.target.value)
+          setIsOpen(true)
+        }}
+        onBlur={() => setIsOpen(false)}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') setIsOpen(false)
+        }}
+        placeholder="Busca un ejercicio o escribe uno propio"
+      />
+      {isOpen && value.trim().length > 0 && (
+        <div
+          className="absolute left-0 right-0 top-full z-30 mt-1 max-h-64 overflow-y-auto rounded-lg border border-slate-200 bg-white py-1 shadow-lg"
+          id={`${id}-suggestions`}
+          role="listbox"
+        >
+          {isLoading ? (
+            <p className="px-3 py-3 text-sm text-slate-500">Cargando ejercicios compatibles...</p>
+          ) : matches.length > 0 ? (
+            matches.map((exercise) => (
+              <button
+                className="flex w-full flex-col items-start px-3 py-2 text-left transition hover:bg-green-50 focus:bg-green-50 focus:outline-none"
+                key={exercise.id}
+                type="button"
+                role="option"
+                aria-selected="false"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => {
+                  onSelect(exercise)
+                  setIsOpen(false)
+                }}
+              >
+                <span className="text-sm font-medium text-slate-900">{exercise.name}</span>
+                <span className="text-xs text-slate-500">
+                  {exercise.originalName !== exercise.name ? `${exercise.originalName} · ` : ''}
+                  {exercise.equipment || 'Peso corporal'}
+                </span>
+              </button>
+            ))
+          ) : (
+            <p className="px-3 py-3 text-sm text-slate-500">
+              {error || 'Sin coincidencias. Puedes escribir el nombre manualmente.'}
+            </p>
+          )}
+          {error && !isLoading && (
+            <p className="border-t border-amber-100 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              No se pudo cargar el catálogo externo; puedes capturar el nombre manualmente.
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function Routines() {
   const [templates, setTemplates] = useState<RoutineTemplate[]>([])
   const [routines, setRoutines] = useState<Routine[]>([])
   const [clients, setClients] = useState<User[]>([])
   const [equipment, setEquipment] = useState<Equipment[]>([])
+  const [exerciseSuggestions, setExerciseSuggestions] = useState<SuggestedExercise[]>([])
+  const [isExerciseCatalogLoading, setIsExerciseCatalogLoading] = useState(true)
+  const [exerciseCatalogError, setExerciseCatalogError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<BuilderMode>('template')
@@ -218,11 +338,31 @@ function Routines() {
         setTemplates(extractArray<RoutineTemplate>(templatesResponse, ['data', 'templates', 'routineTemplates']))
         setRoutines(extractArray<Routine>(routinesResponse, ['data', 'routines', 'rutinas']))
         setClients(extractArray<User>(usersResponse, ['data', 'users']).filter(isClient))
-        setEquipment(extractArray<Equipment>(equipmentResponse, ['data', 'equipment']))
+        const equipmentList = extractArray<Equipment>(equipmentResponse, ['data', 'equipment'])
+        setEquipment(equipmentList)
+        void fetchAndFilterExercises(equipmentList)
+          .then((suggestions) => {
+            if (!isMounted) return
+            setExerciseSuggestions(suggestions)
+            setExerciseCatalogError(null)
+          })
+          .catch((catalogError: unknown) => {
+            if (!isMounted) return
+            setExerciseCatalogError(catalogError instanceof Error
+              ? catalogError.message
+              : 'No se pudo cargar el catálogo de ejercicios.')
+          })
+          .finally(() => {
+            if (isMounted) setIsExerciseCatalogLoading(false)
+          })
         setError(null)
       } catch (requestError) {
         if (isMounted) {
           setError(requestError instanceof Error ? requestError.message : 'No se pudieron cargar los datos de rutinas.')
+          setExerciseCatalogError(requestError instanceof Error
+            ? requestError.message
+            : 'No se pudo cargar el catálogo de ejercicios.')
+          setIsExerciseCatalogLoading(false)
         }
       } finally {
         if (isMounted) setIsLoading(false)
@@ -253,7 +393,6 @@ function Routines() {
       objective: template.objective || '',
       level: template.level || '',
       durationWeeks: String(template.durationWeeks ?? ''),
-      scheduleDays: template.scheduleDays || [],
       assignedTo: '',
       blocks: (template.blocks || []).map(toBlockForm),
     })
@@ -270,7 +409,6 @@ function Routines() {
       objective: routine.objective || '',
       level: routine.level || '',
       durationWeeks: String(routine.durationWeeks ?? ''),
-      scheduleDays: routine.scheduleDays || [],
       assignedTo: typeof routine.assignedTo === 'string'
         ? routine.assignedTo
         : routine.assignedTo ? recordId(routine.assignedTo) : '',
@@ -337,6 +475,37 @@ function Routines() {
     }))
   }
 
+  function selectSuggestedExercise(
+    blockIndex: number,
+    exerciseIndex: number,
+    suggestion: SuggestedExercise,
+  ) {
+    const isPresetMuscleGroup = muscleGroupOptions.includes(suggestion.muscleGroup)
+    setForm((current) => ({
+      ...current,
+      blocks: current.blocks.map((block, currentBlockIndex) =>
+        currentBlockIndex === blockIndex
+          ? {
+              ...block,
+              exercises: block.exercises.map((exercise, currentExerciseIndex) =>
+                currentExerciseIndex === exerciseIndex
+                  ? {
+                      ...exercise,
+                      name: suggestion.name,
+                      videoUrl: suggestion.videoUrl,
+                      muscleGroup: isPresetMuscleGroup ? suggestion.muscleGroup : customMuscleGroupOption,
+                      customMuscleGroup: isPresetMuscleGroup ? '' : suggestion.muscleGroup,
+                      equipment: suggestion.equipment,
+                      ...(suggestion.muscleGroup === 'Cardio' ? { mode: 'Cardio' as const } : {}),
+                    }
+                  : exercise,
+              ),
+            }
+          : block,
+      ),
+    }))
+  }
+
   function removeExercise(blockIndex: number, exerciseIndex: number) {
     setForm((current) => ({
       ...current,
@@ -346,12 +515,43 @@ function Routines() {
     }))
   }
 
-  function toggleDay(day: string) {
+  function toggleBlockDay(blockIndex: number, day: string) {
     setForm((current) => ({
       ...current,
-      scheduleDays: current.scheduleDays.includes(day)
-        ? current.scheduleDays.filter((selectedDay) => selectedDay !== day)
-        : [...current.scheduleDays, day],
+      blocks: current.blocks.map((block, index) => index === blockIndex
+        ? {
+            ...block,
+            scheduleDays: block.scheduleDays.includes(day)
+              ? block.scheduleDays.filter((selectedDay) => selectedDay !== day)
+              : [...block.scheduleDays, day],
+          }
+        : block),
+    }))
+  }
+
+  function updateMuscleGroup(
+    blockIndex: number,
+    exerciseIndex: number,
+    value: string,
+  ) {
+    setForm((current) => ({
+      ...current,
+      blocks: current.blocks.map((block, currentBlockIndex) =>
+        currentBlockIndex === blockIndex
+          ? {
+              ...block,
+              exercises: block.exercises.map((exercise, currentExerciseIndex) =>
+                currentExerciseIndex === exerciseIndex
+                  ? {
+                      ...exercise,
+                      muscleGroup: value,
+                      customMuscleGroup: value === customMuscleGroupOption ? exercise.customMuscleGroup : '',
+                    }
+                  : exercise,
+              ),
+            }
+          : block,
+      ),
     }))
   }
 
@@ -361,9 +561,12 @@ function Routines() {
       blockSets: Number(block.blockSets) || 0,
       restTime: Number(block.restTime) || 0,
       order: blockIndex,
+      scheduleDays: block.scheduleDays,
       exercises: block.exercises.map((exercise): RoutineExercise => ({
         name: exercise.name.trim(),
-        muscleGroup: exercise.muscleGroup.trim(),
+        muscleGroup: (exercise.muscleGroup === customMuscleGroupOption
+          ? exercise.customMuscleGroup
+          : exercise.muscleGroup).trim(),
         equipment: exercise.equipment,
         videoUrl: exercise.videoUrl.trim(),
         isCardio: exercise.mode === 'Cardio',
@@ -393,7 +596,6 @@ function Routines() {
         objective: form.objective.trim(),
         level: form.level,
         durationWeeks: Number(form.durationWeeks) || 0,
-        scheduleDays: form.scheduleDays,
         blocks: buildBlocks(),
       }
 
@@ -550,7 +752,7 @@ function Routines() {
                     <th className="px-6 py-4 font-medium">Objetivo</th>
                     <th className="px-6 py-4 font-medium">Nivel</th>
                     <th className="px-6 py-4 font-medium">Bloques / ejercicios</th>
-                    <th className="px-6 py-4 font-medium">Días</th>
+                    <th className="px-6 py-4 font-medium">Días por bloque</th>
                     <th className="px-6 py-4 font-medium text-right">Acciones</th>
                   </tr>
                 </thead>
@@ -563,7 +765,7 @@ function Routines() {
                         <td className="px-6 py-4 text-slate-500">{template.objective || '-'}</td>
                         <td className="px-6 py-4 text-slate-500">{template.level || '-'}</td>
                         <td className="px-6 py-4 text-slate-500">{template.blocks?.length || 0} / {exerciseCount(template.blocks)}</td>
-                        <td className="px-6 py-4 text-slate-500">{template.scheduleDays?.join(', ') || '-'}</td>
+                        <td className="px-6 py-4 text-slate-500">{routineScheduleDays(template.blocks).join(', ') || '-'}</td>
                         <td className="whitespace-nowrap px-6 py-4 text-right">
                           <div className="inline-flex items-center justify-end gap-2">
                             <button className="inline-flex items-center gap-1 rounded-lg bg-[#9BFF63] px-2.5 py-2 text-xs font-semibold text-slate-900 transition hover:bg-[#abff7c]" type="button" onClick={() => startAssign(template)} aria-label={`Asignar ${template.title} a un cliente`}>
@@ -673,17 +875,6 @@ function Routines() {
                     </div>
                   )}
                 </div>
-                <fieldset>
-                  <legend className={labelClassName}>Días de entrenamiento</legend>
-                  <div className="flex flex-wrap gap-x-5 gap-y-2">
-                    {daysOfWeek.map((day) => (
-                      <label className="inline-flex items-center gap-2 text-sm text-slate-700" key={day}>
-                        <input className="h-4 w-4 accent-green-600" type="checkbox" checked={form.scheduleDays.includes(day)} onChange={() => toggleDay(day)} />
-                        {day}
-                      </label>
-                    ))}
-                  </div>
-                </fieldset>
               </section>
 
               <section className="space-y-4">
@@ -709,7 +900,7 @@ function Routines() {
                             <Trash2 size={16} aria-hidden="true" />Eliminar bloque
                           </button>
                         </div>
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                           <div>
                             <label className={labelClassName} htmlFor={`block-structure-${blockIndex}`}>Estructura</label>
                             <select className={inputClassName} id={`block-structure-${blockIndex}`} value={block.structure} onChange={(event) => updateBlock(blockIndex, 'structure', event.target.value)}>
@@ -726,6 +917,22 @@ function Routines() {
                             <label className={labelClassName} htmlFor={`block-rest-${blockIndex}`}>Descanso (segundos)</label>
                             <input className={inputClassName} id={`block-rest-${blockIndex}`} type="number" min="0" value={block.restTime} onChange={(event) => updateBlock(blockIndex, 'restTime', event.target.value)} />
                           </div>
+                          <fieldset className="sm:col-span-2 xl:col-span-1">
+                            <legend className={labelClassName}>Días del bloque</legend>
+                            <div className="flex flex-wrap gap-x-3 gap-y-2">
+                              {daysOfWeek.map((day, dayIndex) => (
+                                <label className="inline-flex items-center gap-1.5 text-xs text-slate-700" key={day}>
+                                  <input
+                                    className="h-4 w-4 accent-green-600"
+                                    type="checkbox"
+                                    checked={block.scheduleDays.includes(day)}
+                                    onChange={() => toggleBlockDay(blockIndex, day)}
+                                  />
+                                  {dayAbbreviations[dayIndex]}
+                                </label>
+                              ))}
+                            </div>
+                          </fieldset>
                         </div>
 
                         <div className="mt-5 border-t border-slate-200 pt-4">
@@ -751,12 +958,44 @@ function Routines() {
                                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                     <div>
                                       <label className={labelClassName} htmlFor={`exercise-name-${blockIndex}-${exerciseIndex}`}>Nombre</label>
-                                      <input className={inputClassName} id={`exercise-name-${blockIndex}-${exerciseIndex}`} value={exercise.name} onChange={(event) => updateExercise(blockIndex, exerciseIndex, 'name', event.target.value)} placeholder="Ej. Sentadilla" />
+                                      <ExerciseNameAutocomplete
+                                        id={`exercise-name-${blockIndex}-${exerciseIndex}`}
+                                        value={exercise.name}
+                                        suggestions={exerciseSuggestions}
+                                        isLoading={isExerciseCatalogLoading}
+                                        error={exerciseCatalogError}
+                                        onChange={(value) => updateExercise(blockIndex, exerciseIndex, 'name', value)}
+                                        onSelect={(suggestion) => selectSuggestedExercise(blockIndex, exerciseIndex, suggestion)}
+                                      />
                                     </div>
                                     <div>
                                       <label className={labelClassName} htmlFor={`exercise-muscle-${blockIndex}-${exerciseIndex}`}>Grupo muscular</label>
-                                      <input className={inputClassName} id={`exercise-muscle-${blockIndex}-${exerciseIndex}`} value={exercise.muscleGroup} onChange={(event) => updateExercise(blockIndex, exerciseIndex, 'muscleGroup', event.target.value)} placeholder="Ej. Piernas" />
+                                      <select
+                                        className={inputClassName}
+                                        id={`exercise-muscle-${blockIndex}-${exerciseIndex}`}
+                                        value={exercise.muscleGroup}
+                                        onChange={(event) => updateMuscleGroup(blockIndex, exerciseIndex, event.target.value)}
+                                        required
+                                      >
+                                        <option value="">Selecciona un grupo muscular</option>
+                                        {muscleGroupOptions.map((muscleGroup) => <option key={muscleGroup} value={muscleGroup}>{muscleGroup}</option>)}
+                                        <option value={customMuscleGroupOption}>+ Agregar otro...</option>
+                                      </select>
                                     </div>
+                                    {exercise.muscleGroup === customMuscleGroupOption && (
+                                      <div>
+                                        <label className={labelClassName} htmlFor={`exercise-custom-muscle-${blockIndex}-${exerciseIndex}`}>Grupo muscular personalizado</label>
+                                        <input
+                                          className={inputClassName}
+                                          id={`exercise-custom-muscle-${blockIndex}-${exerciseIndex}`}
+                                          type="text"
+                                          value={exercise.customMuscleGroup}
+                                          onChange={(event) => updateExercise(blockIndex, exerciseIndex, 'customMuscleGroup', event.target.value)}
+                                          placeholder="Escribe el grupo muscular"
+                                          required
+                                        />
+                                      </div>
+                                    )}
                                     <div>
                                       <label className={labelClassName} htmlFor={`exercise-equipment-${blockIndex}-${exerciseIndex}`}>Equipo</label>
                                       <select className={inputClassName} id={`exercise-equipment-${blockIndex}-${exerciseIndex}`} value={exercise.equipment} onChange={(event) => updateExercise(blockIndex, exerciseIndex, 'equipment', event.target.value)}>
