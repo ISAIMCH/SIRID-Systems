@@ -477,13 +477,18 @@ function Users() {
                           <input
                             className="accent-green-600"
                             type="checkbox"
-                            checked={form.availableTrainingDays.includes(day)}
-                            onChange={(event) => setForm({
-                              ...form,
-                              availableTrainingDays: event.target.checked
-                                ? [...form.availableTrainingDays, day]
-                                : form.availableTrainingDays.filter((selectedDay) => selectedDay !== day),
-                            })}
+                            checked={form.availableTrainingDays?.includes(day) ?? false}
+                            onChange={(event) => {
+                              setForm((currentForm) => {
+                                const selectedDays = currentForm.availableTrainingDays || []
+                                return {
+                                  ...currentForm,
+                                  availableTrainingDays: event.target.checked
+                                    ? selectedDays.includes(day) ? selectedDays : [...selectedDays, day]
+                                    : selectedDays.filter((selectedDay) => selectedDay !== day),
+                                }
+                              })
+                            }}
                           />
                           {day}
                         </label>
@@ -521,7 +526,7 @@ function Users() {
                       <select
                         className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
                         id="user-coach"
-                        value={form.assignedCoach}
+                        value={form.assignedCoach || ''}
                         onChange={(event) => setForm({ ...form, assignedCoach: event.target.value })}
                       >
                         <option value="">Sin coach asignado</option>
