@@ -142,6 +142,7 @@ export interface RoutineBlock {
   blockSets: number
   restTime: number
   order: number
+  scheduleDays: string[]
   exercises: RoutineExercise[]
 }
 
@@ -150,7 +151,6 @@ export interface RoutineDefinition {
   objective: string
   level: string
   durationWeeks: number
-  scheduleDays: string[]
   blocks: RoutineBlock[]
 }
 
