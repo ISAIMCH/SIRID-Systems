@@ -35,6 +35,16 @@ interface ApiErrorPayload {
   message?: string
 }
 
+export class ApiError extends Error {
+  response: { data: unknown }
+
+  constructor(message: string, data: unknown) {
+    super(message)
+    this.name = 'ApiError'
+    this.response = { data }
+  }
+}
+
 export async function apiClient<T>(
   endpoint: string,
   options: RequestInit = {},
@@ -61,7 +71,7 @@ export async function apiClient<T>(
       localStorage.removeItem('userName')
       localStorage.removeItem('userData')
     }
-    throw new Error(data.msg || data.message || 'No se pudo completar la solicitud.')
+    throw new ApiError(data.msg || data.message || 'No se pudo completar la solicitud.', data)
   }
 
   return data
@@ -410,6 +420,47 @@ export function updateEquipment(id: string, data: EquipmentPayload) {
 
 export function deleteEquipment(id: string) {
   return apiClient(`/equipment/${id}`, {
+    method: 'DELETE',
+  })
+}
+
+export interface Exercise {
+  id?: string
+  _id?: string
+  name: string
+  originalName?: string
+  muscleGroup: string
+  equipment?: string | null
+  videoUrl?: string
+}
+
+export interface ExercisePayload {
+  name: string
+  muscleGroup: string
+  equipment: string | null
+  videoUrl: string | null
+}
+
+export function getExercises<T = Exercise[]>() {
+  return apiClient<T>('/exercises')
+}
+
+export function createExercise(data: ExercisePayload) {
+  return apiClient('/exercises', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export function updateExercise(id: string, data: ExercisePayload) {
+  return apiClient(`/exercises/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  })
+}
+
+export function deleteExercise(id: string) {
+  return apiClient(`/exercises/${id}`, {
     method: 'DELETE',
   })
 }

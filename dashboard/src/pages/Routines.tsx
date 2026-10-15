@@ -6,6 +6,7 @@ import {
   createTemplate,
   deleteRoutine,
   deleteTemplate,
+  getExercises,
   getEquipment,
   getRoutines,
   getTemplates,
@@ -20,13 +21,10 @@ import type {
   RoutinePayload,
   RoutineTemplate,
   RoutineTemplatePayload,
+  Exercise as CuratedExercise,
 } from '../services/api'
+import { connectSocket, disconnectSocket } from '../services/socket'
 import type { Equipment, User } from '../types'
-import {
-  fetchAndFilterExercises,
-  filterExerciseSuggestions,
-  type SuggestedExercise,
-} from '../utils/exerciseDictionary'
 
 type ArrayResponse<T> = T[] | {
   data?: unknown
@@ -52,12 +50,14 @@ const muscleGroupOptions = [
   'Cuerpo Completo',
 ]
 const customMuscleGroupOption = 'other'
+const customEquipmentOption = 'other'
 
 interface ExerciseFormState {
   name: string
   muscleGroup: string
   customMuscleGroup: string
   equipment: string
+  customEquipment: string
   mode: ExerciseMode
   reps: string
   weight: string
@@ -108,18 +108,40 @@ function extractArray<T>(value: unknown, keys: string[]): T[] {
 }
 
 function recordId(record: { id?: string; _id?: string }) {
-  return record.id || record._id || ''
+  const id = record.id ?? record._id
+  return id == null ? '' : String(id)
+}
+
+function routineAssignedTo(routine: Routine): Routine['assignedTo'] {
+  const record = routine as Routine & Record<string, unknown>
+  const value = record.assignedTo
+    ?? record.assignedToId
+    ?? record.clientId
+    ?? record.userId
+    ?? record.client
+    ?? record.user
+
+  if (typeof value === 'string' || (value && typeof value === 'object')) {
+    return value as Routine['assignedTo']
+  }
+  return null
+}
+
+function assignedUserId(value: Routine['assignedTo']) {
+  if (typeof value === 'string') return value
+  if (!value || typeof value !== 'object') return ''
+  return recordId(value)
 }
 
 function relationName(value: Routine['assignedTo'], users: User[]) {
   if (typeof value === 'object' && value) {
-    if ('email' in value) {
-      return [value.name || value.firstName, value.lastName].filter(Boolean).join(' ') || value.email
-    }
-    return value.name || value.nombre || '-'
+    const relatedUser = users.find((user) => recordId(user) === recordId(value))
+    return relatedUser
+      ? userLabel(relatedUser)
+      : [value.name || value.firstName || value.nombre, value.lastName].filter(Boolean).join(' ') || value.email || '-'
   }
-  return users.find((user) => recordId(user) === value)
-    ?.name || users.find((user) => recordId(user) === value)?.email || '-'
+  const relatedUser = users.find((user) => recordId(user) === value)
+  return relatedUser ? userLabel(relatedUser) : '-'
 }
 
 function userLabel(user: User) {
@@ -130,15 +152,18 @@ function isClient(user: User) {
   return user.role.toLowerCase() === 'cliente' || user.role.toLowerCase() === 'client'
 }
 
-function toExerciseForm(exercise: RoutineExercise): ExerciseFormState {
+function toExerciseForm(exercise: RoutineExercise, equipmentNames: readonly string[] = []): ExerciseFormState {
   const isCardio = exercise.isCardio ?? exercise.time !== undefined
   const muscleGroup = exercise.muscleGroup || ''
   const isPresetMuscleGroup = muscleGroupOptions.includes(muscleGroup)
+  const equipmentName = exercise.equipment || ''
+  const isPresetEquipment = !equipmentName || equipmentNames.includes(equipmentName)
   return {
     name: exercise.name || '',
     muscleGroup: isPresetMuscleGroup ? muscleGroup : customMuscleGroupOption,
     customMuscleGroup: isPresetMuscleGroup ? '' : muscleGroup,
-    equipment: exercise.equipment || '',
+    equipment: isPresetEquipment ? equipmentName : customEquipmentOption,
+    customEquipment: isPresetEquipment ? '' : equipmentName,
     mode: isCardio ? 'Cardio' : 'Fuerza',
     reps: String(exercise.reps ?? ''),
     weight: String(exercise.weight ?? ''),
@@ -147,13 +172,13 @@ function toExerciseForm(exercise: RoutineExercise): ExerciseFormState {
   }
 }
 
-function toBlockForm(block: RoutineBlock): BlockFormState {
+function toBlockForm(block: RoutineBlock, equipmentNames: readonly string[] = []): BlockFormState {
   return {
     structure: block.structure || 'Individual',
     blockSets: String(block.blockSets ?? 3),
     restTime: String(block.restTime ?? 60),
     scheduleDays: block.scheduleDays || [],
-    exercises: (block.exercises || []).map(toExerciseForm),
+    exercises: (block.exercises || []).map((exercise) => toExerciseForm(exercise, equipmentNames)),
   }
 }
 
@@ -163,6 +188,7 @@ function createExerciseForm(): ExerciseFormState {
     muscleGroup: '',
     customMuscleGroup: '',
     equipment: '',
+    customEquipment: '',
     mode: 'Fuerza',
     reps: '',
     weight: '',
@@ -198,11 +224,19 @@ function RoutineSkeleton() {
 interface ExerciseNameAutocompleteProps {
   id: string
   value: string
-  suggestions: SuggestedExercise[]
+  suggestions: CuratedExercise[]
   isLoading: boolean
   error: string | null
   onChange: (value: string) => void
-  onSelect: (exercise: SuggestedExercise) => void
+  onSelect: (exercise: CuratedExercise) => void
+}
+
+function filterCuratedExercises(exercises: CuratedExercise[], query: string) {
+  const normalizedQuery = query.trim().toLocaleLowerCase()
+  if (!normalizedQuery) return []
+  return exercises
+    .filter((exercise) => `${exercise.name} ${exercise.originalName || ''}`.toLocaleLowerCase().includes(normalizedQuery))
+    .slice(0, 8)
 }
 
 function ExerciseNameAutocomplete({
@@ -215,7 +249,7 @@ function ExerciseNameAutocomplete({
   onSelect,
 }: ExerciseNameAutocompleteProps) {
   const [isOpen, setIsOpen] = useState(false)
-  const matches = filterExerciseSuggestions(suggestions, value)
+  const matches = filterCuratedExercises(suggestions, value)
 
   return (
     <div className="relative">
@@ -264,7 +298,7 @@ function ExerciseNameAutocomplete({
               >
                 <span className="text-sm font-medium text-slate-900">{exercise.name}</span>
                 <span className="text-xs text-slate-500">
-                  {exercise.originalName !== exercise.name ? `${exercise.originalName} · ` : ''}
+                  {exercise.originalName && exercise.originalName !== exercise.name ? `${exercise.originalName} · ` : ''}
                   {exercise.equipment || 'Peso corporal'}
                 </span>
               </button>
@@ -290,7 +324,7 @@ function Routines() {
   const [routines, setRoutines] = useState<Routine[]>([])
   const [clients, setClients] = useState<User[]>([])
   const [equipment, setEquipment] = useState<Equipment[]>([])
-  const [exerciseSuggestions, setExerciseSuggestions] = useState<SuggestedExercise[]>([])
+  const [exerciseSuggestions, setExerciseSuggestions] = useState<CuratedExercise[]>([])
   const [isExerciseCatalogLoading, setIsExerciseCatalogLoading] = useState(true)
   const [exerciseCatalogError, setExerciseCatalogError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -327,11 +361,12 @@ function Routines() {
 
     async function loadData() {
       try {
-        const [templatesResponse, routinesResponse, usersResponse, equipmentResponse] = await Promise.all([
+        const [templatesResponse, routinesResponse, usersResponse, equipmentResponse, exercisesResponse] = await Promise.all([
           getTemplates<ArrayResponse<RoutineTemplate>>(),
           getRoutines<ArrayResponse<Routine>>(),
           getUsers<ArrayResponse<User>>(),
           getEquipment<ArrayResponse<Equipment>>(),
+          getExercises<ArrayResponse<CuratedExercise>>(),
         ])
         if (!isMounted) return
 
@@ -340,28 +375,14 @@ function Routines() {
         setClients(extractArray<User>(usersResponse, ['data', 'users']).filter(isClient))
         const equipmentList = extractArray<Equipment>(equipmentResponse, ['data', 'equipment'])
         setEquipment(equipmentList)
-        void fetchAndFilterExercises()
-          .then((suggestions) => {
-            if (!isMounted) return
-            setExerciseSuggestions(suggestions)
-            setExerciseCatalogError(null)
-          })
-          .catch((catalogError: unknown) => {
-            if (!isMounted) return
-            setExerciseCatalogError(catalogError instanceof Error
-              ? catalogError.message
-              : 'No se pudo cargar el catálogo de ejercicios.')
-          })
-          .finally(() => {
-            if (isMounted) setIsExerciseCatalogLoading(false)
-          })
+        setExerciseSuggestions(extractArray<CuratedExercise>(exercisesResponse, ['data', 'exercises']))
+        setExerciseCatalogError(null)
+        setIsExerciseCatalogLoading(false)
         setError(null)
       } catch (requestError) {
         if (isMounted) {
           setError(requestError instanceof Error ? requestError.message : 'No se pudieron cargar los datos de rutinas.')
-          setExerciseCatalogError(requestError instanceof Error
-            ? requestError.message
-            : 'No se pudo cargar el catálogo de ejercicios.')
+          setExerciseCatalogError(requestError instanceof Error ? requestError.message : 'No se pudo cargar el catálogo de ejercicios.')
           setIsExerciseCatalogLoading(false)
         }
       } finally {
@@ -372,6 +393,32 @@ function Routines() {
     void loadData()
     return () => {
       isMounted = false
+    }
+  }, [])
+
+  useEffect(() => {
+    const realtimeSocket = connectSocket()
+    const refreshFromEvent = () => {
+      void Promise.all([refreshTemplates(), refreshRoutines()]).catch((requestError: unknown) => {
+        setError(requestError instanceof Error ? requestError.message : 'No se pudieron actualizar las rutinas.')
+      })
+    }
+    const events = [
+      'routine-created',
+      'routine-updated',
+      'routine-deleted',
+      'routine-assigned',
+      'routines-updated',
+      'routine-template-created',
+      'routine-template-updated',
+      'routine-template-deleted',
+      'routine-templates-updated',
+    ]
+    events.forEach((eventName) => realtimeSocket.on(eventName, refreshFromEvent))
+
+    return () => {
+      events.forEach((eventName) => realtimeSocket.off(eventName, refreshFromEvent))
+      disconnectSocket()
     }
   }, [])
 
@@ -394,7 +441,7 @@ function Routines() {
       level: template.level || '',
       durationWeeks: String(template.durationWeeks ?? ''),
       assignedTo: '',
-      blocks: (template.blocks || []).map(toBlockForm),
+      blocks: (template.blocks || []).map((block) => toBlockForm(block, equipment.map((item) => item.name || ''))),
     })
     setModalError(null)
     setIsBuilderOpen(true)
@@ -404,15 +451,14 @@ function Routines() {
     setBuilderMode('routine')
     setEditingTemplate(null)
     setEditingRoutine(routine)
+    const assignedTo = routineAssignedTo(routine)
     setForm({
       title: routine.title || '',
       objective: routine.objective || '',
       level: routine.level || '',
       durationWeeks: String(routine.durationWeeks ?? ''),
-      assignedTo: typeof routine.assignedTo === 'string'
-        ? routine.assignedTo
-        : routine.assignedTo ? recordId(routine.assignedTo) : '',
-      blocks: (routine.blocks || []).map(toBlockForm),
+      assignedTo: assignedUserId(assignedTo),
+      blocks: (routine.blocks || []).map((block) => toBlockForm(block, equipment.map((item) => item.name || ''))),
     })
     setModalError(null)
     setIsBuilderOpen(true)
@@ -478,7 +524,7 @@ function Routines() {
   function selectSuggestedExercise(
     blockIndex: number,
     exerciseIndex: number,
-    suggestion: SuggestedExercise,
+    suggestion: CuratedExercise,
   ) {
     const isPresetMuscleGroup = muscleGroupOptions.includes(suggestion.muscleGroup)
     setForm((current) => ({
@@ -492,10 +538,11 @@ function Routines() {
                   ? {
                       ...exercise,
                       name: suggestion.name,
-                      videoUrl: suggestion.videoUrl,
+                      videoUrl: suggestion.videoUrl || '',
                       muscleGroup: isPresetMuscleGroup ? suggestion.muscleGroup : customMuscleGroupOption,
                       customMuscleGroup: isPresetMuscleGroup ? '' : suggestion.muscleGroup,
-                      equipment: suggestion.equipment,
+                      equipment: suggestion.equipment ? customEquipmentOption : '',
+                      customEquipment: suggestion.equipment,
                       ...(suggestion.muscleGroup === 'Cardio' ? { mode: 'Cardio' as const } : {}),
                     }
                   : exercise,
@@ -567,16 +614,16 @@ function Routines() {
         muscleGroup: (exercise.muscleGroup === customMuscleGroupOption
           ? exercise.customMuscleGroup
           : exercise.muscleGroup).trim(),
-        equipment: exercise.equipment && exercise.equipment !== 'Selecciona equipo'
-          ? exercise.equipment
-          : null,
+        equipment: (exercise.equipment === customEquipmentOption
+          ? exercise.customEquipment
+          : exercise.equipment).trim() || null,
         videoUrl: exercise.videoUrl.trim(),
         isCardio: exercise.mode === 'Cardio',
         ...(exercise.mode === 'Cardio'
-          ? { time: exercise.time === '' ? null : Number(exercise.time) }
+          ? (exercise.time !== '' ? { time: Number(exercise.time) } : {})
           : {
-              reps: exercise.reps === '' ? null : Number(exercise.reps),
-              weight: exercise.weight === '' ? null : Number(exercise.weight),
+              ...(exercise.reps !== '' ? { reps: Number(exercise.reps) } : {}),
+              ...(exercise.weight !== '' ? { weight: Number(exercise.weight) } : {}),
             }),
       })),
     }))
@@ -597,7 +644,7 @@ function Routines() {
         title: form.title.trim(),
         objective: form.objective.trim(),
         level: form.level,
-        durationWeeks: Number(form.durationWeeks),
+        durationWeeks: Number(form.durationWeeks) || 0,
         blocks: buildBlocks(),
       }
 
@@ -630,6 +677,15 @@ function Routines() {
       setForm(emptyForm)
       setIsBuilderOpen(false)
     } catch (requestError) {
+      const error = requestError as {
+        response?: { data?: unknown }
+        message?: string
+      }
+      const responseData = error.response?.data
+      const responseMessage = responseData && typeof responseData === 'object' && 'message' in responseData
+        ? (responseData as { message?: unknown }).message
+        : undefined
+      alert(JSON.stringify(responseMessage || responseData || error.message))
       setModalError(requestError instanceof Error ? requestError.message : 'No se pudo guardar la rutina.')
     } finally {
       setIsSubmitting(false)
@@ -801,10 +857,11 @@ function Routines() {
                 <tbody className="divide-y divide-slate-100 text-slate-700">
                   {routines.length ? routines.map((routine, index) => {
                     const routineId = recordId(routine) || `routine-${index}`
+                    const assignedTo = routineAssignedTo(routine)
                     return (
                       <tr className="transition-colors hover:bg-slate-50" key={routineId}>
                         <td className="px-6 py-4 font-medium text-slate-900">{routine.title || 'Sin título'}</td>
-                        <td className="px-6 py-4 text-slate-500">{routine.assignedTo ? relationName(routine.assignedTo, clients) : '-'}</td>
+                        <td className="px-6 py-4 text-slate-500">{assignedTo ? relationName(assignedTo, clients) : '-'}</td>
                         <td className="px-6 py-4 text-slate-500">{routine.objective || '-'}</td>
                         <td className="px-6 py-4 text-slate-500">{routine.status || 'Activa'}</td>
                         <td className="px-6 py-4 text-slate-500">{routine.blocks?.length || 0} / {exerciseCount(routine.blocks)}</td>
@@ -1003,11 +1060,24 @@ function Routines() {
                                       <select className={inputClassName} id={`exercise-equipment-${blockIndex}-${exerciseIndex}`} value={exercise.equipment} onChange={(event) => updateExercise(blockIndex, exerciseIndex, 'equipment', event.target.value)}>
                                         <option value="">Selecciona equipo</option>
                                         {equipment.map((item, index) => {
-                                          const value = item.name || recordId(item)
-                                          return <option key={recordId(item) || `equipment-${index}`} value={value}>{item.name}</option>
+                                          return <option key={item._id || `equipment-${index}`} value={item.name || ''}>{item.name}</option>
                                         })}
+                                        <option value={customEquipmentOption}>+ Agregar otro...</option>
                                       </select>
                                     </div>
+                                    {exercise.equipment === customEquipmentOption && (
+                                      <div>
+                                        <label className={labelClassName} htmlFor={`exercise-custom-equipment-${blockIndex}-${exerciseIndex}`}>Equipo personalizado</label>
+                                        <input
+                                          className={inputClassName}
+                                          id={`exercise-custom-equipment-${blockIndex}-${exerciseIndex}`}
+                                          type="text"
+                                          value={exercise.customEquipment}
+                                          onChange={(event) => updateExercise(blockIndex, exerciseIndex, 'customEquipment', event.target.value)}
+                                          placeholder="Escribe el nombre del equipo"
+                                        />
+                                      </div>
+                                    )}
                                     <div>
                                       <label className={labelClassName} htmlFor={`exercise-video-${blockIndex}-${exerciseIndex}`}>URL del video</label>
                                       <input className={inputClassName} id={`exercise-video-${blockIndex}-${exerciseIndex}`} type="url" value={exercise.videoUrl} onChange={(event) => updateExercise(blockIndex, exerciseIndex, 'videoUrl', event.target.value)} placeholder="https://..." />

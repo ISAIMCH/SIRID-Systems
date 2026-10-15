@@ -9,6 +9,7 @@ import {
   redeemPaymentPin,
 } from '../services/api'
 import type { Payment, PaymentPayload, PaymentRelation } from '../services/api'
+import { connectSocket, disconnectSocket } from '../services/socket'
 import type { Plan, User } from '../types'
 
 interface PaymentFormState {
@@ -133,6 +134,22 @@ function Payments() {
     loadData()
     return () => {
       isMounted = false
+    }
+  }, [])
+
+  useEffect(() => {
+    const realtimeSocket = connectSocket()
+    const refreshFromEvent = () => {
+      void refreshPayments().catch((requestError: unknown) => {
+        setError(requestError instanceof Error ? requestError.message : 'No se pudieron actualizar los pagos.')
+      })
+    }
+    const events = ['payment-created', 'payment-updated', 'payment-redeemed', 'payments-updated']
+    events.forEach((eventName) => realtimeSocket.on(eventName, refreshFromEvent))
+
+    return () => {
+      events.forEach((eventName) => realtimeSocket.off(eventName, refreshFromEvent))
+      disconnectSocket()
     }
   }, [])
 

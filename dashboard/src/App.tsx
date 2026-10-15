@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation } from 'rea
 import AdminLayout from './layouts/AdminLayout'
 import Gyms from './pages/Gyms'
 import Equipment from './pages/Equipment'
+import Exercises from './pages/Exercises'
 import Inventory from './pages/Inventory'
 import Login from './pages/Login'
 import Overview from './pages/Overview'
@@ -36,6 +37,7 @@ function App() {
               <Route index element={<Overview />} />
               <Route path="gyms" element={<Gyms />} />
               <Route path="equipment" element={<Equipment />} />
+              <Route path="exercises" element={<Exercises />} />
               <Route path="inventory" element={<Inventory />} />
               <Route path="promotions" element={<Promotions />} />
               <Route path="users" element={<Users />} />

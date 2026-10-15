@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Minus, Plus, Trash2 } from 'lucide-react'
 import { createSale, getProducts, getSales, getUsers, redeemSalePin } from '../services/api'
 import type { Sale, SaleItem, SalePayload } from '../services/api'
+import { connectSocket, disconnectSocket } from '../services/socket'
 import type { Product, User } from '../types'
 
 type SaleResponse = Sale[] | { data?: unknown; sales?: unknown; ventas?: unknown }
@@ -112,6 +113,22 @@ function Sales() {
     }
     loadData()
     return () => { isMounted = false }
+  }, [])
+
+  useEffect(() => {
+    const realtimeSocket = connectSocket()
+    const refreshFromEvent = () => {
+      void refreshSales().catch((requestError: unknown) => {
+        setError(requestError instanceof Error ? requestError.message : 'No se pudieron actualizar las ventas.')
+      })
+    }
+    const events = ['sale-created', 'sale-updated', 'sale-deleted', 'sales-updated']
+    events.forEach((eventName) => realtimeSocket.on(eventName, refreshFromEvent))
+
+    return () => {
+      events.forEach((eventName) => realtimeSocket.off(eventName, refreshFromEvent))
+      disconnectSocket()
+    }
   }, [])
 
   function openCreateModal() {
