@@ -20,6 +20,37 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
+  const products = {
+    esencial: { id: 'esencial', title: 'Básico', price: 99, rec: true },
+    pro: { id: 'pro', title: 'Pro con Hardware IoT', price: 199, rec: true },
+    hw: { id: 'hw', title: 'Enterprise', price: 250, rec: false }
+  };
+  const user = JSON.parse(localStorage.getItem('userData') || 'null');
+  const cartKey = `gg_pay_${user?.id || user?.email || 'guest'}`;
+
+  document.querySelectorAll('.add-to-cart').forEach((button) => {
+    button.addEventListener('click', () => {
+      const product = products[button.dataset.productId];
+      if (!product) return;
+
+      const state = JSON.parse(localStorage.getItem(cartKey) || 'null') || { cart: [], orders: [] };
+      if (product.rec) {
+        state.cart = state.cart.filter((item) => !products[item.pid]?.rec || item.pid === product.id);
+      }
+
+      const item = state.cart.find((cartItem) => cartItem.id === product.id);
+      if (item) {
+        if (!product.rec) item.qty += 1;
+      } else {
+        state.cart.push({ ...product, pid: product.id, qty: 1 });
+      }
+
+      localStorage.setItem(cartKey, JSON.stringify(state));
+      button.textContent = 'Añadido al carrito';
+      setTimeout(() => { button.textContent = 'Añadir al carrito'; }, 1800);
+    });
+  });
+
 });
 
 document.addEventListener("DOMContentLoaded", async () => {
