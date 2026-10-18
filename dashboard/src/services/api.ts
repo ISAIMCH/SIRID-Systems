@@ -1,6 +1,6 @@
 import type { Equipment, EquipmentStatus, User, UserRole } from '../types'
 
-const API_BASE_URL = import.meta.env.VITE_GYMGO_API_URL
+export const API_BASE_URL = import.meta.env.VITE_GYMGO_API_URL
 
 if (!API_BASE_URL) {
   throw new Error('VITE_GYMGO_API_URL no está configurada.')
@@ -52,7 +52,8 @@ export async function apiClient<T>(
   const token = localStorage.getItem('token')
   const headers = new Headers(options.headers)
 
-  if (options.body && !headers.has('Content-Type')) {
+  const isFormDataBody = typeof FormData !== 'undefined' && options.body instanceof FormData
+  if (options.body && !isFormDataBody && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json')
   }
   if (token) {
@@ -84,8 +85,14 @@ export function login(credentials: LoginCredentials) {
   })
 }
 
-export function getUsers<T = AuthUser[]>() {
-  return apiClient<T>('/auth/users')
+export async function getUsers<T = AuthUser[]>(params?: { role?: string }) {
+  const query = params?.role ? `?role=${encodeURIComponent(params.role)}` : ''
+  const response = await apiClient<any>(`/auth/users${query}`)
+  const responseData = response?.data ?? response
+  const users = Array.isArray(responseData)
+    ? responseData
+    : (responseData?.data || responseData?.users || [])
+  return (Array.isArray(users) ? users : []) as T
 }
 
 export interface UserPayload {
@@ -95,6 +102,10 @@ export interface UserPayload {
   password?: string
   role: UserRole
   phone?: string
+  address?: string
+  documents?: string[]
+  pdfFiles?: File[]
+  isActive?: boolean
   goal?: string
   experienceLevel?: string
   availableTrainingDays?: number[]
@@ -103,17 +114,29 @@ export interface UserPayload {
   observations?: string
 }
 
+function userPayloadBody(userData: UserPayload): BodyInit {
+  if (!userData.pdfFiles?.length) return JSON.stringify(userData)
+
+  const formData = new FormData()
+  Object.entries(userData).forEach(([key, value]) => {
+    if (key === 'pdfFiles' || value === undefined) return
+    formData.append(key, Array.isArray(value) ? JSON.stringify(value) : String(value))
+  })
+  userData.pdfFiles.forEach((file) => formData.append('pdfFiles', file))
+  return formData
+}
+
 export function createUser(userData: UserPayload) {
   return apiClient('/auth/users', {
     method: 'POST',
-    body: JSON.stringify(userData),
+    body: userPayloadBody(userData),
   })
 }
 
 export function updateUser(id: string, userData: UserPayload) {
   return apiClient(`/auth/users/${id}`, {
     method: 'PUT',
-    body: JSON.stringify(userData),
+    body: userPayloadBody(userData),
   })
 }
 

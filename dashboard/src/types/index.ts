@@ -11,6 +11,8 @@ export interface User {
   status?: string
   isActive?: boolean
   phone?: string
+  address?: string
+  documents?: string[]
   goal?: string
   experienceLevel?: string
   availableTrainingDays?: number[]

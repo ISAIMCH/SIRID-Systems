@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Pencil } from 'lucide-react'
-import { createUser, getPlans, getUsers, updateUser } from '../services/api'
+import { Pencil, Trash2 } from 'lucide-react'
+import { API_BASE_URL, createUser, getPlans, getUsers, updateUser } from '../services/api'
 import type { UserPayload } from '../services/api'
 import type { Plan, User, UserReference } from '../types'
 
@@ -24,6 +24,10 @@ interface UserFormState {
   password: string
   role: 'Admin' | 'Coach' | 'Cliente'
   phone: string
+  address: string
+  documents: string[]
+  pdfFiles?: File[]
+  isActive: boolean
   goal: string
   experienceLevel: string
   availableTrainingDays: number[]
@@ -39,6 +43,10 @@ const emptyUserForm: UserFormState = {
   password: '',
   role: 'Cliente',
   phone: '',
+  address: '',
+  documents: [],
+  pdfFiles: [],
+  isActive: true,
   goal: '',
   experienceLevel: '',
   availableTrainingDays: [],
@@ -102,6 +110,7 @@ function Users() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [modalError, setModalError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
+  const [activeTab, setActiveTab] = useState<'clientes' | 'staff'>('clientes')
 
   useEffect(() => {
     let isMounted = true
@@ -133,17 +142,22 @@ function Users() {
   }, [])
 
   useEffect(() => {
-    const loadCoaches = async () => {
+    const fetchCoaches = async () => {
       try {
-        const users = await getUsers() as User[]
-        const coachList = users.filter((u: any) => u.role === 'Coach' || u.role === 'coach')
+        const response = await getUsers({ role: 'Coach' }) as any
+        console.log('Respuesta cruda del servidor:', response)
+        const usersArray = Array.isArray(response) ? response : (response?.data || response?.users || [])
+        console.log('Array a punto de ser filtrado:', usersArray)
+        const coachList = usersArray.filter((u: any) => String(u.role || u.rol || '').toLowerCase() === 'coach')
+        console.log('Entrenadores detectados:', coachList)
+
         setCoaches(coachList)
       } catch (error) {
-        console.error('Failed to load coaches', error)
+        console.error('Error al cargar entrenadores:', error)
       }
     }
 
-    loadCoaches()
+    fetchCoaches()
   }, [])
 
   function openModal() {
@@ -163,6 +177,13 @@ function Users() {
 
   function openEditModal(user: User) {
     const [fallbackFirstName = '', ...fallbackLastNameParts] = (user.name || '').trim().split(/\s+/)
+    let coachId = ''
+    if (user.assignedCoach) {
+      coachId = typeof user.assignedCoach === 'object'
+        ? String(user.assignedCoach._id || user.assignedCoach.id || '')
+        : String(user.assignedCoach)
+    }
+
     setEditingUser(user)
     setForm({
       firstName: user.firstName || fallbackFirstName,
@@ -171,10 +192,14 @@ function Users() {
       password: '',
       role: user.role || 'Cliente',
       phone: user.phone || '',
+      address: user.address || '',
+      documents: user.documents ?? [],
+      pdfFiles: [],
+      isActive: user.isActive ?? true,
       goal: user.goal || '',
       experienceLevel: user.experienceLevel || '',
       availableTrainingDays: user.availableTrainingDays ?? [],
-      assignedCoach: recordId(user.assignedCoach),
+      assignedCoach: coachId,
       planId: recordId(user.planId),
       observations: user.observations || '',
     })
@@ -202,6 +227,14 @@ function Users() {
           planId: form.planId,
           observations: form.observations.trim(),
         }),
+        ...(form.role !== 'Cliente' && {
+          phone: form.phone.trim(),
+          address: form.address.trim(),
+          documents: form.documents,
+          pdfFiles: form.pdfFiles,
+          isActive: form.isActive,
+        }),
+        ...(editingUser && form.password.trim() && { password: form.password }),
       }
 
       if (!editingUser) {
@@ -226,9 +259,82 @@ function Users() {
     }
   }
 
-  const filteredUsers = users.filter((user) =>
-    `${userDisplayName(user)} ${user.email || ''}`.toLocaleLowerCase().includes(searchTerm.trim().toLocaleLowerCase()),
-  )
+  const matchesSearch = (user: User) =>
+    `${userDisplayName(user)} ${user.email || ''}`.toLocaleLowerCase().includes(searchTerm.trim().toLocaleLowerCase())
+  const clients = users.filter((user) => user.role === 'Cliente' && matchesSearch(user))
+  const staff = users.filter((user) => user.role !== 'Cliente' && matchesSearch(user))
+
+  function renderUsersTable(groupUsers: User[], emptyMessage: string) {
+    return (
+      <table className="min-w-full text-left text-sm">
+        <thead className="border-b border-slate-100 bg-slate-50/80 text-xs uppercase tracking-wider text-slate-500">
+          <tr>
+            <th className="px-6 py-4 font-medium">Nombre</th>
+            <th className="px-6 py-4 font-medium">Email</th>
+            <th className="px-6 py-4 font-medium">Rol</th>
+            <th className="px-6 py-4 font-medium">Estado</th>
+            <th className="px-6 py-4 font-medium" />
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100 text-slate-700">
+          {groupUsers.length > 0 ? (
+            groupUsers.map((user, index) => {
+              const userId = user?.id || user?._id || user?.email || `user-${index}`
+              const role = user?.role || 'Cliente'
+              const isStaff = role === 'Admin' || role === 'Coach'
+              const isActive = user?.isActive === true
+
+              return (
+                <tr className="transition-colors hover:bg-slate-50" key={userId}>
+                  <td className="whitespace-nowrap px-6 py-4 font-medium text-slate-900">
+                    {userDisplayName(user) || 'Sin nombre'}
+                  </td>
+                  <td className="whitespace-nowrap px-6 py-4 text-slate-500">
+                    {user?.email || 'Sin correo'}
+                  </td>
+                  <td className="px-6 py-4">
+                    <span
+                      className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${
+                        isStaff ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-600'
+                      }`}
+                    >
+                      {role}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span
+                      className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${
+                        isActive ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-600'
+                      }`}
+                    >
+                      {isActive ? 'Activo' : 'Inactivo'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <button
+                      className="cursor-pointer text-slate-400 transition hover:text-green-600"
+                      type="button"
+                      aria-label={`Editar ${user?.name || 'usuario'}`}
+                      title="Editar"
+                      onClick={() => openEditModal(user)}
+                    >
+                      <Pencil className="h-4 w-4" aria-hidden="true" />
+                    </button>
+                  </td>
+                </tr>
+              )
+            })
+          ) : (
+            <tr>
+              <td className="px-6 py-10 text-center text-sm text-slate-500" colSpan={5}>
+                {emptyMessage}
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    )
+  }
 
   return (
     <section className="min-h-screen bg-[#F8FAFC] px-8 py-10">
@@ -268,74 +374,32 @@ function Users() {
         {isLoading ? (
           <UserSkeleton />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-left text-sm">
-              <thead className="border-b border-slate-100 bg-slate-50/80 text-xs uppercase tracking-wider text-slate-500">
-                <tr>
-                  <th className="px-6 py-4 font-medium">Nombre</th>
-                  <th className="px-6 py-4 font-medium">Email</th>
-                  <th className="px-6 py-4 font-medium">Rol</th>
-                  <th className="px-6 py-4 font-medium">Estado</th>
-                  <th className="px-6 py-4 font-medium" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-slate-700">
-                {filteredUsers.length > 0 ? (
-                  filteredUsers.map((user, index) => {
-                    const userId = user?.id || user?._id || user?.email || `user-${index}`
-                    const role = user?.role || 'Cliente'
-                    const isStaff = role === 'Admin' || role === 'Coach'
-                    const isActive = user?.isActive === true
+          <div className="p-6">
+            <div className="mb-4 flex border-b border-gray-200">
+              <button
+                className={`px-4 py-2 ${activeTab === 'clientes' ? 'border-b-2 border-green-500 font-semibold text-green-700' : 'text-gray-500'}`}
+                type="button"
+                onClick={() => setActiveTab('clientes')}
+              >
+                Clientes {clients.length}
+              </button>
+              <button
+                className={`px-4 py-2 ${activeTab === 'staff' ? 'border-b-2 border-green-500 font-semibold text-green-700' : 'text-gray-500'}`}
+                type="button"
+                onClick={() => setActiveTab('staff')}
+              >
+                Staff {staff.length}
+              </button>
+            </div>
 
-                    return (
-                      <tr className="transition-colors hover:bg-slate-50" key={userId}>
-                        <td className="whitespace-nowrap px-6 py-4 font-medium text-slate-900">
-                          {userDisplayName(user) || 'Sin nombre'}
-                        </td>
-                        <td className="whitespace-nowrap px-6 py-4 text-slate-500">
-                          {user?.email || 'Sin correo'}
-                        </td>
-                        <td className="px-6 py-4">
-                          <span
-                            className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${
-                              isStaff ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-600'
-                            }`}
-                          >
-                            {role}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span
-                            className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${
-                              isActive ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-600'
-                            }`}
-                          >
-                            {isActive ? 'Activo' : 'Inactivo'}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <button
-                            className="cursor-pointer text-slate-400 transition hover:text-green-600"
-                            type="button"
-                            aria-label={`Editar ${user?.name || 'usuario'}`}
-                            title="Editar"
-                            onClick={() => openEditModal(user)}
-                          >
-                            <Pencil className="h-4 w-4" aria-hidden="true" />
-                          </button>
-                        </td>
-                      </tr>
-                    )
-                  })
-                ) : (
-                  <tr>
-                    <td className="px-6 py-10 text-center text-sm text-slate-500" colSpan={5}>
-                      {searchTerm ? 'No hay usuarios que coincidan con la búsqueda.' : 'No hay usuarios encontrados o formato incorrecto.'}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+            <div className="overflow-x-auto">
+              {renderUsersTable(
+                activeTab === 'clientes' ? clients : staff,
+                activeTab === 'clientes'
+                  ? searchTerm ? 'No hay clientes que coincidan con la búsqueda.' : 'No hay clientes encontrados.'
+                  : searchTerm ? 'No hay miembros del staff que coincidan con la búsqueda.' : 'No hay miembros del staff encontrados.',
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -552,7 +616,7 @@ function Users() {
                       >
                         <option value="">Sin coach asignado</option>
                         {coaches.map((coach: any) => (
-                          <option key={coach._id} value={coach._id}>
+                          <option key={String(coach._id || coach.id)} value={String(coach._id || coach.id)}>
                             {coach.name} {coach.lastName || ''}
                           </option>
                         ))}
@@ -572,6 +636,125 @@ function Users() {
                       rows={3}
                     />
                   </div>
+                </section>
+              )}
+
+              {form.role !== 'Cliente' && (
+                <section className="space-y-5 rounded-xl border border-slate-200 bg-slate-50 p-5">
+                  <div>
+                    <h3 className="text-lg font-semibold text-slate-900">Perfil Administrativo</h3>
+                    <p className="mt-1 text-sm text-slate-500">Información laboral y de acceso del equipo.</p>
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="staff-phone">
+                      Teléfono (10 dígitos)
+                    </label>
+                    <input
+                      className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                      id="staff-phone"
+                      type="tel"
+                      inputMode="numeric"
+                      maxLength={10}
+                      value={form.phone}
+                      onChange={(event) => setForm({ ...form, phone: event.target.value })}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="staff-address">
+                      Dirección
+                    </label>
+                    <input
+                      className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                      id="staff-address"
+                      type="text"
+                      value={form.address}
+                      onChange={(event) => setForm({ ...form, address: event.target.value })}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="staff-documents">
+                      Documentos/Certificaciones
+                    </label>
+                    {form.documents.length > 0 && (
+                      <ul className="mb-3 space-y-2 rounded-lg border border-slate-200 bg-white p-3">
+                        {form.documents.map((document, index) => {
+                          const fileName = document.split('/').pop() || document
+                          return (
+                            <li className="flex items-center justify-between gap-3 rounded-md bg-slate-50 px-3 py-2" key={`${document}-${index}`}>
+                              <span className="min-w-0 truncate text-sm text-slate-700" title={fileName}>
+                                {fileName}
+                              </span>
+                              <div className="flex shrink-0 items-center gap-2">
+                                <a
+                                  className="text-sm font-medium text-green-700 transition hover:text-green-900"
+                                  href={`${API_BASE_URL}${document}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                >
+                                  Ver
+                                </a>
+                                <button
+                                  className="rounded p-1 text-slate-400 transition hover:bg-red-50 hover:text-red-600"
+                                  type="button"
+                                  aria-label={`Eliminar ${fileName}`}
+                                  title="Eliminar"
+                                  onClick={() => setForm({
+                                    ...form,
+                                    documents: form.documents.filter((item) => item !== document),
+                                  })}
+                                >
+                                  <Trash2 className="h-4 w-4" aria-hidden="true" />
+                                </button>
+                              </div>
+                            </li>
+                          )
+                        })}
+                      </ul>
+                    )}
+                    <input
+                      className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                      id="staff-documents"
+                      type="file"
+                      accept=".pdf"
+                      multiple
+                      onChange={(event) => setForm({ ...form, pdfFiles: Array.from(event.target.files || []) })}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="staff-status">
+                      Estado del Empleado
+                    </label>
+                    <select
+                      className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                      id="staff-status"
+                      value={String(form.isActive)}
+                      onChange={(event) => setForm({ ...form, isActive: event.target.value === 'true' })}
+                    >
+                      <option value="true">Activo</option>
+                      <option value="false">Inactivo</option>
+                    </select>
+                  </div>
+
+                  {editingUser && (
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="staff-password-reset">
+                        Reset de Contraseña
+                      </label>
+                      <input
+                        className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                        id="staff-password-reset"
+                        type="password"
+                        autoComplete="new-password"
+                        placeholder="Nueva contraseña (dejar en blanco para conservar actual)"
+                        value={form.password}
+                        onChange={(event) => setForm({ ...form, password: event.target.value })}
+                      />
+                    </div>
+                  )}
                 </section>
               )}
 
