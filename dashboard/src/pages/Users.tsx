@@ -113,7 +113,6 @@ function Users() {
       const errors: string[] = []
       if (usersResult.status === 'fulfilled') {
         setUsers(usersResult.value)
-        setCoaches(usersResult.value.filter((user) => user.role === 'Coach' && Boolean(user.id || user._id)))
       } else {
         errors.push(usersResult.reason instanceof Error ? usersResult.reason.message : 'No se pudo cargar el directorio de usuarios.')
       }
@@ -131,6 +130,20 @@ function Users() {
     return () => {
       isMounted = false
     }
+  }, [])
+
+  useEffect(() => {
+    const loadCoaches = async () => {
+      try {
+        const users = await getUsers() as User[]
+        const coachList = users.filter((u: any) => u.role === 'Coach' || u.role === 'coach')
+        setCoaches(coachList)
+      } catch (error) {
+        console.error('Failed to load coaches', error)
+      }
+    }
+
+    loadCoaches()
   }, [])
 
   function openModal() {
@@ -538,14 +551,11 @@ function Users() {
                         onChange={(event) => setForm({ ...form, assignedCoach: event.target.value })}
                       >
                         <option value="">Sin coach asignado</option>
-                        {coaches.map((coach) => {
-                          const coachId = coach.id || coach._id
-                          return (
-                            <option key={coachId} value={coachId}>
-                              {userDisplayName(coach)}
-                            </option>
-                          )
-                        })}
+                        {coaches.map((coach: any) => (
+                          <option key={coach._id} value={coach._id}>
+                            {coach.name} {coach.lastName || ''}
+                          </option>
+                        ))}
                       </select>
                     </div>
                   </div>
