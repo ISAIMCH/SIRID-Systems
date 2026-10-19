@@ -180,23 +180,33 @@ export interface RoutineRelation {
 }
 
 export interface RoutineExercise {
-  name: string
-  muscleGroup: string
-  equipment: string | null
+  exerciseId: string
+  targetReps?: number | null
+  targetWeight?: number | null
+  targetDuration?: number | null
+  targetDistance?: number | null
+  targetLevel?: number | null
+  name?: string
+  muscleGroup?: string
+  equipment?: string | null
+  videoUrl?: string
+  isCardio?: boolean
   reps?: number | null
   weight?: number | null
   time?: number | null
-  videoUrl: string
-  isCardio: boolean
 }
 
 export interface RoutineBlock {
-  structure: 'Individual' | 'Superset' | 'Circuito'
-  blockSets: number
-  restTime: number
-  order: number
-  scheduleDays: string[]
+  dayOfWeek: number
+  type: 'single' | 'superset' | 'circuit'
+  sets: number
+  restSeconds: number
   exercises: RoutineExercise[]
+  order?: number
+  structure?: 'Individual' | 'Superset' | 'Circuito'
+  blockSets?: number
+  restTime?: number
+  scheduleDays?: string[]
 }
 
 export interface RoutineDefinition {

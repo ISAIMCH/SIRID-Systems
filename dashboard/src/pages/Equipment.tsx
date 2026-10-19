@@ -160,6 +160,12 @@ function Equipment() {
         maintenanceQuantity: Number(form.cantidadMantenimiento),
         status: equipmentStatusMap[form.estado.trim().toLowerCase()],
       }
+      if (!Number.isInteger(payload.totalQuantity) || payload.totalQuantity < 0) {
+        throw new Error('La cantidad total debe ser un número entero no negativo.')
+      }
+      if (!Number.isInteger(payload.maintenanceQuantity) || payload.maintenanceQuantity < 0 || payload.maintenanceQuantity > payload.totalQuantity) {
+        throw new Error('Las unidades en mantenimiento deben estar entre 0 y la cantidad total.')
+      }
       if (!payload.status) throw new Error('Selecciona un estado válido para el equipo.')
       if (!payload.zone) throw new Error('Selecciona o escribe una zona.')
       const equipmentId = editingEquipment?._id || editingEquipment?.id
@@ -269,6 +275,7 @@ function Equipment() {
                   <th className="px-6 py-4 font-medium">Marca</th>
                   <th className="px-6 py-4 font-medium">Tipo</th>
                   <th className="px-6 py-4 font-medium">Cantidades</th>
+                  <th className="px-6 py-4 font-medium">Disponibles</th>
                   <th className="px-6 py-4 font-medium">Estado</th>
                   <th className="px-6 py-4 font-medium">Reportes</th>
                   <th className="px-6 py-4 font-medium" />
@@ -279,6 +286,7 @@ function Equipment() {
                   filteredEquipment.map((item, index) => {
                     const equipmentId = item._id || item.id || `equipment-${index}`
                     const hasActiveReports = (item.activeReportsCount || 0) > 0
+                    const availableQuantity = Math.max(0, (item.totalQuantity ?? 0) - (item.maintenanceQuantity || 0))
 
                     return (
                       <tr className="transition-colors hover:bg-slate-50" key={equipmentId}>
@@ -292,6 +300,13 @@ function Equipment() {
                           <span className="font-medium text-slate-700">{item.totalQuantity ?? 0}</span>
                           <span className="mx-1.5 text-slate-300">/</span>
                           {item.maintenanceQuantity ?? 0} mantenimiento
+                        </td>
+                        <td className="px-6 py-4">
+                          {availableQuantity === 0 ? (
+                            <span className="inline-flex rounded-full bg-red-100 px-3 py-1 text-xs font-medium text-red-800">Fuera de servicio</span>
+                          ) : (
+                            <span className="font-medium text-slate-700">{availableQuantity}</span>
+                          )}
                         </td>
                         <td className="px-6 py-4">
                           <span className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${statusClass(item.status)}`}>
@@ -335,7 +350,7 @@ function Equipment() {
                   })
                 ) : (
                   <tr>
-                    <td className="px-6 py-10 text-center text-sm text-slate-500" colSpan={8}>
+                    <td className="px-6 py-10 text-center text-sm text-slate-500" colSpan={9}>
                       {searchTerm ? 'No hay equipo que coincida con la búsqueda.' : 'No hay equipo registrado.'}
                     </td>
                   </tr>
@@ -462,7 +477,7 @@ function Equipment() {
                 </div>
                 <div>
                   <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="equipment-maintenance-quantity">
-                    En mantenimiento
+                    Unidades en Mantenimiento
                   </label>
                   <input
                     className="w-full rounded-lg border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"

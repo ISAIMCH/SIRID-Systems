@@ -37,7 +37,7 @@ type ArrayResponse<T> = T[] | {
 }
 type BuilderMode = 'template' | 'routine'
 type ExerciseMode = 'Fuerza' | 'Cardio'
-type BlockStructure = RoutineBlock['structure']
+type BlockType = RoutineBlock['type']
 
 const muscleGroupOptions = [
   'Pecho',
@@ -53,6 +53,7 @@ const customMuscleGroupOption = 'other'
 const customEquipmentOption = 'other'
 
 interface ExerciseFormState {
+  exerciseId: string
   name: string
   muscleGroup: string
   customMuscleGroup: string
@@ -61,15 +62,17 @@ interface ExerciseFormState {
   mode: ExerciseMode
   reps: string
   weight: string
-  time: string
+  duration: string
+  distance: string
+  level: string
   videoUrl: string
 }
 
 interface BlockFormState {
-  structure: BlockStructure
-  blockSets: string
-  restTime: string
-  scheduleDays: string[]
+  type: BlockType
+  sets: string
+  restSeconds: string
+  dayOfWeek: string
   exercises: ExerciseFormState[]
 }
 
@@ -83,7 +86,6 @@ interface RoutineFormState {
 }
 
 const daysOfWeek = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
-const dayAbbreviations = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
 const inputClassName = 'w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100'
 const labelClassName = 'mb-1.5 block text-sm font-medium text-slate-700'
 
@@ -135,10 +137,11 @@ function assignedUserId(value: Routine['assignedTo']) {
 
 function relationName(value: Routine['assignedTo'], users: User[]) {
   if (typeof value === 'object' && value) {
+    const relation = value as RoutineRelation
     const relatedUser = users.find((user) => recordId(user) === recordId(value))
     return relatedUser
       ? userLabel(relatedUser)
-      : [value.name || value.firstName || value.nombre, value.lastName].filter(Boolean).join(' ') || value.email || '-'
+      : [relation.name || relation.firstName || relation.nombre || '', relation.lastName].filter(Boolean).join(' ') || relation.email || '-'
   }
   const relatedUser = users.find((user) => recordId(user) === value)
   return relatedUser ? userLabel(relatedUser) : '-'
@@ -153,37 +156,44 @@ function isClient(user: User) {
 }
 
 function toExerciseForm(exercise: RoutineExercise, equipmentNames: readonly string[] = []): ExerciseFormState {
-  const isCardio = exercise.isCardio ?? exercise.time !== undefined
+  const isCardio = exercise.isCardio ?? (exercise.targetDuration !== undefined || exercise.time !== undefined)
   const muscleGroup = exercise.muscleGroup || ''
   const isPresetMuscleGroup = muscleGroupOptions.includes(muscleGroup)
   const equipmentName = exercise.equipment || ''
   const isPresetEquipment = !equipmentName || equipmentNames.includes(equipmentName)
   return {
+    exerciseId: exercise.exerciseId || '',
     name: exercise.name || '',
     muscleGroup: isPresetMuscleGroup ? muscleGroup : customMuscleGroupOption,
     customMuscleGroup: isPresetMuscleGroup ? '' : muscleGroup,
     equipment: isPresetEquipment ? equipmentName : customEquipmentOption,
     customEquipment: isPresetEquipment ? '' : equipmentName,
     mode: isCardio ? 'Cardio' : 'Fuerza',
-    reps: String(exercise.reps ?? ''),
-    weight: String(exercise.weight ?? ''),
-    time: String(exercise.time ?? ''),
+    reps: String(exercise.targetReps ?? exercise.reps ?? ''),
+    weight: String(exercise.targetWeight ?? exercise.weight ?? ''),
+    duration: String(exercise.targetDuration ?? exercise.time ?? ''),
+    distance: String(exercise.targetDistance ?? ''),
+    level: String(exercise.targetLevel ?? ''),
     videoUrl: exercise.videoUrl || '',
   }
 }
 
 function toBlockForm(block: RoutineBlock, equipmentNames: readonly string[] = []): BlockFormState {
+  const legacyStructure = block.structure
+  const type = block.type || (legacyStructure === 'Superset' ? 'superset' : legacyStructure === 'Circuito' ? 'circuit' : 'single')
+  const legacyDay = block.scheduleDays?.map((day) => daysOfWeek.indexOf(day)).find((day) => day >= 0)
   return {
-    structure: block.structure || 'Individual',
-    blockSets: String(block.blockSets ?? 3),
-    restTime: String(block.restTime ?? 60),
-    scheduleDays: block.scheduleDays || [],
+    type,
+    sets: String(block.sets ?? block.blockSets ?? 3),
+    restSeconds: String(block.restSeconds ?? block.restTime ?? 60),
+    dayOfWeek: String(block.dayOfWeek ?? legacyDay ?? 0),
     exercises: (block.exercises || []).map((exercise) => toExerciseForm(exercise, equipmentNames)),
   }
 }
 
 function createExerciseForm(): ExerciseFormState {
   return {
+    exerciseId: '',
     name: '',
     muscleGroup: '',
     customMuscleGroup: '',
@@ -192,13 +202,15 @@ function createExerciseForm(): ExerciseFormState {
     mode: 'Fuerza',
     reps: '',
     weight: '',
-    time: '',
+    duration: '',
+    distance: '',
+    level: '',
     videoUrl: '',
   }
 }
 
 function createBlockForm(): BlockFormState {
-  return { structure: 'Individual', blockSets: '3', restTime: '60', scheduleDays: [], exercises: [] }
+  return { type: 'single', sets: '3', restSeconds: '60', dayOfWeek: '0', exercises: [] }
 }
 
 function exerciseCount(blocks: RoutineBlock[] | undefined) {
@@ -206,7 +218,7 @@ function exerciseCount(blocks: RoutineBlock[] | undefined) {
 }
 
 function routineScheduleDays(blocks: RoutineBlock[] | undefined) {
-  return [...new Set(blocks?.flatMap((block) => block.scheduleDays || []) || [])]
+  return [...new Set(blocks?.map((block) => daysOfWeek[block.dayOfWeek] || block.scheduleDays?.join(', ') || '') || [])].filter(Boolean)
 }
 
 function RoutineSkeleton() {
@@ -542,7 +554,8 @@ function Routines() {
                       muscleGroup: isPresetMuscleGroup ? suggestion.muscleGroup : customMuscleGroupOption,
                       customMuscleGroup: isPresetMuscleGroup ? '' : suggestion.muscleGroup,
                       equipment: suggestion.equipment ? customEquipmentOption : '',
-                      customEquipment: suggestion.equipment,
+                      customEquipment: suggestion.equipment || '',
+                      exerciseId: suggestion.id || suggestion._id || '',
                       ...(suggestion.muscleGroup === 'Cardio' ? { mode: 'Cardio' as const } : {}),
                     }
                   : exercise,
@@ -558,20 +571,6 @@ function Routines() {
       ...current,
       blocks: current.blocks.map((block, index) => index === blockIndex
         ? { ...block, exercises: block.exercises.filter((_, currentExerciseIndex) => currentExerciseIndex !== exerciseIndex) }
-        : block),
-    }))
-  }
-
-  function toggleBlockDay(blockIndex: number, day: string) {
-    setForm((current) => ({
-      ...current,
-      blocks: current.blocks.map((block, index) => index === blockIndex
-        ? {
-            ...block,
-            scheduleDays: block.scheduleDays.includes(day)
-              ? block.scheduleDays.filter((selectedDay) => selectedDay !== day)
-              : [...block.scheduleDays, day],
-          }
         : block),
     }))
   }
@@ -604,12 +603,23 @@ function Routines() {
 
   function buildBlocks(): RoutineBlock[] {
     return form.blocks.map((block, blockIndex) => ({
-      structure: block.structure,
-      blockSets: Number(block.blockSets) || 0,
-      restTime: Number(block.restTime) || 0,
+      dayOfWeek: Number(block.dayOfWeek),
+      type: block.type,
+      sets: Number(block.sets) || 0,
+      restSeconds: Number(block.restSeconds) || 0,
       order: blockIndex,
-      scheduleDays: block.scheduleDays,
       exercises: block.exercises.map((exercise): RoutineExercise => ({
+        exerciseId: exercise.exerciseId,
+        ...(exercise.mode === 'Cardio'
+          ? {
+              ...(exercise.duration !== '' ? { targetDuration: Number(exercise.duration) } : {}),
+              ...(exercise.distance !== '' ? { targetDistance: Number(exercise.distance) } : {}),
+              ...(exercise.level !== '' ? { targetLevel: Number(exercise.level) } : {}),
+            }
+          : {
+              ...(exercise.reps !== '' ? { targetReps: Number(exercise.reps) } : {}),
+              ...(exercise.weight !== '' ? { targetWeight: Number(exercise.weight) } : {}),
+            }),
         name: exercise.name.trim(),
         muscleGroup: (exercise.muscleGroup === customMuscleGroupOption
           ? exercise.customMuscleGroup
@@ -619,12 +629,6 @@ function Routines() {
           : exercise.equipment).trim() || null,
         videoUrl: exercise.videoUrl.trim(),
         isCardio: exercise.mode === 'Cardio',
-        ...(exercise.mode === 'Cardio'
-          ? (exercise.time !== '' ? { time: Number(exercise.time) } : {})
-          : {
-              ...(exercise.reps !== '' ? { reps: Number(exercise.reps) } : {}),
-              ...(exercise.weight !== '' ? { weight: Number(exercise.weight) } : {}),
-            }),
       })),
     }))
   }
@@ -638,6 +642,13 @@ function Routines() {
       if (!form.title.trim()) throw new Error('Escribe un título para la rutina.')
       if (builderMode === 'routine' && !form.assignedTo) {
         throw new Error('Selecciona un cliente para la rutina asignada.')
+      }
+      for (const [blockIndex, block] of form.blocks.entries()) {
+        if (!block.exercises.length) throw new Error(`El bloque ${blockIndex + 1} debe tener al menos un ejercicio.`)
+        if (block.type === 'superset' && block.exercises.length < 2) throw new Error(`El superset ${blockIndex + 1} debe tener al menos dos ejercicios.`)
+        for (const [exerciseIndex, exercise] of block.exercises.entries()) {
+          if (!exercise.exerciseId) throw new Error(`Selecciona un ejercicio del catálogo en el bloque ${blockIndex + 1}, ejercicio ${exerciseIndex + 1}.`)
+        }
       }
 
       const definition: RoutineTemplatePayload = {
@@ -961,37 +972,27 @@ function Routines() {
                         </div>
                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                           <div>
-                            <label className={labelClassName} htmlFor={`block-structure-${blockIndex}`}>Estructura</label>
-                            <select className={inputClassName} id={`block-structure-${blockIndex}`} value={block.structure} onChange={(event) => updateBlock(blockIndex, 'structure', event.target.value)}>
-                              <option value="Individual">Individual</option>
-                              <option value="Superset">Superset</option>
-                              <option value="Circuito">Circuito</option>
+                            <label className={labelClassName} htmlFor={`block-type-${blockIndex}`}>Tipo de bloque</label>
+                            <select className={inputClassName} id={`block-type-${blockIndex}`} value={block.type} onChange={(event) => updateBlock(blockIndex, 'type', event.target.value)}>
+                              <option value="single">Single</option>
+                              <option value="superset">Superset</option>
+                              <option value="circuit">Circuit</option>
                             </select>
                           </div>
                           <div>
                             <label className={labelClassName} htmlFor={`block-sets-${blockIndex}`}>Series</label>
-                            <input className={inputClassName} id={`block-sets-${blockIndex}`} type="number" min="1" value={block.blockSets} onChange={(event) => updateBlock(blockIndex, 'blockSets', event.target.value)} />
+                            <input className={inputClassName} id={`block-sets-${blockIndex}`} type="number" min="1" value={block.sets} onChange={(event) => updateBlock(blockIndex, 'sets', event.target.value)} />
                           </div>
                           <div>
                             <label className={labelClassName} htmlFor={`block-rest-${blockIndex}`}>Descanso (segundos)</label>
-                            <input className={inputClassName} id={`block-rest-${blockIndex}`} type="number" min="0" value={block.restTime} onChange={(event) => updateBlock(blockIndex, 'restTime', event.target.value)} />
+                            <input className={inputClassName} id={`block-rest-${blockIndex}`} type="number" min="0" value={block.restSeconds} onChange={(event) => updateBlock(blockIndex, 'restSeconds', event.target.value)} />
                           </div>
-                          <fieldset className="sm:col-span-2 xl:col-span-1">
-                            <legend className={labelClassName}>Días del bloque</legend>
-                            <div className="flex flex-wrap gap-x-3 gap-y-2">
-                              {daysOfWeek.map((day, dayIndex) => (
-                                <label className="inline-flex items-center gap-1.5 text-xs text-slate-700" key={day}>
-                                  <input
-                                    className="h-4 w-4 accent-green-600"
-                                    type="checkbox"
-                                    checked={block.scheduleDays.includes(day)}
-                                    onChange={() => toggleBlockDay(blockIndex, day)}
-                                  />
-                                  {dayAbbreviations[dayIndex]}
-                                </label>
-                              ))}
-                            </div>
-                          </fieldset>
+                          <div>
+                            <label className={labelClassName} htmlFor={`block-day-${blockIndex}`}>Día</label>
+                            <select className={inputClassName} id={`block-day-${blockIndex}`} value={block.dayOfWeek} onChange={(event) => updateBlock(blockIndex, 'dayOfWeek', event.target.value)}>
+                              {daysOfWeek.map((day, dayIndex) => <option key={day} value={dayIndex}>{day}</option>)}
+                            </select>
+                          </div>
                         </div>
 
                         <div className="mt-5 border-t border-slate-200 pt-4">
@@ -1091,8 +1092,12 @@ function Routines() {
                                     </div>
                                     {exercise.mode === 'Cardio' ? (
                                       <div>
-                                        <label className={labelClassName} htmlFor={`exercise-time-${blockIndex}-${exerciseIndex}`}>Tiempo (minutos)</label>
-                                        <input className={inputClassName} id={`exercise-time-${blockIndex}-${exerciseIndex}`} type="number" min="1" value={exercise.time} onChange={(event) => updateExercise(blockIndex, exerciseIndex, 'time', event.target.value)} />
+                                        <label className={labelClassName} htmlFor={`exercise-duration-${blockIndex}-${exerciseIndex}`}>Duración (minutos)</label>
+                                        <input className={inputClassName} id={`exercise-duration-${blockIndex}-${exerciseIndex}`} type="number" min="1" value={exercise.duration} onChange={(event) => updateExercise(blockIndex, exerciseIndex, 'duration', event.target.value)} />
+                                        <label className={labelClassName} htmlFor={`exercise-distance-${blockIndex}-${exerciseIndex}`}>Distancia</label>
+                                        <input className={inputClassName} id={`exercise-distance-${blockIndex}-${exerciseIndex}`} type="number" min="0" step="0.1" value={exercise.distance} onChange={(event) => updateExercise(blockIndex, exerciseIndex, 'distance', event.target.value)} />
+                                        <label className={labelClassName} htmlFor={`exercise-level-${blockIndex}-${exerciseIndex}`}>Nivel</label>
+                                        <input className={inputClassName} id={`exercise-level-${blockIndex}-${exerciseIndex}`} type="number" min="0" value={exercise.level} onChange={(event) => updateExercise(blockIndex, exerciseIndex, 'level', event.target.value)} />
                                       </div>
                                     ) : (
                                       <>
