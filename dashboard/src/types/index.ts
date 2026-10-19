@@ -18,6 +18,7 @@ export interface User {
   availableTrainingDays?: number[]
   assignedCoach?: string | UserReference
   planId?: string | UserReference
+  membership?: UserMembership
   observations?: string
 }
 
@@ -28,6 +29,12 @@ export interface UserReference {
   nombre?: string
   firstName?: string
   lastName?: string
+}
+
+export interface UserMembership {
+  planId?: string | UserReference
+  plan?: string | UserReference
+  planName?: string
 }
 
 export interface Plan {
@@ -41,6 +48,8 @@ export interface Plan {
   duration?: number | string
   tipoCobro?: string
   isActive?: boolean
+  autoRenew?: boolean
+  planType?: 'standard' | 'promotional'
   descripcion?: string
   destacado?: boolean
   caracteristicas?: string[]
@@ -80,4 +89,5 @@ export interface Promotion {
   validUntil: string
   isActive: boolean
   imageUrl?: string
+  applicableProducts?: string[]
 }

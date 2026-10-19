@@ -18,7 +18,7 @@ const trainingDays = [
 ]
 
 interface UserFormState {
-  firstName: string
+  name: string
   lastName: string
   email: string
   password: string
@@ -37,7 +37,7 @@ interface UserFormState {
 }
 
 const emptyUserForm: UserFormState = {
-  firstName: '',
+  name: '',
   lastName: '',
   email: '',
   password: '',
@@ -178,15 +178,24 @@ function Users() {
   function openEditModal(user: User) {
     const [fallbackFirstName = '', ...fallbackLastNameParts] = (user.name || '').trim().split(/\s+/)
     let coachId = ''
+    let currentPlanId = ''
     if (user.assignedCoach) {
       coachId = typeof user.assignedCoach === 'object'
         ? String(user.assignedCoach._id || user.assignedCoach.id || '')
         : String(user.assignedCoach)
     }
+    if (user.planId) {
+      currentPlanId = recordId(user.planId)
+    } else if (user.membership?.planId) {
+      currentPlanId = recordId(user.membership.planId)
+    } else if (user.membership?.planName) {
+      const matchedPlan = plans.find((plan) => plan.name === user.membership?.planName)
+      currentPlanId = matchedPlan?.id || matchedPlan?._id || ''
+    }
 
     setEditingUser(user)
     setForm({
-      firstName: user.firstName || fallbackFirstName,
+      name: user.name || user.firstName || fallbackFirstName,
       lastName: user.lastName || fallbackLastNameParts.join(' '),
       email: user.email || '',
       password: '',
@@ -200,7 +209,7 @@ function Users() {
       experienceLevel: user.experienceLevel || '',
       availableTrainingDays: user.availableTrainingDays ?? [],
       assignedCoach: coachId,
-      planId: recordId(user.planId),
+      planId: currentPlanId,
       observations: user.observations || '',
     })
     setModalError(null)
@@ -214,8 +223,8 @@ function Users() {
 
     try {
       const payload: UserPayload = {
-        firstName: form.firstName.trim(),
-        lastName: form.lastName.trim(),
+        name: form.name.trim(),
+        lastName: form.lastName,
         email: form.email.trim(),
         role: form.role,
         ...(form.role === 'Cliente' && {
@@ -231,8 +240,10 @@ function Users() {
           phone: form.phone.trim(),
           address: form.address.trim(),
           documents: form.documents,
-          pdfFiles: form.pdfFiles,
           isActive: form.isActive,
+        }),
+        ...(form.role !== 'Cliente' && form.pdfFiles.length > 0 && {
+          pdfFiles: form.pdfFiles,
         }),
         ...(editingUser && form.password.trim() && { password: form.password }),
       }
@@ -426,15 +437,15 @@ function Users() {
 
             <form className="mt-6 space-y-5" onSubmit={handleSubmitUser}>
               <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="user-first-name">
+                <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="user-name">
                   Nombre
                 </label>
                 <input
                   className="w-full rounded-lg border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
-                  id="user-first-name"
+                  id="user-name"
                   type="text"
-                  value={form.firstName}
-                  onChange={(event) => setForm({ ...form, firstName: event.target.value })}
+                  value={form.name || ''}
+                  onChange={(event) => setForm({ ...form, name: event.target.value })}
                   required
                 />
               </div>
@@ -447,7 +458,7 @@ function Users() {
                   className="w-full rounded-lg border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
                   id="user-last-name"
                   type="text"
-                  value={form.lastName}
+                  value={form.lastName || ''}
                   onChange={(event) => setForm({ ...form, lastName: event.target.value })}
                   required
                 />

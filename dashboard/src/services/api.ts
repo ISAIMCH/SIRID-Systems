@@ -53,7 +53,9 @@ export async function apiClient<T>(
   const headers = new Headers(options.headers)
 
   const isFormDataBody = typeof FormData !== 'undefined' && options.body instanceof FormData
-  if (options.body && !isFormDataBody && !headers.has('Content-Type')) {
+  if (isFormDataBody) {
+    headers.delete('Content-Type')
+  } else if (options.body && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json')
   }
   if (token) {
@@ -96,7 +98,7 @@ export async function getUsers<T = AuthUser[]>(params?: { role?: string }) {
 }
 
 export interface UserPayload {
-  firstName: string
+  name: string
   lastName: string
   email: string
   password?: string
@@ -115,7 +117,10 @@ export interface UserPayload {
 }
 
 function userPayloadBody(userData: UserPayload): BodyInit {
-  if (!userData.pdfFiles?.length) return JSON.stringify(userData)
+  if (!userData.pdfFiles?.length) {
+    const { pdfFiles: _pdfFiles, ...jsonUserData } = userData
+    return JSON.stringify(jsonUserData)
+  }
 
   const formData = new FormData()
   Object.entries(userData).forEach(([key, value]) => {
@@ -351,6 +356,7 @@ export interface SalePayload {
   userId: string
   items: Array<{ productId: string; quantity: number }>
   status: string
+  promotionId?: string
 }
 
 export function getSales<T = unknown[]>() {
@@ -507,14 +513,24 @@ export function getPromotions<T = unknown[]>() {
   return apiClient<T>('/promotions')
 }
 
-export function createPromotion(data: any) {
+export interface PromotionPayload {
+  title: string
+  description: string
+  discountPercentage: number
+  validUntil: string
+  isActive: boolean
+  imageUrl?: string
+  applicableProducts?: string[]
+}
+
+export function createPromotion(data: PromotionPayload) {
   return apiClient('/promotions', {
     method: 'POST',
     body: JSON.stringify(data),
   })
 }
 
-export function updatePromotion(id: string, data: any) {
+export function updatePromotion(id: string, data: PromotionPayload) {
   return apiClient(`/promotions/${id}`, {
     method: 'PUT',
     body: JSON.stringify(data),

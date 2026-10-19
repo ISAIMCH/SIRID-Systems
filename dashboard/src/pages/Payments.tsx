@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Plus, Trash2 } from 'lucide-react'
+import { Pencil, Plus, Trash2 } from 'lucide-react'
 import {
   createPayment,
   deletePayment,
@@ -7,6 +7,7 @@ import {
   getPlans,
   getUsers,
   redeemPaymentPin,
+  updatePayment,
 } from '../services/api'
 import type { Payment, PaymentPayload, PaymentRelation } from '../services/api'
 import { connectSocket, disconnectSocket } from '../services/socket'
@@ -58,6 +59,21 @@ function getPaymentPlanName(payment: Payment) {
   return payment.plan?.name || payment.plan?.nombre || ''
 }
 
+function getAssignedPlan(user: User, plans: Plan[]) {
+  const membership = user.membership
+  const assignedPlan = user.planId
+  const assignedPlanId = getRelationId(assignedPlan) || getRelationId(membership?.planId) || getRelationId(membership?.plan)
+  const assignedPlanName = (typeof assignedPlan === 'object' ? assignedPlan.name || assignedPlan.nombre : undefined)
+    || (typeof membership?.plan === 'object' ? membership.plan.name || membership.plan.nombre : undefined)
+    || membership?.planName
+
+  return plans.find((plan) => (
+    assignedPlanId && getRecordId(plan) === assignedPlanId
+  ) || (
+    assignedPlanName && (plan.name || plan.nombre) === assignedPlanName
+  ))
+}
+
 function formatSource(source: string | undefined) {
   switch (source?.toLowerCase()) {
     case 'reception': return 'Recepción'
@@ -94,6 +110,9 @@ function Payments() {
   const [error, setError] = useState<string | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [form, setForm] = useState<PaymentFormState>(emptyForm)
+  const [isEditing, setIsEditing] = useState(false)
+  const [editingPaymentId, setEditingPaymentId] = useState('')
+  const [hasPlan, setHasPlan] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [modalError, setModalError] = useState<string | null>(null)
   const [reference, setReference] = useState('')
@@ -155,6 +174,9 @@ function Payments() {
 
   function openCreateModal() {
     setForm(emptyForm)
+    setIsEditing(false)
+    setEditingPaymentId('')
+    setHasPlan(false)
     setModalError(null)
     setIsModalOpen(true)
   }
@@ -162,6 +184,9 @@ function Payments() {
   function closeModal() {
     if (isSubmitting) return
     setForm(emptyForm)
+    setIsEditing(false)
+    setEditingPaymentId('')
+    setHasPlan(false)
     setReference('')
     setModalError(null)
     setIsModalOpen(false)
@@ -185,11 +210,18 @@ function Payments() {
         reference: reference.trim(),
         status: form.status,
       }
-      await createPayment(payload)
+      if (isEditing && editingPaymentId) {
+        await updatePayment(editingPaymentId, payload)
+      } else {
+        await createPayment(payload)
+      }
 
       await refreshPayments()
       setError(null)
       setForm(emptyForm)
+      setIsEditing(false)
+      setEditingPaymentId('')
+      setHasPlan(false)
       setReference('')
       setIsModalOpen(false)
     } catch (requestError) {
@@ -197,6 +229,63 @@ function Payments() {
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  function handleUserChange(userId: string) {
+    const selectedUser = users.find((user) => getRecordId(user) === userId)
+    const activePlan = selectedUser ? getAssignedPlan(selectedUser, plans) : undefined
+    const activePlanPrice = activePlan?.price ?? activePlan?.precio
+
+    setForm((current) => ({
+      ...current,
+      userId,
+      planId: activePlan ? getRecordId(activePlan) : '',
+      amount: activePlanPrice === undefined ? '0' : String(activePlanPrice),
+    }))
+    setHasPlan(Boolean(activePlan))
+  }
+
+  function handlePlanChange(planId: string) {
+    const selectedPlan = plans.find((plan) => getRecordId(plan) === planId)
+    const planPrice = selectedPlan?.price ?? selectedPlan?.precio
+
+    setForm((current) => ({
+      ...current,
+      planId,
+      amount: planPrice === undefined ? '' : String(planPrice),
+    }))
+  }
+
+  function handleEditPayment(payment: Payment) {
+    const paymentId = getRecordId(payment)
+    if (!paymentId) {
+      setError('No se puede editar un pago sin identificador.')
+      return
+    }
+
+    const paymentUser = payment.userId || payment.user
+    const userId = getRelationId(paymentUser)
+    const paymentPlanName = getPaymentPlanName(payment)
+    const selectedPlan = plans.find((plan) => (
+      getRecordId(plan) === getRelationId(payment.plan)
+      || (plan.name || plan.nombre) === paymentPlanName
+    ))
+    const assignedPlan = users.find((user) => getRecordId(user) === userId)
+
+    setForm({
+      userId,
+      planId: selectedPlan ? getRecordId(selectedPlan) : getRelationId(payment.plan),
+      amount: String(payment.amount ?? 0),
+      source: payment.source || 'reception',
+      createdAt: payment.createdAt ? payment.createdAt.slice(0, 10) : new Date().toISOString().slice(0, 10),
+      status: payment.status || 'Completed',
+    })
+    setReference(payment.reference || '')
+    setIsEditing(true)
+    setEditingPaymentId(paymentId)
+    setHasPlan(Boolean(assignedPlan && getAssignedPlan(assignedPlan, plans)))
+    setModalError(null)
+    setIsModalOpen(true)
   }
 
   async function handleRedeemPin(event: React.FormEvent<HTMLFormElement>) {
@@ -355,6 +444,14 @@ function Payments() {
                         <div className="inline-flex items-center gap-3">
                           {isPending && <span className="text-xs font-medium text-slate-400">Requiere PIN</span>}
                           <button
+                            className="cursor-pointer text-slate-400 transition hover:text-green-600"
+                            type="button"
+                            aria-label="Editar pago"
+                            onClick={() => handleEditPayment(payment)}
+                          >
+                            <Pencil className="h-4 w-4" aria-hidden="true" />
+                          </button>
+                          <button
                             className="cursor-pointer text-slate-400 transition hover:text-red-600"
                             type="button"
                             aria-label="Eliminar pago"
@@ -386,7 +483,7 @@ function Payments() {
               <div>
                 <p className="text-sm font-medium uppercase tracking-[0.2em] text-emerald-700">Comercial</p>
                 <h2 className="mt-2 text-2xl font-semibold text-slate-900">
-                  Nuevo pago
+                  {isEditing ? 'Editar pago' : 'Nuevo pago'}
                 </h2>
               </div>
               <button
@@ -406,7 +503,8 @@ function Payments() {
                   className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
                   id="payment-user"
                   value={form.userId}
-                  onChange={(event) => setForm({ ...form, userId: event.target.value })}
+                  onChange={(event) => handleUserChange(event.target.value)}
+                  disabled={isEditing}
                   required
                 >
                   <option value="">Selecciona un usuario</option>
@@ -423,7 +521,8 @@ function Payments() {
                   className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
                   id="payment-plan"
                   value={form.planId}
-                  onChange={(event) => setForm({ ...form, planId: event.target.value })}
+                  onChange={(event) => handlePlanChange(event.target.value)}
+                  disabled={isEditing || hasPlan}
                   required
                 >
                   <option value="">Selecciona un plan</option>
@@ -438,15 +537,17 @@ function Payments() {
                 <div>
                   <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="payment-amount">Monto</label>
                   <input
-                    className="w-full rounded-lg border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                    className={`w-full rounded-lg border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100 ${isEditing || hasPlan ? 'cursor-not-allowed bg-slate-100 text-slate-500' : 'bg-white'}`}
                     id="payment-amount"
                     type="number"
                     min="0"
                     step="0.01"
                     value={form.amount}
                     onChange={(event) => setForm({ ...form, amount: event.target.value })}
+                    readOnly={isEditing || hasPlan}
                     required
                   />
+                  {(isEditing || hasPlan) && <p className="mt-1 text-xs text-slate-500">Monto protegido para conservar el registro.</p>}
                 </div>
                 <div>
                   <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="payment-source">Método de pago</label>

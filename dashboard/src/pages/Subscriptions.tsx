@@ -29,12 +29,16 @@ interface PlanFormState {
   nombre: string
   precio: string
   duracion: string
+  autoRenew: boolean
+  planType: 'standard' | 'promotional'
 }
 
 const emptyPlanForm: PlanFormState = {
   nombre: '',
   precio: '',
   duracion: '',
+  autoRenew: true,
+  planType: 'standard',
 }
 
 async function fetchPlans() {
@@ -114,6 +118,8 @@ function Subscriptions() {
       nombre: plan.name || plan.nombre || '',
       precio: planPrice === undefined ? '' : String(planPrice),
       duracion: planDuration === undefined ? '' : String(planDuration),
+      autoRenew: plan.autoRenew ?? true,
+      planType: plan.planType ?? 'standard',
     })
     setSpecificationsText(plan.caracteristicas?.join(', ') || '')
     setModalError(null)
@@ -151,6 +157,8 @@ function Subscriptions() {
         name: form.nombre.trim(),
         price: Number(form.precio),
         durationInDays: Number(form.duracion),
+        autoRenew: form.autoRenew,
+        planType: form.planType,
         specifications,
       }
 
@@ -232,7 +240,16 @@ function Subscriptions() {
                   key={planId}
                 >
                   <div className="flex items-start justify-between gap-4">
-                    <h2 className="text-xl font-semibold text-slate-900">{planName}</h2>
+                    <div className="min-w-0">
+                      <h2 className="text-xl font-semibold text-slate-900">{planName}</h2>
+                      <span className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
+                        plan.planType === 'promotional'
+                          ? 'bg-amber-100 text-amber-800'
+                          : 'bg-slate-100 text-slate-600'
+                      }`}>
+                        {plan.planType === 'promotional' ? 'Promocional' : 'Estándar'}
+                      </span>
+                    </div>
                     <div className="relative flex items-center gap-2">
                       <span
                         className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium ${
@@ -333,6 +350,21 @@ function Subscriptions() {
               </div>
 
               <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="plan-type">
+                  Tipo de Plan
+                </label>
+                <select
+                  className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                  id="plan-type"
+                  value={form.planType}
+                  onChange={(event) => setForm({ ...form, planType: event.target.value as 'standard' | 'promotional' })}
+                >
+                  <option value="standard">Estándar</option>
+                  <option value="promotional">Promocional</option>
+                </select>
+              </div>
+
+              <div>
                 <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="plan-price">
                   Precio
                 </label>
@@ -362,6 +394,17 @@ function Subscriptions() {
                   required
                 />
               </div>
+
+              <label className="flex items-center gap-3 text-sm font-medium text-slate-700" htmlFor="plan-auto-renew">
+                <input
+                  className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                  id="plan-auto-renew"
+                  type="checkbox"
+                  checked={form.autoRenew}
+                  onChange={(event) => setForm({ ...form, autoRenew: event.target.checked })}
+                />
+                Renovación Automática
+              </label>
 
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="plan-specifications">

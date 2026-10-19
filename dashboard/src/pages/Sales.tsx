@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react'
 import { Minus, Plus, Trash2 } from 'lucide-react'
-import { createSale, getProducts, getSales, getUsers, redeemSalePin } from '../services/api'
+import { createSale, getProducts, getPromotions, getSales, getUsers, redeemSalePin } from '../services/api'
 import type { Sale, SaleItem, SalePayload } from '../services/api'
 import { connectSocket, disconnectSocket } from '../services/socket'
-import type { Product, User } from '../types'
+import type { Product, Promotion, User } from '../types'
 
 type SaleResponse = Sale[] | { data?: unknown; sales?: unknown; ventas?: unknown }
 type UserResponse = User[] | { data?: unknown; users?: unknown }
 type ProductResponse = Product[] | { data?: unknown; products?: unknown }
+type PromotionResponse = Promotion[] | { data?: unknown; promotions?: unknown }
 
 interface SaleFormItem {
   productId: string
@@ -18,9 +19,10 @@ interface SaleFormState {
   userId: string
   status: string
   items: SaleFormItem[]
+  promotionId: string
 }
 
-const emptyForm: SaleFormState = { userId: '', status: 'paid', items: [] }
+const emptyForm: SaleFormState = { userId: '', status: 'paid', items: [], promotionId: '' }
 
 function extractArray<T>(value: unknown, keys: string[]): T[] {
   if (Array.isArray(value)) return value as T[]
@@ -76,6 +78,7 @@ function Sales() {
   const [sales, setSales] = useState<Sale[]>([])
   const [users, setUsers] = useState<User[]>([])
   const [products, setProducts] = useState<Product[]>([])
+  const [promotions, setPromotions] = useState<Promotion[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -97,13 +100,14 @@ function Sales() {
     let isMounted = true
     async function loadData() {
       try {
-        const [salesResponse, usersResponse, productsResponse] = await Promise.all([
-          getSales<SaleResponse>(), getUsers<UserResponse>(), getProducts<ProductResponse>(),
+        const [salesResponse, usersResponse, productsResponse, promotionsResponse] = await Promise.all([
+          getSales<SaleResponse>(), getUsers<UserResponse>(), getProducts<ProductResponse>(), getPromotions<PromotionResponse>(),
         ])
         if (!isMounted) return
         setSales(extractArray<Sale>(salesResponse, ['data', 'sales', 'ventas']))
         setUsers(extractArray<User>(usersResponse, ['data', 'users']))
         setProducts(extractArray<Product>(productsResponse, ['data', 'products']))
+        setPromotions(extractArray<Promotion>(promotionsResponse, ['data', 'promotions']).filter((promotion) => promotion.isActive))
         setError(null)
       } catch (requestError) {
         if (isMounted) setError(requestError instanceof Error ? requestError.message : 'No se pudieron cargar las ventas.')
@@ -158,7 +162,12 @@ function Sales() {
     try {
       if (!form.userId) throw new Error('Selecciona un usuario.')
       if (form.items.length === 0) throw new Error('Agrega al menos un producto.')
-      const payload: SalePayload = { userId: form.userId, items: form.items, status: form.status }
+      const payload: SalePayload = {
+        userId: form.userId,
+        items: form.items,
+        status: form.status,
+        promotionId: form.promotionId || undefined,
+      }
       await createSale(payload)
       await refreshSales(); setError(null); closeModal()
     } catch (requestError) {
@@ -183,6 +192,33 @@ function Sales() {
   }
 
   const formatCurrency = (value: number | string) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(Number(value) || 0)
+  const availablePromotions = promotions.filter((promotion) => {
+    const applicableProducts = promotion.applicableProducts || []
+    if (applicableProducts.length === 0) return true
+    return form.items.some((item) => applicableProducts.includes(item.productId))
+  })
+  let calculatedBaseTotal = 0
+  let discountableSubtotal = 0
+  const selectedPromo = promotions.find((promotion) => recordId(promotion) === form.promotionId)
+
+  form.items.forEach((item) => {
+    const product = products.find((candidate) => recordId(candidate) === item.productId)
+    const itemTotal = (Number(product?.price) || 0) * item.quantity
+
+    calculatedBaseTotal += itemTotal
+
+    if (selectedPromo) {
+      const applicableProducts = selectedPromo.applicableProducts || []
+      if (applicableProducts.length === 0 || applicableProducts.includes(recordId(product || {}))) {
+        discountableSubtotal += itemTotal
+      }
+    }
+  })
+
+  const calculatedDiscount = selectedPromo
+    ? (discountableSubtotal * Number(selectedPromo.discountPercentage || 0)) / 100
+    : 0
+  const finalTotal = calculatedBaseTotal - calculatedDiscount
 
   return (
     <section className="min-h-screen bg-[#F8FAFC] px-8 py-10">
@@ -212,6 +248,39 @@ function Sales() {
       {isModalOpen && <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-900/50 px-4 py-8 backdrop-blur-sm"><div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl"><div className="flex items-start justify-between gap-4"><div><p className="text-sm font-medium uppercase tracking-[0.2em] text-emerald-700">Comercial</p><h2 className="mt-2 text-2xl font-semibold text-slate-900">Venta directa</h2></div><button className="text-2xl leading-none text-slate-400 transition hover:text-slate-700" type="button" aria-label="Cerrar modal" onClick={closeModal}>×</button></div>
         <form className="mt-6 space-y-4" onSubmit={handleSubmit}><div><label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="sale-user">Usuario</label><select className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100" id="sale-user" value={form.userId} onChange={(event) => setForm({ ...form, userId: event.target.value })} required><option value="">Selecciona un usuario</option>{users.map((user, index) => <option key={recordId(user) || `user-${index}`} value={recordId(user)}>{user.name || user.firstName || user.email}</option>)}</select></div>
           <div><label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="sale-product">Productos</label><div className="flex gap-2"><select className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-3 text-slate-900" id="sale-product" value={productToAdd} onChange={(event) => setProductToAdd(event.target.value)}><option value="">Selecciona un producto</option>{products.map((product, index) => <option key={recordId(product) || `product-${index}`} value={recordId(product)}>{product.name} ({product.stock} disponibles)</option>)}</select><input className="w-20 rounded-lg border border-slate-200 px-3 py-3" type="number" min="1" aria-label="Cantidad" value={quantityToAdd} onChange={(event) => setQuantityToAdd(event.target.value)} /><button className="rounded-lg border border-slate-200 px-3 text-slate-600 hover:bg-slate-50" type="button" aria-label="Agregar producto" onClick={addProduct}><Plus size={18} /></button></div><div className="mt-3 space-y-2">{form.items.map((item) => <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm" key={item.productId}><span>{products.find((product) => recordId(product) === item.productId)?.name || item.productId}</span><span className="inline-flex items-center gap-2"><button className="rounded border border-slate-200 p-1" type="button" aria-label="Reducir cantidad" onClick={() => changeQuantity(item.productId, -1)}><Minus size={14} /></button>{item.quantity}<button className="rounded border border-slate-200 p-1" type="button" aria-label="Aumentar cantidad" onClick={() => changeQuantity(item.productId, 1)}><Plus size={14} /></button><button className="ml-1 text-slate-400 hover:text-red-600" type="button" aria-label="Quitar producto" onClick={() => setForm({ ...form, items: form.items.filter((selected) => selected.productId !== item.productId) })}><Trash2 size={15} /></button></span></div>)}</div></div>
+          <div><label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="sale-promotion">Aplicar Promoción (Opcional)</label><select className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900" id="sale-promotion" value={form.promotionId} onChange={(event) => setForm({ ...form, promotionId: event.target.value })}><option value="">Sin promoción</option>{availablePromotions.map((promotion, index) => { const promotionId = recordId(promotion); return <option key={promotionId || `promotion-${index}`} value={promotionId}>{promotion.title} - {promotion.discountPercentage}% OFF</option> })}</select></div>
+          <div className="grid gap-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+            <div className="space-y-3">
+              <div className="text-xs font-medium uppercase tracking-wide text-slate-500">Detalle de compra</div>
+              {form.items.map((item) => {
+                const product = products.find((candidate) => recordId(candidate) === item.productId)
+                const rowBaseTotal = (Number(product?.price) || 0) * item.quantity
+                const applicableProducts = selectedPromo?.applicableProducts || []
+                const isDiscountable = Boolean(selectedPromo) && (
+                  applicableProducts.length === 0 || applicableProducts.includes(recordId(product || {}))
+                )
+                const rowDiscount = isDiscountable
+                  ? (rowBaseTotal * Number(selectedPromo?.discountPercentage || 0)) / 100
+                  : 0
+
+                return (
+                  <div className="flex items-start justify-between gap-4 border-b border-slate-200 pb-2 text-sm last:border-b-0 last:pb-0" key={item.productId}>
+                    <div className="min-w-0">
+                      <div className="truncate font-medium text-slate-700">{product?.name || item.productId} x {item.quantity}</div>
+                      {rowDiscount > 0 && <div className="mt-1 text-xs text-green-700">Descuento promo: -{formatCurrency(rowDiscount)}</div>}
+                    </div>
+                    <div className="shrink-0 font-medium text-slate-700">{formatCurrency(rowBaseTotal)}</div>
+                  </div>
+                )
+              })}
+            </div>
+            <div className="border-t border-slate-200 pt-3 text-right sm:min-w-40 sm:border-l sm:border-t-0 sm:pl-4 sm:pt-0">
+              <div className="text-sm text-slate-500">Total</div>
+              {calculatedDiscount > 0 && <div className="text-sm text-slate-400 line-through">{formatCurrency(calculatedBaseTotal)}</div>}
+              <div className="text-2xl font-semibold text-slate-900">{formatCurrency(finalTotal)}</div>
+              {calculatedDiscount > 0 && <div className="text-xs font-medium text-green-700">Descuento: {formatCurrency(calculatedDiscount)}</div>}
+            </div>
+          </div>
           <div><label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="sale-status">Estado</label><select className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900" id="sale-status" value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })}><option value="paid">Pagado</option><option value="pending">Pendiente</option><option value="cancelled">Cancelado</option></select></div>
           {modalError && <p className="text-sm text-red-600" role="alert">{modalError}</p>}<div className="flex justify-end gap-3 pt-2"><button className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100" type="button" onClick={closeModal}>Cancelar</button><button className="rounded-lg bg-[#0F172A] px-4 py-2 text-sm font-medium text-white disabled:opacity-50" type="submit" disabled={isSubmitting}>{isSubmitting ? 'Guardando...' : 'Guardar venta'}</button></div>
         </form></div></div>}
