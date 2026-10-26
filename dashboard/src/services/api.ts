@@ -1,4 +1,4 @@
-import type { Equipment, EquipmentStatus, User, UserRole } from '../types'
+import type { Equipment, User, UserRole } from '../types'
 
 export const API_BASE_URL = import.meta.env.VITE_GYMGO_API_URL
 
@@ -449,6 +449,7 @@ export interface EquipmentPayload {
   zone: string
   brand: string
   type: string
+  imageUrl?: string
   totalQuantity: number
   maintenanceQuantity: number
   status: 'available' | 'maintenance' | 'unavailable'

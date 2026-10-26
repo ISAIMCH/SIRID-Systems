@@ -74,6 +74,7 @@ export interface Equipment {
   zone: string
   brand: string
   type?: string
+  imageUrl?: string
   totalQuantity?: number
   maintenanceQuantity?: number
   status: EquipmentStatus

@@ -56,23 +56,23 @@ const mexicanExerciseNames: Record<string, string> = {
 }
 
 const muscleGroupTranslations: Record<string, string> = {
-  abdominals: 'Core',
-  abductors: 'Piernas',
-  adductors: 'Piernas',
-  biceps: 'Brazos',
-  calves: 'Piernas',
+  abdominals: 'Abdominales',
+  abductors: 'Abductores',
+  adductors: 'Aductores',
+  biceps: 'Bíceps',
+  calves: 'Gemelos',
   chest: 'Pecho',
-  forearms: 'Brazos',
-  glutes: 'Piernas',
-  hamstrings: 'Piernas',
-  lats: 'Espalda',
-  lower_back: 'Espalda',
+  forearms: 'Antebrazos',
+  glutes: 'Glúteos',
+  hamstrings: 'Femoral',
+  lats: 'Dorsales',
+  lower_back: 'Lumbar',
   middle_back: 'Espalda',
-  neck: 'Hombros',
-  quadriceps: 'Piernas',
+  neck: 'Cuello',
+  quadriceps: 'Cuádriceps',
   shoulders: 'Hombros',
-  traps: 'Espalda',
-  triceps: 'Brazos',
+  traps: 'Trapecio',
+  triceps: 'Tríceps',
 }
 
 interface FreeExercise {
@@ -115,7 +115,7 @@ function translateMuscleGroup(muscles: string[] | null | undefined, category?: s
     if (translated) return translated
   }
 
-  return category?.toLocaleLowerCase() === 'cardio' ? 'Cardio' : 'Cuerpo Completo'
+  return category?.toLocaleLowerCase() === 'cardio' ? 'Cardio' : 'Pecho'
 }
 
 function imageUrl(image: string) {

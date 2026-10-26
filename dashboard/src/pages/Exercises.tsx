@@ -13,14 +13,24 @@ type ExercisesResponse = Exercise[] | { data?: unknown; exercises?: unknown }
 type EquipmentResponse = Equipment[] | { data?: unknown; equipment?: unknown }
 
 const muscleGroupOptions = [
-  'Pecho',
-  'Espalda',
-  'Piernas',
-  'Brazos',
-  'Hombros',
-  'Core',
+  'Abdominales',
+  'Abductores',
+  'Aductores',
+  'Antebrazos',
+  'Bíceps',
   'Cardio',
-  'Cuerpo Completo',
+  'Cuello',
+  'Cuádriceps',
+  'Dorsales',
+  'Espalda',
+  'Femoral',
+  'Gemelos',
+  'Glúteos',
+  'Hombros',
+  'Lumbar',
+  'Pecho',
+  'Trapecio',
+  'Tríceps',
 ]
 const inputClassName = 'w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100'
 const labelClassName = 'mb-1.5 block text-sm font-medium text-slate-700'
@@ -151,7 +161,7 @@ function Exercises() {
     setForm({
       name: exercise.name || '',
       videoSearch: '',
-      muscleGroup: exercise.muscleGroup || '',
+      muscleGroup: muscleGroupOptions.includes(exercise.muscleGroup || '') ? exercise.muscleGroup || '' : '',
       equipment: exercise.equipment || '',
       videoUrl: exercise.videoUrl || '',
     })
@@ -190,6 +200,7 @@ function Exercises() {
         videoUrl: form.videoUrl.trim() || null,
       }
       if (!payload.name || !payload.muscleGroup) throw new Error('El nombre y el grupo muscular son obligatorios.')
+      if (!muscleGroupOptions.includes(payload.muscleGroup)) throw new Error('Selecciona un grupo muscular válido.')
 
       const id = editingExercise && recordId(editingExercise)
       if (editingExercise) {

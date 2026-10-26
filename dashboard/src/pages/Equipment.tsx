@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { AlertTriangle, Pencil, Plus, Trash2 } from 'lucide-react'
+import { AlertTriangle, Image as ImageIcon, Pencil, Plus, Trash2 } from 'lucide-react'
 import { createEquipment, deleteEquipment, getEquipment, updateEquipment } from '../services/api'
 import type { EquipmentPayload } from '../services/api'
 import type { Equipment, EquipmentStatus } from '../types'
@@ -11,6 +11,7 @@ interface EquipmentFormState {
   zona: string
   marca: string
   tipo: string
+  imageUrl: string
   cantidadTotal: string
   cantidadMantenimiento: string
   estado: EquipmentStatus
@@ -41,6 +42,7 @@ const emptyEquipmentForm: EquipmentFormState = {
   zona: '',
   marca: '',
   tipo: 'Cardio',
+  imageUrl: '',
   cantidadTotal: '1',
   cantidadMantenimiento: '0',
   estado: 'operational',
@@ -127,6 +129,7 @@ function Equipment() {
       zona: isPresetZone ? zone : customZoneOption,
       marca: item.brand || '',
       tipo: item.type || 'Cardio',
+      imageUrl: item.imageUrl || '',
       cantidadTotal: String(item.totalQuantity ?? 1),
       cantidadMantenimiento: String(item.maintenanceQuantity ?? 0),
       estado: item.status || 'operational',
@@ -156,6 +159,7 @@ function Equipment() {
         zone: (form.zona === customZoneOption ? customZone : form.zona).trim(),
         brand: form.marca.trim(),
         type: equipmentTypeMap[form.tipo.trim().toLowerCase()] || form.tipo.trim().toLowerCase(),
+        imageUrl: form.imageUrl.trim(),
         totalQuantity: Number(form.cantidadTotal),
         maintenanceQuantity: Number(form.cantidadMantenimiento),
         status: equipmentStatusMap[form.estado.trim().toLowerCase()],
@@ -270,6 +274,7 @@ function Equipment() {
             <table className="min-w-full text-left text-sm">
               <thead className="border-b border-slate-100 bg-slate-50/80 text-xs uppercase tracking-wider text-slate-500">
                 <tr>
+                  <th className="px-6 py-4 font-medium">Imagen</th>
                   <th className="px-6 py-4 font-medium">Nombre</th>
                   <th className="px-6 py-4 font-medium">Zona</th>
                   <th className="px-6 py-4 font-medium">Marca</th>
@@ -290,6 +295,19 @@ function Equipment() {
 
                     return (
                       <tr className="transition-colors hover:bg-slate-50" key={equipmentId}>
+                        <td className="px-6 py-4">
+                          {item.imageUrl ? (
+                            <img
+                              className="h-10 w-10 rounded-lg object-cover"
+                              src={item.imageUrl}
+                              alt=""
+                            />
+                          ) : (
+                            <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 text-slate-400">
+                              <ImageIcon size={18} aria-hidden="true" />
+                            </span>
+                          )}
+                        </td>
                         <td className="whitespace-nowrap px-6 py-4 font-medium text-slate-900">
                           {item.name || 'Sin nombre'}
                         </td>
@@ -350,7 +368,7 @@ function Equipment() {
                   })
                 ) : (
                   <tr>
-                    <td className="px-6 py-10 text-center text-sm text-slate-500" colSpan={9}>
+                    <td className="px-6 py-10 text-center text-sm text-slate-500" colSpan={10}>
                       {searchTerm ? 'No hay equipo que coincida con la búsqueda.' : 'No hay equipo registrado.'}
                     </td>
                   </tr>
@@ -457,6 +475,20 @@ function Equipment() {
                   <option value="Cardio">Cardio</option>
                   <option value="Fuerza">Fuerza</option>
                 </select>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="equipment-image-url">
+                  Imagen (URL)
+                </label>
+                <input
+                  className="w-full rounded-lg border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                  id="equipment-image-url"
+                  type="url"
+                  value={form.imageUrl}
+                  onChange={(event) => setForm({ ...form, imageUrl: event.target.value })}
+                  placeholder="https://..."
+                />
               </div>
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

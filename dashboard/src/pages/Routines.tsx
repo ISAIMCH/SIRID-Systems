@@ -40,14 +40,24 @@ type ExerciseMode = 'Fuerza' | 'Cardio'
 type BlockType = RoutineBlock['type']
 
 const muscleGroupOptions = [
-  'Pecho',
-  'Espalda',
-  'Piernas',
-  'Brazos',
-  'Hombros',
-  'Core',
+  'Abdominales',
+  'Abductores',
+  'Aductores',
+  'Antebrazos',
+  'Bíceps',
   'Cardio',
-  'Cuerpo Completo',
+  'Cuello',
+  'Cuádriceps',
+  'Dorsales',
+  'Espalda',
+  'Femoral',
+  'Gemelos',
+  'Glúteos',
+  'Hombros',
+  'Lumbar',
+  'Pecho',
+  'Trapecio',
+  'Tríceps',
 ]
 const customMuscleGroupOption = 'other'
 const customEquipmentOption = 'other'
