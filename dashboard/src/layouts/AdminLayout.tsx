@@ -11,6 +11,7 @@ import {
   Wrench,
 } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router-dom'
+import { useAuth } from '../store/useAuth'
 
 const navigation = [
   { label: 'Inicio', to: '/', icon: LayoutDashboard, end: true, section: undefined },
@@ -27,6 +28,8 @@ const navigation = [
 ]
 
 function AdminLayout() {
+  const { signOut } = useAuth()
+
   return (
     <div className="min-h-screen bg-[#F8FAFC]">
       <aside className="fixed inset-y-0 left-0 z-10 flex h-screen w-64 flex-col overflow-y-auto bg-[#0F172A] px-4 py-6 text-slate-300">
@@ -77,6 +80,13 @@ function AdminLayout() {
         <div className="mt-auto border-t border-slate-700/70 px-3 pt-5">
           <p className="text-xs text-slate-500">Panel de operaciones</p>
           <p className="mt-1 text-sm text-slate-300">Versión inicial</p>
+          <button
+            className="mt-4 text-sm font-medium text-slate-400 transition-colors hover:text-white"
+            type="button"
+            onClick={signOut}
+          >
+            Cerrar sesión
+          </button>
         </div>
       </aside>
 

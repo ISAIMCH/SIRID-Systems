@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Pencil, Plus, Tag, Trash2 } from 'lucide-react'
 import { createPromotion, deletePromotion, getPlans, getProducts, getPromotions, updatePromotion } from '../services/api'
 import type { Plan, Product, Promotion } from '../types'
+import { isValidImageValue } from '../utils/imageValidation'
 
 type PromotionsResponse = Promotion[] | { data?: unknown; promotions?: unknown }
 type ProductsResponse = Product[] | { data?: unknown; products?: unknown }
@@ -218,14 +219,20 @@ function Promotions() {
     setIsSubmitting(true)
 
     try {
+      const imageUrl = form.imageUrl.trim()
       const payload = {
         title: form.title.trim(),
         description: form.description.trim(),
         discountPercentage: promoType === 'store' ? Number(form.discountPercentage) : 0,
-        validUntil: promoType === 'store' ? form.validUntil : null,
         isActive: form.isActive,
-        imageUrl: form.imageUrl.trim(),
         applicableProducts: form.applicableProducts,
+        ...(imageUrl ? { imageUrl } : {}),
+        ...(promoType === 'store' && form.validUntil.trim()
+          ? { validUntil: form.validUntil.trim() }
+          : {}),
+      }
+      if (imageUrl && !isValidImageValue(imageUrl)) {
+        throw new Error('La imagen debe ser una URL http(s) válida o una imagen base64 PNG, JPG, WEBP o GIF.')
       }
       const promotionId = editingPromotion?._id || editingPromotion?.id
 
@@ -530,7 +537,6 @@ function Promotions() {
                       type="date"
                       value={form.validUntil}
                       onChange={(event) => setForm({ ...form, validUntil: event.target.value })}
-                      required
                     />
                   </div>
                 </>
@@ -551,7 +557,7 @@ function Promotions() {
                   className="w-full rounded-lg border border-slate-200 px-4 py-3 text-slate-900 outline-none transition file:mr-4 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-medium file:text-slate-700 hover:file:bg-slate-200"
                   id="promotion-image-file"
                   type="file"
-                  accept="image/*"
+                  accept="image/png,image/jpeg,image/webp,image/gif"
                   onChange={handleImageChange}
                 />
               </div>

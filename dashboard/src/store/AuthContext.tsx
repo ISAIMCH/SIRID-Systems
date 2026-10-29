@@ -1,5 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { AuthContext, type AuthContextValue } from './auth-context'
+import { disconnectSocket } from '../services/socket'
 
 function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState(() => localStorage.getItem('token'))
@@ -17,6 +18,7 @@ function AuthProvider({ children }: { children: ReactNode }) {
         setToken(nextToken)
       },
       signOut: () => {
+        disconnectSocket()
         localStorage.removeItem('token')
         localStorage.removeItem('userName')
         localStorage.removeItem('userData')

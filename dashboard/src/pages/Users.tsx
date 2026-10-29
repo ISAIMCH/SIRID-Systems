@@ -87,6 +87,36 @@ async function fetchPlans() {
   return extractArray<Plan>(await getPlans<PlansResponse>(), ['data', 'plans', 'planes'])
 }
 
+async function openPrivateDocument(documentPath: string) {
+  const token = localStorage.getItem('token')
+  if (!token) throw new Error('La sesión expiró. Inicia sesión nuevamente.')
+
+  const documentWindow = window.open('', '_blank')
+  if (!documentWindow) {
+    throw new Error('El navegador bloqueó la nueva pestaña. Permite ventanas emergentes para ver el documento.')
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}${documentPath}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
+
+    if (!response.ok) {
+      throw new Error('No se pudo cargar el documento.')
+    }
+
+    const blob = await response.blob()
+    const objectUrl = URL.createObjectURL(blob)
+    documentWindow.location.href = objectUrl
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000)
+  } catch (error) {
+    documentWindow.close()
+    throw error
+  }
+}
+
 function recordId(value: string | UserReference | undefined) {
   if (typeof value === 'string') return value
   return value?.id || value?._id || ''
@@ -701,9 +731,17 @@ function Users() {
                               <div className="flex shrink-0 items-center gap-2">
                                 <a
                                   className="text-sm font-medium text-green-700 transition hover:text-green-900"
-                                  href={`${API_BASE_URL}${document}`}
-                                  target="_blank"
-                                  rel="noreferrer"
+                                  href="#"
+                                  onClick={(event) => {
+                                    event.preventDefault()
+                                    void openPrivateDocument(document).catch((requestError: unknown) => {
+                                      setError(
+                                        requestError instanceof Error
+                                          ? requestError.message
+                                          : 'No se pudo abrir el documento.',
+                                      )
+                                    })
+                                  }}
                                 >
                                   Ver
                                 </a>

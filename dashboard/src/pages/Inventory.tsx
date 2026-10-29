@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Pencil, Plus, Trash2 } from 'lucide-react'
 import { createProduct, deleteProduct, getProducts, updateProduct } from '../services/api'
 import type { Product } from '../types'
+import { isValidImageValue } from '../utils/imageValidation'
 
 type ProductsResponse = Product[] | { data?: unknown; products?: unknown }
 
@@ -143,14 +144,18 @@ function Inventory() {
     setIsSubmitting(true)
 
     try {
+      const imageUrl = form.imageUrl.trim()
       const payload = {
         name: form.nombre.trim(),
         category: (form.categoria === customCategoryOption ? customCategory : form.categoria).trim(),
         price: Number(form.precio),
         stock: Number(form.stock),
-        imageUrl: form.imageUrl.trim(),
+        ...(imageUrl ? { imageUrl } : {}),
       }
       if (!payload.category) throw new Error('Selecciona o escribe una categoría.')
+      if (imageUrl && !isValidImageValue(imageUrl)) {
+        throw new Error('La imagen debe ser una URL http(s) válida o una imagen base64 PNG, JPG, WEBP o GIF.')
+      }
       const productId = editingProduct?._id || editingProduct?.id
 
       if (editingProduct) {
@@ -410,7 +415,7 @@ function Inventory() {
                   className="w-full rounded-lg border border-slate-200 px-4 py-3 text-slate-900 outline-none transition file:mr-4 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-medium file:text-slate-700 hover:file:bg-slate-200"
                   id="product-image-file"
                   type="file"
-                  accept="image/*"
+                  accept="image/png,image/jpeg,image/webp,image/gif"
                   onChange={handleImageChange}
                 />
               </div>

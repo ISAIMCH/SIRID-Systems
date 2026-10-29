@@ -87,7 +87,7 @@ export interface Promotion {
   title: string
   description: string
   discountPercentage: number
-  validUntil: string
+  validUntil?: string
   isActive: boolean
   imageUrl?: string
   applicableProducts?: string[]

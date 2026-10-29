@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { Pencil, Plus, Trash2 } from 'lucide-react'
+import { Activity, Boxes, Dumbbell, Pencil, Plus, Search, Trash2 } from 'lucide-react'
 import { createExercise, deleteExercise, getEquipment, getExercises, updateExercise } from '../services/api'
 import type { Exercise, ExercisePayload } from '../services/api'
 import type { Equipment } from '../types'
@@ -251,9 +251,11 @@ function Exercises() {
       .toLocaleLowerCase()
       .includes(searchTerm.trim().toLocaleLowerCase()),
   )
+  const muscleGroupCount = new Set(exercises.map((exercise) => exercise.muscleGroup).filter(Boolean)).size
+  const equippedExerciseCount = exercises.filter((exercise) => exercise.equipment).length
 
   return (
-    <section className="min-h-screen bg-[#F8FAFC] px-8 py-10">
+    <section className="min-h-screen bg-gray-50 px-5 py-8 sm:px-8 sm:py-10">
       <p className="text-sm font-medium uppercase tracking-[0.25em] text-slate-500">Entrenamiento</p>
       <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
@@ -265,27 +267,78 @@ function Exercises() {
         </button>
       </div>
 
-      <div className="mt-8 overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
+      <div className="mt-8 grid gap-4 sm:grid-cols-3">
+        <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium text-slate-500">Ejercicios totales</p>
+            <span className="rounded-lg bg-blue-50 p-2 text-blue-600">
+              <Dumbbell size={18} aria-hidden="true" />
+            </span>
+          </div>
+          <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-900">{exercises.length}</p>
+          <p className="mt-1 text-xs text-slate-400">Disponibles en tu catálogo</p>
+        </div>
+        <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium text-slate-500">Grupos musculares</p>
+            <span className="rounded-lg bg-violet-50 p-2 text-violet-600">
+              <Activity size={18} aria-hidden="true" />
+            </span>
+          </div>
+          <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-900">{muscleGroupCount}</p>
+          <p className="mt-1 text-xs text-slate-400">Categorías representadas</p>
+        </div>
+        <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium text-slate-500">Con equipo</p>
+            <span className="rounded-lg bg-emerald-50 p-2 text-emerald-600">
+              <Boxes size={18} aria-hidden="true" />
+            </span>
+          </div>
+          <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-900">{equippedExerciseCount}</p>
+          <p className="mt-1 text-xs text-slate-400">Ejercicios con implementos</p>
+        </div>
+      </div>
+
+      <div className="mt-6 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
         {error && <div className="border-b border-red-100 bg-red-50 px-6 py-4 text-sm text-red-700" role="alert">{error}</div>}
-        <div className="border-b border-slate-100 p-4">
-          <input className="w-full max-w-sm rounded-lg border border-slate-200 px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100" type="search" placeholder="Buscar ejercicios..." aria-label="Buscar ejercicios" value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} />
+        <div className="flex flex-col gap-3 border-b border-gray-100 p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-base font-semibold text-slate-900">Catálogo de ejercicios</h2>
+            <p className="mt-1 text-sm text-slate-500">Consulta y administra los ejercicios disponibles.</p>
+          </div>
+          <div className="relative w-full sm:max-w-xs">
+            <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={17} aria-hidden="true" />
+            <input className="w-full rounded-lg border border-slate-200 py-2.5 pl-9 pr-4 text-sm text-slate-900 outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100" type="search" placeholder="Buscar ejercicios..." aria-label="Buscar ejercicios" value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} />
+          </div>
         </div>
         {isLoading ? (
           <div className="p-6 text-sm text-slate-500">Cargando ejercicios...</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full text-left text-sm">
-              <thead className="border-b border-slate-100 bg-slate-50/80 text-xs uppercase tracking-wider text-slate-500">
-                <tr><th className="px-6 py-4 font-medium">Nombre</th><th className="px-6 py-4 font-medium">Grupo muscular</th><th className="px-6 py-4 font-medium">Equipo</th><th className="px-6 py-4 text-right font-medium">Acciones</th></tr>
+              <thead className="border-b border-gray-100 bg-gray-50/80 text-xs uppercase tracking-wider text-slate-500">
+                <tr><th className="px-5 py-4 font-medium sm:px-6">Ejercicio</th><th className="px-5 py-4 font-medium sm:px-6">Grupo muscular</th><th className="px-5 py-4 font-medium sm:px-6">Equipo</th><th className="px-5 py-4 text-right font-medium sm:px-6">Acciones</th></tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 text-slate-700">
+              <tbody className="divide-y divide-gray-100 text-slate-700">
                 {filteredExercises.length ? filteredExercises.map((exercise, index) => {
                   const id = recordId(exercise) || `exercise-${index}`
                   return <tr className="hover:bg-slate-50" key={id}>
-                    <td className="px-6 py-4 font-medium text-slate-900">{exercise.name}</td>
-                    <td className="px-6 py-4 text-slate-500">{exercise.muscleGroup}</td>
-                    <td className="px-6 py-4 text-slate-500">{exercise.equipment || 'Peso corporal'}</td>
-                    <td className="px-6 py-4 text-right"><div className="inline-flex gap-3">
+                    <td className="whitespace-nowrap px-5 py-4 sm:px-6">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-400" aria-hidden="true">
+                          <Dumbbell size={18} />
+                        </div>
+                        <span className="font-medium text-slate-900">{exercise.name}</span>
+                      </div>
+                    </td>
+                    <td className="whitespace-nowrap px-5 py-4 sm:px-6">
+                      <span className="inline-flex rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700">{exercise.muscleGroup}</span>
+                    </td>
+                    <td className="whitespace-nowrap px-5 py-4 sm:px-6">
+                      <span className="inline-flex rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700">{exercise.equipment || 'Peso corporal'}</span>
+                    </td>
+                    <td className="whitespace-nowrap px-5 py-4 text-right sm:px-6"><div className="inline-flex gap-3">
                       <button className="text-slate-400 hover:text-green-600" type="button" aria-label={`Editar ${exercise.name}`} onClick={() => openEditModal(exercise)}><Pencil size={17} /></button>
                       <button className="text-slate-400 hover:text-red-600" type="button" aria-label={`Eliminar ${exercise.name}`} onClick={() => handleDelete(exercise)}><Trash2 size={17} /></button>
                     </div></td>
