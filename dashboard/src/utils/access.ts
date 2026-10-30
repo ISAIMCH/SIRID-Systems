@@ -4,7 +4,8 @@ export type StaffRole = 'Admin' | 'Coach' | 'Recepcion'
 
 // Mirrors the API's authorize() for each page's main data; pages not listed are open to every staff role.
 const PAGE_ROLES: Record<string, StaffRole[]> = {
-  '/gyms': ['Admin'],
+  '/gyms': ['Admin', 'Recepcion'],
+  '/access': ['Admin', 'Recepcion'],
   '/equipment': ['Admin', 'Coach'],
   '/inventory': ['Admin'],
   '/exercises': ['Admin', 'Coach'],

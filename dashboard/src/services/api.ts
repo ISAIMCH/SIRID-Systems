@@ -596,3 +596,60 @@ export function getInventory<T = unknown[]>() {
 export function getStoreProducts<T = unknown[]>() {
   return apiClient<T>('/store/products')
 }
+export interface Gym {
+  id: string
+  name: string
+  address: string
+  timezone: string
+  joinCode: string | null
+}
+
+export interface AccessDevice {
+  id: string
+  name: string
+  gymId: string
+  keyPreview: string
+  lastSeenAt: string | null
+  revokedAt: string | null
+  createdAt: string
+}
+
+export interface AccessResult {
+  event: 'check-in' | 'check-out'
+  occurredAt: string
+  gymId: string
+  userId: string
+  userName: string
+}
+
+export function getGyms() {
+  return apiClient<{ gyms: Gym[] }>('/gyms')
+}
+
+export function regenerateJoinCode(gymId: string) {
+  return apiClient<{ gym: Gym }>(`/gyms/${gymId}/join-code`, { method: 'POST' })
+}
+
+export function getAccessDevices() {
+  return apiClient<{ devices: AccessDevice[] }>('/access-devices')
+}
+
+// The key comes back only once; the API stores its hash.
+export function createAccessDevice(data: { name: string; gymId?: string }) {
+  return apiClient<{ device: AccessDevice; key: string }>('/access-devices', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export function revokeAccessDevice(id: string) {
+  return apiClient<{ device: AccessDevice }>(`/access-devices/${id}`, { method: 'DELETE' })
+}
+
+// Staff scanning a client's QR; gymId is required in the all-gyms view.
+export function registerQrAccess(data: { qrToken: string; gymId?: string }) {
+  return apiClient<{ accepted: boolean; access: AccessResult }>('/iot/access', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}

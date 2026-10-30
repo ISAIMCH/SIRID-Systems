@@ -5,12 +5,14 @@ import {
   Package,
   LayoutDashboard,
   Megaphone,
+  Menu,
   Receipt,
+  ScanLine,
   ShoppingCart,
   Users,
   Wrench,
 } from 'lucide-react'
-import { useEffect, type ComponentType } from 'react'
+import { useEffect, useState, type ComponentType } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../store/useAuth'
 import { ALL_GYMS } from '../services/activeGym'
@@ -29,6 +31,7 @@ interface NavItem {
 const navigation: NavItem[] = [
   { label: 'Inicio', to: '/', icon: LayoutDashboard, end: true },
   { label: 'Gimnasios', to: '/gyms', icon: Dumbbell },
+  { label: 'Control de acceso', to: '/access', icon: ScanLine },
   { label: 'Equipo', to: '/equipment', icon: Wrench },
   { label: 'Inventario', to: '/inventory', icon: Package },
   { label: 'Usuarios', to: '/users', icon: Users },
@@ -47,6 +50,8 @@ function AdminLayout() {
 
   const roles = useStaffRoles()
   const visibleNavigation = navigation.filter((item) => canAccessPage(roles, item.to))
+  // On phones the sidebar slides in over the page, so reception can use the access scanner there.
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
 
   // One connection for the whole session; its rooms cover every gym, so switching gyms keeps it.
   useEffect(() => {
@@ -56,7 +61,10 @@ function AdminLayout() {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC]">
-      <aside className="fixed inset-y-0 left-0 z-10 flex h-screen w-64 flex-col overflow-y-auto bg-[#0F172A] px-4 py-6 text-slate-300">
+      {isMenuOpen && (
+        <div className="fixed inset-0 z-20 bg-slate-900/50 md:hidden" aria-hidden="true" onClick={() => setIsMenuOpen(false)} />
+      )}
+      <aside className={`fixed inset-y-0 left-0 z-30 flex h-screen w-64 flex-col overflow-y-auto bg-[#0F172A] px-4 py-6 text-slate-300 transition-transform md:translate-x-0 ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="border-b border-slate-700/70 px-3 pb-6">
           <p className="text-xl font-semibold tracking-tight text-white">GymGo</p>
           <p className="mt-1 text-xs font-medium uppercase tracking-[0.25em] text-[#9BFF63]">
@@ -110,6 +118,7 @@ function AdminLayout() {
                 <NavLink
                   to={to}
                   end={end}
+                  onClick={() => setIsMenuOpen(false)}
                   className={({ isActive }) =>
                     `flex items-center gap-3 px-3 py-3 text-sm font-medium transition-colors ${
                       isActive
@@ -139,7 +148,13 @@ function AdminLayout() {
         </div>
       </aside>
 
-      <main className="ml-64 h-screen min-h-screen overflow-y-auto">
+      <main className="h-screen min-h-screen overflow-y-auto md:ml-64">
+        <div className="sticky top-0 z-10 flex items-center gap-3 bg-[#0F172A] px-4 py-3 text-white md:hidden">
+          <button className="rounded-lg p-1 text-slate-300 transition hover:text-white" type="button" aria-label="Abrir menú" onClick={() => setIsMenuOpen(true)}>
+            <Menu size={22} />
+          </button>
+          <p className="font-semibold tracking-tight">GymGo</p>
+        </div>
         {/* Pages remount when the gym changes, so they reload their data for it. */}
         <Outlet key={activeGymId ?? 'sin-sucursal'} />
       </main>
