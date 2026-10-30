@@ -41,7 +41,9 @@ export interface LoginResponse extends SessionResponse {
   token: string
 }
 
+// The API sends { error }; msg and message are kept for older responses.
 interface ApiErrorPayload {
+  error?: string
   msg?: string
   message?: string
 }
@@ -98,7 +100,7 @@ export async function apiClient<T>(
 
   if (!response.ok) {
     if (response.status === 401 && sessionOn401 === 'clear') clearStoredSession()
-    throw new ApiError(data.msg || data.message || 'No se pudo completar la solicitud.', data, response.status)
+    throw new ApiError(data.error || data.msg || data.message || 'No se pudo completar la solicitud.', data, response.status)
   }
 
   return data
