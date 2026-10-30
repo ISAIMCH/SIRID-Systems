@@ -3,6 +3,9 @@ import { Pencil, Plus, Trash2 } from 'lucide-react'
 import { createProduct, deleteProduct, getProducts, updateProduct } from '../services/api'
 import type { Product } from '../types'
 import { isValidImageValue } from '../utils/imageValidation'
+import GymSelect from '../components/GymSelect'
+import { useAuth } from '../store/useAuth'
+import { targetGymField } from '../utils/targetGym'
 
 type ProductsResponse = Product[] | { data?: unknown; products?: unknown }
 
@@ -12,6 +15,7 @@ interface ProductFormState {
   precio: string
   stock: string
   imageUrl: string
+  gymId: string
 }
 
 const categoryOptions = ['Suplementos', 'Ropa', 'Accesorios']
@@ -23,6 +27,7 @@ const emptyProductForm: ProductFormState = {
   precio: '',
   stock: '',
   imageUrl: '',
+  gymId: '',
 }
 
 async function fetchProducts() {
@@ -49,6 +54,7 @@ function ProductSkeleton() {
 }
 
 function Inventory() {
+  const { isAllGyms, organizationGyms } = useAuth()
   const [products, setProducts] = useState<Product[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -59,6 +65,8 @@ function Inventory() {
   const [modalError, setModalError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [customCategory, setCustomCategory] = useState('')
+  // In the all-gyms view each gym has its own stock, so it is shown per gym and edited from that gym.
+  const isStockReadOnly = isAllGyms && editingProduct !== null
 
   useEffect(() => {
     let isMounted = true
@@ -107,6 +115,7 @@ function Inventory() {
       precio: String(product.price ?? ''),
       stock: String(product.stock ?? ''),
       imageUrl: product.imageUrl || '',
+      gymId: '',
     })
     setCustomCategory(isPresetCategory ? '' : category)
     setModalError(null)
@@ -149,8 +158,9 @@ function Inventory() {
         name: form.nombre.trim(),
         category: (form.categoria === customCategoryOption ? customCategory : form.categoria).trim(),
         price: Number(form.precio),
-        stock: Number(form.stock),
+        ...(isStockReadOnly ? {} : { stock: Number(form.stock) }),
         ...(imageUrl ? { imageUrl } : {}),
+        ...(editingProduct ? {} : targetGymField(isAllGyms, form.gymId)),
       }
       if (!payload.category) throw new Error('Selecciona o escribe una categoría.')
       if (imageUrl && !isValidImageValue(imageUrl)) {
@@ -200,6 +210,15 @@ function Inventory() {
   const filteredProducts = products.filter((product) =>
     `${product.name} ${product.category}`.toLocaleLowerCase().includes(searchTerm.trim().toLocaleLowerCase()),
   )
+
+  function stockLabel(product: Product) {
+    if (!isAllGyms || !product.stockByGym) return product.stock
+    const total = product.stockByGym.reduce((sum, item) => sum + item.quantity, 0)
+    const detail = product.stockByGym
+      .map((item) => `${organizationGyms.find((gym) => gym.id === String(item.gymId))?.name ?? 'Sucursal'}: ${item.quantity}`)
+      .join(' · ')
+    return <span title={detail}>{total} <span className="text-xs text-slate-400">({detail})</span></span>
+  }
 
   return (
     <section className="flex min-h-screen flex-col gap-6 bg-[#F8FAFC] px-8 py-10">
@@ -261,7 +280,7 @@ function Inventory() {
                         </td>
                         <td className="px-6 py-4 text-slate-500">{product.category || 'Sin categoría'}</td>
                         <td className="px-6 py-4 text-slate-700">${Number(product.price).toFixed(2)}</td>
-                        <td className="px-6 py-4 text-slate-500">{product.stock}</td>
+                        <td className="px-6 py-4 text-slate-500">{stockLabel(product)}</td>
                         <td className="px-6 py-4 text-right">
                           <div className="inline-flex items-center gap-3">
                             <button
@@ -384,21 +403,36 @@ function Inventory() {
                 />
               </div>
 
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="product-stock">
-                  Stock
-                </label>
-                <input
-                  className="w-full rounded-lg border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
-                  id="product-stock"
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={form.stock}
-                  onChange={(event) => setForm({ ...form, stock: event.target.value })}
-                  required
+              {!editingProduct && (
+                <GymSelect
+                  id="product-gym"
+                  label="Sucursal del stock inicial"
+                  value={form.gymId}
+                  onChange={(gymId) => setForm({ ...form, gymId })}
                 />
-              </div>
+              )}
+
+              {isStockReadOnly ? (
+                <p className="rounded-lg bg-slate-50 px-4 py-3 text-sm text-slate-500">
+                  El stock se edita por sucursal. Elige una sucursal en el menú lateral para cambiarlo.
+                </p>
+              ) : (
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="product-stock">
+                    Stock
+                  </label>
+                  <input
+                    className="w-full rounded-lg border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                    id="product-stock"
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={form.stock}
+                    onChange={(event) => setForm({ ...form, stock: event.target.value })}
+                    required
+                  />
+                </div>
+              )}
 
               <div>
                 {form.imageUrl && (

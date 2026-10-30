@@ -1,4 +1,4 @@
-export type UserRole = 'Admin' | 'Coach' | 'Cliente'
+export type UserRole = 'Admin' | 'Coach' | 'Recepcion' | 'Cliente'
 
 export interface User {
   id?: string
@@ -61,7 +61,9 @@ export interface Product {
   name: string
   category: string
   price: number | string
+  // Units in the selected gym (or the main one); stockByGym lists every gym the user sees.
   stock: number
+  stockByGym?: Array<{ gymId: string; quantity: number }>
   imageUrl?: string
 }
 

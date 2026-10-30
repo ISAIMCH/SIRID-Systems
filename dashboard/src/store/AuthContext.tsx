@@ -1,32 +1,101 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { AuthContext, type AuthContextValue } from './auth-context'
 import { disconnectSocket } from '../services/socket'
+import { clearStoredSession, getCurrentSession, type SessionResponse } from '../services/api'
+import { ALL_GYMS, getActiveGymId, storeActiveGymId } from '../services/activeGym'
+
+const SESSION_KEY = 'session'
+
+function readSession(): SessionResponse | null {
+  try {
+    const session = JSON.parse(localStorage.getItem(SESSION_KEY) ?? 'null') as SessionResponse | null
+    return session?.gyms ? session : null
+  } catch {
+    return null
+  }
+}
+
+// Only owners of several gyms get the "all gyms" view; SIRID staff always pick a gym.
+function canSeeAll(session: SessionResponse | null) {
+  return Boolean(session && !session.user.isPlatformAdmin && session.gyms.length > 1
+    && session.gyms.some((gym) => gym.roles.includes('Propietario')))
+}
+
+function resolveGymId(session: SessionResponse | null, gymId: string | null) {
+  if (!session) return null
+  if (gymId === ALL_GYMS && canSeeAll(session)) return ALL_GYMS
+  if (gymId && session.gyms.some((gym) => gym.id === gymId)) return gymId
+  return canSeeAll(session) ? ALL_GYMS : session.defaultGymId
+}
 
 function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState(() => localStorage.getItem('token'))
+  const [session, setSession] = useState(readSession)
+  // Stored right away so the first requests of the pages already carry the right gym.
+  const [activeGymId, setActiveGym] = useState(() => {
+    const gymId = resolveGymId(readSession(), getActiveGymId())
+    storeActiveGymId(gymId)
+    return gymId
+  })
 
-  const value = useMemo<AuthContextValue>(
-    () => ({
+  const saveSession = useCallback((nextSession: SessionResponse, preferredGymId: string | null) => {
+    const gymId = resolveGymId(nextSession, preferredGymId)
+    localStorage.setItem(SESSION_KEY, JSON.stringify(nextSession))
+    storeActiveGymId(gymId)
+    setSession(nextSession)
+    setActiveGym(gymId)
+  }, [])
+
+  const signOut = useCallback(() => {
+    disconnectSocket()
+    clearStoredSession()
+    setToken(null)
+    setSession(null)
+    setActiveGym(null)
+  }, [])
+
+  // Gyms and roles can change while a session is open, and older sessions have no gyms at all.
+  useEffect(() => {
+    if (!token) return
+    let isCurrent = true
+    getCurrentSession()
+      .then((nextSession) => {
+        if (!isCurrent) return
+        if (nextSession.user.role === 'Cliente') signOut()
+        else saveSession(nextSession, getActiveGymId())
+      })
+      .catch(() => undefined)
+    return () => {
+      isCurrent = false
+    }
+  }, [token, saveSession, signOut])
+
+  const value = useMemo<AuthContextValue>(() => {
+    const activeGym = session?.gyms.find((gym) => gym.id === activeGymId)
+    const organizationId = activeGym?.organization.id ?? session?.organization?.id
+    return {
       token,
       isAuthenticated: Boolean(token),
-      signIn: (nextToken, user) => {
+      session,
+      activeGymId,
+      isAllGyms: activeGymId === ALL_GYMS,
+      canSeeAllGyms: canSeeAll(session),
+      organizationGyms: session?.gyms.filter((gym) => gym.organization.id === organizationId) ?? [],
+      setActiveGymId: (gymId) => {
+        const nextGymId = resolveGymId(session, gymId)
+        storeActiveGymId(nextGymId)
+        setActiveGym(nextGymId)
+      },
+      signIn: (nextToken, nextSession) => {
         localStorage.setItem('token', nextToken)
-        if (user) {
-          localStorage.setItem('userName', user.nombre)
-          localStorage.setItem('userData', JSON.stringify(user))
-        }
+        localStorage.setItem('userName', nextSession.user.nombre ?? nextSession.user.name ?? '')
+        localStorage.setItem('userData', JSON.stringify(nextSession.user))
+        saveSession(nextSession, null)
         setToken(nextToken)
       },
-      signOut: () => {
-        disconnectSocket()
-        localStorage.removeItem('token')
-        localStorage.removeItem('userName')
-        localStorage.removeItem('userData')
-        setToken(null)
-      },
-    }),
-    [token],
-  )
+      signOut,
+    }
+  }, [token, session, activeGymId, saveSession, signOut])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

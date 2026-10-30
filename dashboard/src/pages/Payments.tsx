@@ -9,26 +9,27 @@ import {
   redeemPaymentPin,
   updatePayment,
 } from '../services/api'
-import type { Payment, PaymentPayload, PaymentRelation } from '../services/api'
-import { connectSocket, disconnectSocket } from '../services/socket'
+import type { Payment, PaymentPayload, PaymentRelation, PaymentStatus } from '../services/api'
+import { socket } from '../services/socket'
 import type { Plan, User } from '../types'
+import GymSelect from '../components/GymSelect'
+import { useAuth } from '../store/useAuth'
+import { targetGymField } from '../utils/targetGym'
 
 interface PaymentFormState {
   userId: string
   planId: string
   amount: string
-  source: string
-  createdAt: string
-  status: string
+  paymentDate: string
+  status: PaymentStatus
 }
 
 const emptyForm: PaymentFormState = {
   userId: '',
   planId: '',
   amount: '',
-  source: 'reception',
-  createdAt: new Date().toISOString().slice(0, 10),
-  status: 'Completed',
+  paymentDate: new Date().toISOString().slice(0, 10),
+  status: 'paid',
 }
 
 function extractArray<T>(value: unknown, keys: string[]): T[] {
@@ -84,8 +85,33 @@ function formatSource(source: string | undefined) {
   }
 }
 
+// Older records may still carry English/Spanish labels; the API only accepts these three.
+function toPaymentStatus(status: string | undefined): PaymentStatus {
+  switch (status?.toLowerCase()) {
+    case 'pending':
+    case 'pendiente':
+      return 'pending'
+    case 'cancelled':
+    case 'failed':
+    case 'fallido':
+      return 'cancelled'
+    default:
+      return 'paid'
+  }
+}
+
+function statusLabel(status: string) {
+  switch (status.toLowerCase()) {
+    case 'paid': return 'Pagado'
+    case 'pending': return 'Pendiente'
+    case 'cancelled': return 'Cancelado'
+    default: return status
+  }
+}
+
 function statusClasses(status: string) {
   switch (status.toLowerCase()) {
+    case 'paid':
     case 'completed':
     case 'completado':
     case 'completada':
@@ -93,6 +119,7 @@ function statusClasses(status: string) {
     case 'pending':
     case 'pendiente':
       return 'bg-yellow-100 text-yellow-800'
+    case 'cancelled':
     case 'failed':
     case 'fallido':
     case 'fallida':
@@ -103,6 +130,8 @@ function statusClasses(status: string) {
 }
 
 function Payments() {
+  const { isAllGyms } = useAuth()
+  const [gymId, setGymId] = useState('')
   const [payments, setPayments] = useState<Payment[]>([])
   const [users, setUsers] = useState<User[]>([])
   const [plans, setPlans] = useState<Plan[]>([])
@@ -157,18 +186,16 @@ function Payments() {
   }, [])
 
   useEffect(() => {
-    const realtimeSocket = connectSocket()
     const refreshFromEvent = () => {
       void refreshPayments().catch((requestError: unknown) => {
         setError(requestError instanceof Error ? requestError.message : 'No se pudieron actualizar los pagos.')
       })
     }
     const events = ['payment-created', 'payment-updated', 'payment-redeemed', 'payments-updated']
-    events.forEach((eventName) => realtimeSocket.on(eventName, refreshFromEvent))
+    events.forEach((eventName) => socket.on(eventName, refreshFromEvent))
 
     return () => {
-      events.forEach((eventName) => realtimeSocket.off(eventName, refreshFromEvent))
-      disconnectSocket()
+      events.forEach((eventName) => socket.off(eventName, refreshFromEvent))
     }
   }, [])
 
@@ -203,17 +230,17 @@ function Payments() {
 
       const payload: PaymentPayload = {
         userId: form.userId,
-        planName: selectedPlan.name || selectedPlan.nombre || '',
+        planId: form.planId,
         amount: Number(form.amount),
-        source: form.source,
-        createdAt: form.createdAt,
-        reference: reference.trim(),
+        source: 'reception',
+        paymentDate: form.paymentDate,
+        reference: reference.trim() || undefined,
         status: form.status,
       }
       if (isEditing && editingPaymentId) {
         await updatePayment(editingPaymentId, payload)
       } else {
-        await createPayment(payload)
+        await createPayment({ ...payload, ...targetGymField(isAllGyms, gymId) })
       }
 
       await refreshPayments()
@@ -267,18 +294,17 @@ function Payments() {
     const userId = getRelationId(paymentUser)
     const paymentPlanName = getPaymentPlanName(payment)
     const selectedPlan = plans.find((plan) => (
-      getRecordId(plan) === getRelationId(payment.plan)
+      getRecordId(plan) === getRelationId(payment.planId ?? payment.plan)
       || (plan.name || plan.nombre) === paymentPlanName
     ))
     const assignedPlan = users.find((user) => getRecordId(user) === userId)
 
     setForm({
       userId,
-      planId: selectedPlan ? getRecordId(selectedPlan) : getRelationId(payment.plan),
+      planId: selectedPlan ? getRecordId(selectedPlan) : getRelationId(payment.planId ?? payment.plan),
       amount: String(payment.amount ?? 0),
-      source: payment.source || 'reception',
-      createdAt: payment.createdAt ? payment.createdAt.slice(0, 10) : new Date().toISOString().slice(0, 10),
-      status: payment.status || 'Completed',
+      paymentDate: (payment.paymentDate || payment.createdAt || new Date().toISOString()).slice(0, 10),
+      status: toPaymentStatus(payment.status),
     })
     setReference(payment.reference || '')
     setIsEditing(true)
@@ -437,7 +463,7 @@ function Payments() {
                       <td className="whitespace-nowrap px-6 py-4 text-slate-500">{payment.reference || 'Sin referencia'}</td>
                       <td className="px-6 py-4">
                         <span className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${statusClasses(status)}`}>
-                          {status}
+                          {statusLabel(status)}
                         </span>
                       </td>
                       <td className="whitespace-nowrap px-6 py-4 text-right">
@@ -497,6 +523,7 @@ function Payments() {
             </div>
 
             <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
+              {!isEditing && <GymSelect id="payment-gym" label="Sucursal que cobra" value={gymId} onChange={setGymId} />}
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="payment-user">Usuario</label>
                 <select
@@ -554,14 +581,10 @@ function Payments() {
                   <select
                     className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
                     id="payment-source"
-                    value={form.source}
-                    onChange={(event) => setForm({ ...form, source: event.target.value })}
-                    required
+                    value="reception"
+                    disabled
                   >
                     <option value="reception">Recepción</option>
-                    <option value="cash">Efectivo</option>
-                    <option value="card">Tarjeta</option>
-                    <option value="transfer">Transferencia</option>
                   </select>
                 </div>
               </div>
@@ -586,8 +609,8 @@ function Payments() {
                     className="w-full rounded-lg border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
                     id="payment-created-at"
                     type="date"
-                    value={form.createdAt}
-                    onChange={(event) => setForm({ ...form, createdAt: event.target.value })}
+                    value={form.paymentDate}
+                    onChange={(event) => setForm({ ...form, paymentDate: event.target.value })}
                     required
                   />
                 </div>
@@ -597,12 +620,12 @@ function Payments() {
                     className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
                     id="payment-status"
                     value={form.status}
-                    onChange={(event) => setForm({ ...form, status: event.target.value })}
+                    onChange={(event) => setForm({ ...form, status: event.target.value as PaymentStatus })}
                     required
                   >
-                    <option value="Completed">Completado</option>
-                    <option value="Pending">Pendiente</option>
-                    <option value="Failed">Fallido</option>
+                    <option value="paid">Pagado</option>
+                    <option value="pending">Pendiente</option>
+                    <option value="cancelled">Cancelado</option>
                   </select>
                 </div>
               </div>

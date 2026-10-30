@@ -10,15 +10,28 @@ import {
   Users,
   Wrench,
 } from 'lucide-react'
+import { useEffect, type ComponentType } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../store/useAuth'
+import { ALL_GYMS } from '../services/activeGym'
+import { connectSocket, disconnectSocket } from '../services/socket'
+import { canAccessPage, useStaffRoles } from '../utils/access'
 
-const navigation = [
-  { label: 'Inicio', to: '/', icon: LayoutDashboard, end: true, section: undefined },
-  { label: 'Gimnasios', to: '/gyms', icon: Dumbbell, section: undefined },
-  { label: 'Equipo', to: '/equipment', icon: Wrench, section: undefined },
-  { label: 'Inventario', to: '/inventory', icon: Package, section: undefined },
-  { label: 'Usuarios', to: '/users', icon: Users, section: undefined },
+interface NavItem {
+  label: string
+  to: string
+  icon: ComponentType<{ size?: number; strokeWidth?: number }>
+  end?: boolean
+  section?: string
+  disabled?: boolean
+}
+
+const navigation: NavItem[] = [
+  { label: 'Inicio', to: '/', icon: LayoutDashboard, end: true },
+  { label: 'Gimnasios', to: '/gyms', icon: Dumbbell },
+  { label: 'Equipo', to: '/equipment', icon: Wrench },
+  { label: 'Inventario', to: '/inventory', icon: Package },
+  { label: 'Usuarios', to: '/users', icon: Users },
   { label: 'Ejercicios', to: '/exercises', icon: Dumbbell, section: 'Entrenamiento' },
   { label: 'Rutinas', to: '/routines', icon: ClipboardList, section: 'Entrenamiento' },
   { label: 'Promociones', to: '/promotions', icon: Megaphone, section: 'Comercial' },
@@ -28,7 +41,18 @@ const navigation = [
 ]
 
 function AdminLayout() {
-  const { signOut } = useAuth()
+  const { signOut, session, activeGymId, setActiveGymId, canSeeAllGyms } = useAuth()
+  const gyms = session?.gyms ?? []
+  const organizations = [...new Map(gyms.map((gym) => [gym.organization.id, gym.organization])).values()]
+
+  const roles = useStaffRoles()
+  const visibleNavigation = navigation.filter((item) => canAccessPage(roles, item.to))
+
+  // One connection for the whole session; its rooms cover every gym, so switching gyms keeps it.
+  useEffect(() => {
+    connectSocket()
+    return () => disconnectSocket()
+  }, [])
 
   return (
     <div className="min-h-screen bg-[#F8FAFC]">
@@ -40,10 +64,35 @@ function AdminLayout() {
           </p>
         </div>
 
+        {gyms.length > 0 && (
+          <div className="mt-6 px-3">
+            <label className="mb-2 block text-xs font-medium uppercase tracking-[0.2em] text-slate-500" htmlFor="active-gym">
+              Sucursal
+            </label>
+            <select
+              className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white outline-none transition focus:border-[#9BFF63] disabled:opacity-70"
+              id="active-gym"
+              value={activeGymId ?? ''}
+              onChange={(event) => setActiveGymId(event.target.value)}
+              disabled={gyms.length === 1}
+            >
+              {canSeeAllGyms && <option value={ALL_GYMS}>Todas las sucursales</option>}
+              {organizations.length > 1
+                ? organizations.map((organization) => (
+                  <optgroup key={organization.id} label={organization.name}>
+                    {gyms.filter((gym) => gym.organization.id === organization.id)
+                      .map((gym) => <option key={gym.id} value={gym.id}>{gym.name}</option>)}
+                  </optgroup>
+                ))
+                : gyms.map((gym) => <option key={gym.id} value={gym.id}>{gym.name}</option>)}
+            </select>
+          </div>
+        )}
+
         <nav className="mt-8 space-y-2" aria-label="Navegación principal">
-          {navigation.map(({ label, to, icon: Icon, end, section, disabled }, index) => (
+          {visibleNavigation.map(({ label, to, icon: Icon, end, section, disabled }, index) => (
             <div key={to}>
-              {section && navigation[index - 1]?.section !== section && (
+              {section && visibleNavigation[index - 1]?.section !== section && (
                 <p className="mb-2 mt-5 px-3 text-xs font-medium uppercase tracking-[0.2em] text-slate-500">
                   {section}
                 </p>
@@ -91,7 +140,8 @@ function AdminLayout() {
       </aside>
 
       <main className="ml-64 h-screen min-h-screen overflow-y-auto">
-        <Outlet />
+        {/* Pages remount when the gym changes, so they reload their data for it. */}
+        <Outlet key={activeGymId ?? 'sin-sucursal'} />
       </main>
     </div>
   )

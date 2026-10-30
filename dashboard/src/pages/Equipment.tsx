@@ -3,6 +3,9 @@ import { AlertTriangle, Image as ImageIcon, Pencil, Plus, Trash2 } from 'lucide-
 import { createEquipment, deleteEquipment, getEquipment, updateEquipment } from '../services/api'
 import type { EquipmentPayload } from '../services/api'
 import type { Equipment, EquipmentStatus } from '../types'
+import GymSelect from '../components/GymSelect'
+import { useAuth } from '../store/useAuth'
+import { targetGymField } from '../utils/targetGym'
 
 type EquipmentResponse = Equipment[] | { data?: unknown; equipment?: unknown }
 
@@ -71,7 +74,9 @@ function EquipmentSkeleton() {
   )
 }
 
-function Equipment() {
+function EquipmentPage() {
+  const { isAllGyms } = useAuth()
+  const [gymId, setGymId] = useState('')
   const [equipment, setEquipment] = useState<Equipment[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -178,7 +183,7 @@ function Equipment() {
         if (!equipmentId) throw new Error('El equipo no tiene un identificador válido.')
         await updateEquipment(equipmentId, payload)
       } else {
-        await createEquipment(payload)
+        await createEquipment({ ...payload, ...targetGymField(isAllGyms, gymId) })
       }
 
       setEquipment(await fetchEquipment())
@@ -400,6 +405,7 @@ function Equipment() {
             </div>
 
             <form className="mt-6 space-y-5" onSubmit={handleSubmit}>
+              {!editingEquipment && <GymSelect id="equipment-gym" value={gymId} onChange={setGymId} />}
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="equipment-name">
                   Nombre
@@ -572,4 +578,4 @@ function Equipment() {
   )
 }
 
-export default Equipment
+export default EquipmentPage
