@@ -15,8 +15,7 @@ import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../store/useAuth'
 import { ALL_GYMS } from '../services/activeGym'
 import { connectSocket, disconnectSocket } from '../services/socket'
-
-type NavRole = 'Admin' | 'Coach' | 'Recepcion'
+import { canAccessPage, useStaffRoles } from '../utils/access'
 
 interface NavItem {
   label: string
@@ -25,43 +24,29 @@ interface NavItem {
   end?: boolean
   section?: string
   disabled?: boolean
-  // Mirrors the API's authorize() for the page's main data; omitted means every staff role.
-  roles?: NavRole[]
 }
 
 const navigation: NavItem[] = [
   { label: 'Inicio', to: '/', icon: LayoutDashboard, end: true },
-  { label: 'Gimnasios', to: '/gyms', icon: Dumbbell, roles: ['Admin'] },
-  { label: 'Equipo', to: '/equipment', icon: Wrench, roles: ['Admin', 'Coach'] },
-  { label: 'Inventario', to: '/inventory', icon: Package, roles: ['Admin'] },
+  { label: 'Gimnasios', to: '/gyms', icon: Dumbbell },
+  { label: 'Equipo', to: '/equipment', icon: Wrench },
+  { label: 'Inventario', to: '/inventory', icon: Package },
   { label: 'Usuarios', to: '/users', icon: Users },
-  { label: 'Ejercicios', to: '/exercises', icon: Dumbbell, section: 'Entrenamiento', roles: ['Admin', 'Coach'] },
-  { label: 'Rutinas', to: '/routines', icon: ClipboardList, section: 'Entrenamiento', roles: ['Admin', 'Coach'] },
-  { label: 'Promociones', to: '/promotions', icon: Megaphone, section: 'Comercial', roles: ['Admin', 'Recepcion'] },
-  { label: 'Pagos', to: '/payments', icon: Receipt, section: 'Comercial', roles: ['Admin', 'Recepcion'] },
-  { label: 'Ventas', to: '/sales', icon: ShoppingCart, section: 'Comercial', roles: ['Admin', 'Recepcion'] },
-  { label: 'Suscripciones', to: '/subscriptions', icon: CreditCard, section: 'Comercial', roles: ['Admin', 'Recepcion'] },
+  { label: 'Ejercicios', to: '/exercises', icon: Dumbbell, section: 'Entrenamiento' },
+  { label: 'Rutinas', to: '/routines', icon: ClipboardList, section: 'Entrenamiento' },
+  { label: 'Promociones', to: '/promotions', icon: Megaphone, section: 'Comercial' },
+  { label: 'Pagos', to: '/payments', icon: Receipt, section: 'Comercial' },
+  { label: 'Ventas', to: '/sales', icon: ShoppingCart, section: 'Comercial' },
+  { label: 'Suscripciones', to: '/subscriptions', icon: CreditCard, section: 'Comercial' },
 ]
 
-// Same mapping as the API: Propietario and Gerente act as Admin.
-function toNavRole(role: string): NavRole | null {
-  if (role === 'Propietario' || role === 'Gerente' || role === 'Admin') return 'Admin'
-  if (role === 'Coach' || role === 'Recepcion') return role
-  return null
-}
-
 function AdminLayout() {
-  const { signOut, session, activeGymId, setActiveGymId, canSeeAllGyms, isAllGyms, organizationGyms } = useAuth()
+  const { signOut, session, activeGymId, setActiveGymId, canSeeAllGyms } = useAuth()
   const gyms = session?.gyms ?? []
   const organizations = [...new Map(gyms.map((gym) => [gym.organization.id, gym.organization])).values()]
 
-  // Roles in the active gym (every gym of the organization in the all-gyms view); sessions without gyms use the legacy role.
-  const visibleNavigation = (() => {
-    const scopeGyms = isAllGyms ? organizationGyms : gyms.filter((gym) => gym.id === activeGymId)
-    const roleNames = scopeGyms.length > 0 ? scopeGyms.flatMap((gym) => gym.roles) : [session?.user.role ?? '']
-    const roles = new Set(roleNames.map(toNavRole).filter((role) => role !== null))
-    return navigation.filter((item) => (item.roles ?? [...roles]).some((role) => roles.has(role)))
-  })()
+  const roles = useStaffRoles()
+  const visibleNavigation = navigation.filter((item) => canAccessPage(roles, item.to))
 
   // One connection for the whole session; its rooms cover every gym, so switching gyms keeps it.
   useEffect(() => {

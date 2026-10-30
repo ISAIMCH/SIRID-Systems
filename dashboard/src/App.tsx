@@ -14,6 +14,7 @@ import Subscriptions from './pages/Subscriptions'
 import Users from './pages/Users'
 import AuthProvider from './store/AuthContext'
 import { useAuth } from './store/useAuth'
+import { canAccessPage, useStaffRoles } from './utils/access'
 
 function ProtectedRoute() {
   const { isAuthenticated } = useAuth()
@@ -21,6 +22,22 @@ function ProtectedRoute() {
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />
+  }
+
+  return <Outlet />
+}
+
+// Typing the URL of a page the active gym's roles can't use sends the user to Inicio instead of hitting a 403.
+function RoleRoute() {
+  const { session } = useAuth()
+  const roles = useStaffRoles()
+  const location = useLocation()
+
+  // Sessions saved before gyms existed load as null until /auth/me answers; wait instead of redirecting.
+  if (!session) return null
+
+  if (!canAccessPage(roles, location.pathname)) {
+    return <Navigate to="/" replace />
   }
 
   return <Outlet />
@@ -35,16 +52,18 @@ function App() {
           <Route element={<ProtectedRoute />}>
             <Route element={<AdminLayout />}>
               <Route index element={<Overview />} />
-              <Route path="gyms" element={<Gyms />} />
-              <Route path="equipment" element={<Equipment />} />
-              <Route path="exercises" element={<Exercises />} />
-              <Route path="inventory" element={<Inventory />} />
-              <Route path="promotions" element={<Promotions />} />
-              <Route path="users" element={<Users />} />
-              <Route path="payments" element={<Payments />} />
-              <Route path="routines" element={<Routines />} />
-              <Route path="sales" element={<Sales />} />
-              <Route path="subscriptions" element={<Subscriptions />} />
+              <Route element={<RoleRoute />}>
+                <Route path="gyms" element={<Gyms />} />
+                <Route path="equipment" element={<Equipment />} />
+                <Route path="exercises" element={<Exercises />} />
+                <Route path="inventory" element={<Inventory />} />
+                <Route path="promotions" element={<Promotions />} />
+                <Route path="users" element={<Users />} />
+                <Route path="payments" element={<Payments />} />
+                <Route path="routines" element={<Routines />} />
+                <Route path="sales" element={<Sales />} />
+                <Route path="subscriptions" element={<Subscriptions />} />
+              </Route>
             </Route>
           </Route>
         </Routes>

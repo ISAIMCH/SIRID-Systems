@@ -3,6 +3,7 @@ import { Activity, CreditCard, ShoppingBag, TrendingUp, Users } from 'lucide-rea
 import { getPayments, getProducts, getSales, getUsers } from '../services/api'
 import type { Sale } from '../services/api'
 import type { Product } from '../types'
+import { canAccessPage, useStaffRoles } from '../utils/access'
 
 const LOW_STOCK_THRESHOLD = 5
 
@@ -43,6 +44,9 @@ const statCards = [
   { key: 'revenue', label: 'Ingresos', icon: TrendingUp, iconClass: 'text-emerald-600', format: (value: number | string) => Number(value).toLocaleString('es-MX', { style: 'currency', currency: 'MXN' }) },
   { key: 'systemStatus', label: 'Estado del Sistema', icon: Activity, iconClass: 'text-green-600', format: (value: number | string) => String(value) },
 ] as const
+
+// Revenue and subscriptions come from payments, which only Admin and Recepcion can read.
+const BILLING_STATS: readonly string[] = ['activeSubscriptions', 'revenue']
 
 function extractArray<T>(value: unknown, keys: string[]): T[] {
   if (Array.isArray(value)) return value as T[]
@@ -117,6 +121,8 @@ function StatsSkeleton() {
 }
 
 function Overview() {
+  const roles = useStaffRoles()
+  const canSeeBilling = canAccessPage(roles, '/payments')
   const [stats, setStats] = useState<OverviewStats | null>(null)
   const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -128,8 +134,8 @@ function Overview() {
     async function loadOverview() {
       const results = await Promise.allSettled([
         getUsers<unknown>(),
-        getPayments<unknown>(),
-        getSales<unknown>(),
+        canSeeBilling ? getPayments<unknown>() : undefined,
+        canSeeBilling ? getSales<unknown>() : undefined,
         getProducts<unknown>(),
       ])
 
@@ -191,7 +197,7 @@ function Overview() {
     return () => {
       isMounted = false
     }
-  }, [])
+  }, [canSeeBilling])
 
   return (
     <section className="min-h-screen bg-[#F8FAFC] px-8 py-10">
@@ -210,8 +216,8 @@ function Overview() {
           <StatsSkeleton />
         ) : (
           <>
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-              {statCards.map(({ key, label, icon: Icon, iconClass, format }) => (
+            <div className={`grid grid-cols-1 gap-6 sm:grid-cols-2 ${canSeeBilling ? 'lg:grid-cols-4' : ''}`}>
+              {statCards.filter(({ key }) => canSeeBilling || !BILLING_STATS.includes(key)).map(({ key, label, icon: Icon, iconClass, format }) => (
                 <article className="rounded-xl border border-slate-100 bg-white p-6 shadow-sm" key={key}>
                   <div className="flex items-center justify-between">
                     <p className="text-sm font-medium text-slate-500">{label}</p>
@@ -224,6 +230,7 @@ function Overview() {
               ))}
             </div>
 
+            {canSeeBilling ? (
             <article className="mt-6 rounded-xl border border-slate-100 bg-white p-6 shadow-sm">
               <div className="flex items-center gap-2">
                 <ShoppingBag className="text-slate-600" size={20} strokeWidth={1.8} />
@@ -249,6 +256,11 @@ function Overview() {
                 <p className="mt-3 text-sm text-slate-500">No hay actividad reciente para mostrar.</p>
               )}
             </article>
+            ) : (
+              <p className="mt-6 rounded-xl border border-slate-100 bg-white p-6 text-sm text-slate-500 shadow-sm">
+                Sin acceso a métricas de pagos y ventas.
+              </p>
+            )}
           </>
         )}
       </div>
