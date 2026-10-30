@@ -1,6 +1,6 @@
+import { lazy, Suspense } from 'react'
 import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom'
 import AdminLayout from './layouts/AdminLayout'
-import Gyms from './pages/Gyms'
 import Equipment from './pages/Equipment'
 import Exercises from './pages/Exercises'
 import Inventory from './pages/Inventory'
@@ -15,6 +15,10 @@ import Users from './pages/Users'
 import AuthProvider from './store/AuthContext'
 import { useAuth } from './store/useAuth'
 import { canAccessPage, useStaffRoles } from './utils/access'
+
+// The QR reader and generator only download when these pages open.
+const Access = lazy(() => import('./pages/Access'))
+const Gyms = lazy(() => import('./pages/Gyms'))
 
 function ProtectedRoute() {
   const { isAuthenticated } = useAuth()
@@ -40,7 +44,11 @@ function RoleRoute() {
     return <Navigate to="/" replace />
   }
 
-  return <Outlet />
+  return (
+    <Suspense fallback={null}>
+      <Outlet />
+    </Suspense>
+  )
 }
 
 function App() {
@@ -54,6 +62,7 @@ function App() {
               <Route index element={<Overview />} />
               <Route element={<RoleRoute />}>
                 <Route path="gyms" element={<Gyms />} />
+                <Route path="access" element={<Access />} />
                 <Route path="equipment" element={<Equipment />} />
                 <Route path="exercises" element={<Exercises />} />
                 <Route path="inventory" element={<Inventory />} />

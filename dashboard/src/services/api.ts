@@ -41,7 +41,9 @@ export interface LoginResponse extends SessionResponse {
   token: string
 }
 
+// The API sends { error }; msg and message are kept for older responses.
 interface ApiErrorPayload {
+  error?: string
   msg?: string
   message?: string
 }
@@ -67,10 +69,11 @@ export function clearStoredSession() {
 }
 
 // Requests carry the selected gym unless withGym is false.
+// A 401 ends the session unless sessionOn401 is 'keep', for endpoints whose 401 is about what was sent, not about the user.
 export async function apiClient<T>(
   endpoint: string,
   options: RequestInit = {},
-  { withGym = true }: { withGym?: boolean } = {},
+  { withGym = true, sessionOn401 = 'clear' }: { withGym?: boolean; sessionOn401?: 'clear' | 'keep' } = {},
 ): Promise<T> {
   const token = localStorage.getItem('token')
   const headers = new Headers(options.headers)
@@ -96,8 +99,8 @@ export async function apiClient<T>(
   const data = (await response.json().catch(() => ({}))) as T & ApiErrorPayload
 
   if (!response.ok) {
-    if (response.status === 401) clearStoredSession()
-    throw new ApiError(data.msg || data.message || 'No se pudo completar la solicitud.', data, response.status)
+    if (response.status === 401 && sessionOn401 === 'clear') clearStoredSession()
+    throw new ApiError(data.error || data.msg || data.message || 'No se pudo completar la solicitud.', data, response.status)
   }
 
   return data
@@ -595,4 +598,62 @@ export function getInventory<T = unknown[]>() {
 
 export function getStoreProducts<T = unknown[]>() {
   return apiClient<T>('/store/products')
+}
+export interface Gym {
+  id: string
+  name: string
+  address: string
+  timezone: string
+  joinCode: string | null
+}
+
+export interface AccessDevice {
+  id: string
+  name: string
+  gymId: string
+  keyPreview: string
+  lastSeenAt: string | null
+  revokedAt: string | null
+  createdAt: string
+}
+
+export interface AccessResult {
+  event: 'check-in' | 'check-out'
+  occurredAt: string
+  gymId: string
+  userId: string
+  userName: string
+}
+
+export function getGyms() {
+  return apiClient<{ gyms: Gym[] }>('/gyms')
+}
+
+export function regenerateJoinCode(gymId: string) {
+  return apiClient<{ gym: Gym }>(`/gyms/${gymId}/join-code`, { method: 'POST' })
+}
+
+export function getAccessDevices() {
+  return apiClient<{ devices: AccessDevice[] }>('/access-devices')
+}
+
+// The key comes back only once; the API stores its hash.
+export function createAccessDevice(data: { name: string; gymId?: string }) {
+  return apiClient<{ device: AccessDevice; key: string }>('/access-devices', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export function revokeAccessDevice(id: string) {
+  return apiClient<{ device: AccessDevice }>(`/access-devices/${id}`, { method: 'DELETE' })
+}
+
+// Staff scanning a client's QR; gymId is required in the all-gyms view.
+// The API answers 401 for an expired or invalid QR, which must not sign the receptionist out.
+export function registerQrAccess(data: { qrToken: string; gymId?: string }) {
+  return apiClient<{ accepted: boolean; access: AccessResult }>('/iot/access', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, { sessionOn401: 'keep' })
 }
