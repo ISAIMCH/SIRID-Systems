@@ -23,7 +23,7 @@ import type {
   RoutineTemplatePayload,
   Exercise as CuratedExercise,
 } from '../services/api'
-import { connectSocket, disconnectSocket } from '../services/socket'
+import { socket } from '../services/socket'
 import type { Equipment, User } from '../types'
 
 type ArrayResponse<T> = T[] | {
@@ -147,7 +147,7 @@ function assignedUserId(value: Routine['assignedTo']) {
 
 function relationName(value: Routine['assignedTo'], users: User[]) {
   if (typeof value === 'object' && value) {
-    const relation = value as RoutineRelation
+    const relation = value as { name?: string; firstName?: string; nombre?: string; lastName?: string; email?: string }
     const relatedUser = users.find((user) => recordId(user) === recordId(value))
     return relatedUser
       ? userLabel(relatedUser)
@@ -419,7 +419,6 @@ function Routines() {
   }, [])
 
   useEffect(() => {
-    const realtimeSocket = connectSocket()
     const refreshFromEvent = () => {
       void Promise.all([refreshTemplates(), refreshRoutines()]).catch((requestError: unknown) => {
         setError(requestError instanceof Error ? requestError.message : 'No se pudieron actualizar las rutinas.')
@@ -436,11 +435,10 @@ function Routines() {
       'routine-template-deleted',
       'routine-templates-updated',
     ]
-    events.forEach((eventName) => realtimeSocket.on(eventName, refreshFromEvent))
+    events.forEach((eventName) => socket.on(eventName, refreshFromEvent))
 
     return () => {
-      events.forEach((eventName) => realtimeSocket.off(eventName, refreshFromEvent))
-      disconnectSocket()
+      events.forEach((eventName) => socket.off(eventName, refreshFromEvent))
     }
   }, [])
 

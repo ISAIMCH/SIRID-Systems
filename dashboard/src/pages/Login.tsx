@@ -19,7 +19,11 @@ function Login() {
 
     try {
       const response = await login({ email, password })
-      signIn(response.token, response.user)
+      if (response.user.role === 'Cliente') {
+        setError('Las cuentas de cliente usan la app móvil de GymGo.')
+        return
+      }
+      signIn(response.token, response)
       const from = (location.state as { from?: string } | null)?.from || '/'
       navigate(from, { replace: true })
     } catch (requestError) {

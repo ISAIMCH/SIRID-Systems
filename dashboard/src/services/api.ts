@@ -1,4 +1,5 @@
 import type { Equipment, User, UserRole } from '../types'
+import { ALL_GYMS, getActiveGymId } from './activeGym'
 
 export const API_BASE_URL = import.meta.env.VITE_GYMGO_API_URL
 
@@ -14,20 +15,30 @@ export interface LoginCredentials {
 export interface AuthUser {
   id: string
   email: string
-  nombre: string
+  name?: string
+  nombre?: string
   apellidos?: string
+  role?: UserRole
+  isPlatformAdmin?: boolean
 }
 
-export interface LoginResponse {
-  token: string
+export interface SessionGym {
+  id: string
+  name: string
+  organization: { id: string; name: string }
+  roles: string[]
+}
+
+// Every gym the user works in, plus the one the API uses when no gym is selected.
+export interface SessionResponse {
   user: AuthUser
+  organization: { id: string; name: string } | null
+  gyms: SessionGym[]
+  defaultGymId: string | null
 }
 
-export interface DashboardStats {
-  totalUsers: number
-  activePlans: number
-  revenue: number
-  systemStatus: string
+export interface LoginResponse extends SessionResponse {
+  token: string
 }
 
 interface ApiErrorPayload {
@@ -37,20 +48,36 @@ interface ApiErrorPayload {
 
 export class ApiError extends Error {
   response: { data: unknown }
+  status: number
 
-  constructor(message: string, data: unknown) {
+  constructor(message: string, data: unknown, status: number) {
     super(message)
     this.name = 'ApiError'
     this.response = { data }
+    this.status = status
   }
 }
 
+export function clearStoredSession() {
+  localStorage.removeItem('token')
+  localStorage.removeItem('userName')
+  localStorage.removeItem('userData')
+  localStorage.removeItem('session')
+  localStorage.removeItem('activeGymId')
+}
+
+// Requests carry the selected gym unless withGym is false.
 export async function apiClient<T>(
   endpoint: string,
   options: RequestInit = {},
+  { withGym = true }: { withGym?: boolean } = {},
 ): Promise<T> {
   const token = localStorage.getItem('token')
   const headers = new Headers(options.headers)
+  const activeGymId = getActiveGymId()
+  if (withGym && activeGymId && activeGymId !== ALL_GYMS) {
+    headers.set('X-Gym-Id', activeGymId)
+  }
 
   const isFormDataBody = typeof FormData !== 'undefined' && options.body instanceof FormData
   if (isFormDataBody) {
@@ -69,12 +96,8 @@ export async function apiClient<T>(
   const data = (await response.json().catch(() => ({}))) as T & ApiErrorPayload
 
   if (!response.ok) {
-    if (response.status === 401) {
-      localStorage.removeItem('token')
-      localStorage.removeItem('userName')
-      localStorage.removeItem('userData')
-    }
-    throw new ApiError(data.msg || data.message || 'No se pudo completar la solicitud.', data)
+    if (response.status === 401) clearStoredSession()
+    throw new ApiError(data.msg || data.message || 'No se pudo completar la solicitud.', data, response.status)
   }
 
   return data
@@ -84,7 +107,11 @@ export function login(credentials: LoginCredentials) {
   return apiClient<LoginResponse>('/auth/login', {
     method: 'POST',
     body: JSON.stringify(credentials),
-  })
+  }, { withGym: false })
+}
+
+export function getCurrentSession() {
+  return apiClient<SessionResponse>('/auth/me', {}, { withGym: false })
 }
 
 export async function getUsers<T = AuthUser[]>(params?: { role?: string }) {
@@ -114,6 +141,7 @@ export interface UserPayload {
   assignedCoach?: string
   planId?: string
   observations?: string
+  gymId?: string
 }
 
 function userPayloadBody(userData: UserPayload): BodyInit {
@@ -316,8 +344,10 @@ export interface Payment {
   userId?: PaymentRelation | string
   planName?: string
   plan?: PaymentRelation | string
+  planId?: PaymentRelation | string
   amount: number | string
   source?: string
+  paymentDate?: string
   createdAt?: string
   reference?: string
   status: string
@@ -367,6 +397,7 @@ export interface SalePayload {
   items: Array<{ productId: string; quantity: number }>
   status: string
   promotionId?: string
+  gymId?: string
 }
 
 export function getSales<T = unknown[]>() {
@@ -410,14 +441,17 @@ export function deletePayment(id: string) {
   })
 }
 
+export type PaymentStatus = 'paid' | 'pending' | 'cancelled'
+
 export interface PaymentPayload {
   userId: string
-  planName: string
+  planId: string
   amount: number
-  source: string
-  createdAt: string
-  reference: string
-  status: string
+  source: 'reception'
+  paymentDate: string
+  reference?: string
+  status: PaymentStatus
+  gymId?: string
 }
 
 export function getProducts<T = unknown[]>() {
@@ -453,6 +487,7 @@ export interface EquipmentPayload {
   totalQuantity: number
   maintenanceQuantity: number
   status: 'available' | 'maintenance' | 'unavailable'
+  gymId?: string
 }
 
 export function getEquipment<T = Equipment[]>() {
@@ -552,47 +587,6 @@ export function deletePromotion(id: string) {
   return apiClient(`/promotions/${id}`, {
     method: 'DELETE',
   })
-}
-
-function extractArray(value: unknown, keys: string[]) {
-  if (Array.isArray(value)) return value
-  if (!value || typeof value !== 'object') return []
-
-  const record = value as Record<string, unknown>
-  const keyedArray = keys.map((key) => record[key]).find((item) => Array.isArray(item))
-  if (Array.isArray(keyedArray)) return keyedArray
-
-  return Object.values(record).find((item) => Array.isArray(item)) || []
-}
-
-export async function getDashboardStats(): Promise<DashboardStats> {
-  try {
-    const stats = await apiClient<Partial<DashboardStats>>('/analytics/dashboard')
-    return {
-      totalUsers: Number(stats.totalUsers) || 0,
-      activePlans: Number(stats.activePlans) || 0,
-      revenue: Number(stats.revenue) || 0,
-      systemStatus: stats.systemStatus || 'En línea',
-    }
-  } catch {
-    const [usersResponse, plansResponse] = await Promise.all([
-      getUsers<unknown>(),
-      getPlans<unknown>(),
-    ])
-    const users = extractArray(usersResponse, ['data', 'users'])
-    const plans = extractArray(plansResponse, ['data', 'plans', 'planes'])
-    const activePlans = plans.filter((plan) => {
-      if (!plan || typeof plan !== 'object') return false
-      return (plan as Record<string, unknown>).isActive !== false
-    }).length
-
-    return {
-      totalUsers: users.length,
-      activePlans,
-      revenue: 0,
-      systemStatus: 'En línea',
-    }
-  }
 }
 
 export function getInventory<T = unknown[]>() {

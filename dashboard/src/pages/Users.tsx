@@ -2,7 +2,11 @@ import { useEffect, useState } from 'react'
 import { Pencil, Trash2 } from 'lucide-react'
 import { API_BASE_URL, createUser, getPlans, getUsers, updateUser } from '../services/api'
 import type { UserPayload } from '../services/api'
-import type { Plan, User, UserReference } from '../types'
+import type { Plan, User, UserReference, UserRole } from '../types'
+import GymSelect from '../components/GymSelect'
+import { ALL_GYMS, getActiveGymId } from '../services/activeGym'
+import { useAuth } from '../store/useAuth'
+import { targetGymField } from '../utils/targetGym'
 
 type UsersResponse = User[] | { data?: unknown; users?: unknown }
 type PlansResponse = Plan[] | { data?: unknown; plans?: unknown; planes?: unknown }
@@ -22,7 +26,7 @@ interface UserFormState {
   lastName: string
   email: string
   password: string
-  role: 'Admin' | 'Coach' | 'Cliente'
+  role: UserRole
   phone: string
   address: string
   documents: string[]
@@ -97,9 +101,11 @@ async function openPrivateDocument(documentPath: string) {
   }
 
   try {
+    const activeGymId = getActiveGymId()
     const response = await fetch(`${API_BASE_URL}${documentPath}`, {
       headers: {
         Authorization: `Bearer ${token}`,
+        ...(activeGymId && activeGymId !== ALL_GYMS ? { 'X-Gym-Id': activeGymId } : {}),
       },
     })
 
@@ -129,6 +135,8 @@ function userDisplayName(user: User) {
 }
 
 function Users() {
+  const { isAllGyms } = useAuth()
+  const [gymId, setGymId] = useState('')
   const [users, setUsers] = useState<User[]>([])
   const [plans, setPlans] = useState<Plan[]>([])
   const [coaches, setCoaches] = useState<User[]>([])
@@ -272,14 +280,14 @@ function Users() {
           documents: form.documents,
           isActive: form.isActive,
         }),
-        ...(form.role !== 'Cliente' && form.pdfFiles.length > 0 && {
+        ...(form.role !== 'Cliente' && form.pdfFiles?.length && {
           pdfFiles: form.pdfFiles,
         }),
         ...(editingUser && form.password.trim() && { password: form.password }),
       }
 
       if (!editingUser) {
-        await createUser({ ...payload, password: form.password })
+        await createUser({ ...payload, password: form.password, ...targetGymField(isAllGyms, gymId) })
       } else {
         const userId = editingUser._id || editingUser.id
         if (!userId) throw new Error('El usuario no tiene un identificador válido.')
@@ -322,7 +330,7 @@ function Users() {
             groupUsers.map((user, index) => {
               const userId = user?.id || user?._id || user?.email || `user-${index}`
               const role = user?.role || 'Cliente'
-              const isStaff = role === 'Admin' || role === 'Coach'
+              const isStaff = role !== 'Cliente'
               const isActive = user?.isActive === true
 
               return (
@@ -539,8 +547,19 @@ function Users() {
                   <option value="Cliente">Cliente</option>
                   <option value="Admin">Admin</option>
                   <option value="Coach">Coach</option>
+                  {/* Reception is assigned per gym; it is shown when editing but not offered for new users yet. */}
+                  {form.role === 'Recepcion' && <option value="Recepcion">Recepción</option>}
                 </select>
               </div>
+
+              {!editingUser && (
+                <GymSelect
+                  id="user-gym"
+                  label={form.role === 'Cliente' ? 'Sucursal base' : 'Sucursal donde trabaja'}
+                  value={gymId}
+                  onChange={setGymId}
+                />
+              )}
 
               {form.role === 'Cliente' && (
                 <section className="space-y-5 rounded-xl border border-slate-200 bg-slate-50 p-5">

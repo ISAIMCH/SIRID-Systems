@@ -148,7 +148,10 @@ function Overview() {
       const sales = extractArray<Sale>(getResult(2, 'ventas'), ['data', 'sales', 'ventas'])
       const products = extractArray<Product>(getResult(3, 'productos'), ['data', 'products', 'productos'])
       const paidPayments = payments.filter((payment) => isSuccessfulPayment(payment.status))
-      const lowStockCount = products.filter((product) => numericValue(product.stock) <= LOW_STOCK_THRESHOLD).length
+      // A product counts as low when any visible gym is running out of it.
+      const lowStockCount = products.filter((product) => (product.stockByGym?.length
+        ? product.stockByGym.some((item) => item.quantity <= LOW_STOCK_THRESHOLD)
+        : numericValue(product.stock) <= LOW_STOCK_THRESHOLD)).length
 
       setStats({
         totalUsers: users.length,

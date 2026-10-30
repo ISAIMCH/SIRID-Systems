@@ -2,8 +2,11 @@ import { useEffect, useState } from 'react'
 import { Minus, Plus, Trash2 } from 'lucide-react'
 import { createSale, getProducts, getPromotions, getSales, getUsers, redeemSalePin } from '../services/api'
 import type { Sale, SaleItem, SalePayload } from '../services/api'
-import { connectSocket, disconnectSocket } from '../services/socket'
+import { socket } from '../services/socket'
 import type { Product, Promotion, User } from '../types'
+import GymSelect from '../components/GymSelect'
+import { useAuth } from '../store/useAuth'
+import { targetGymField } from '../utils/targetGym'
 
 type SaleResponse = Sale[] | { data?: unknown; sales?: unknown; ventas?: unknown }
 type UserResponse = User[] | { data?: unknown; users?: unknown }
@@ -75,6 +78,8 @@ function productName(item: SaleItem, products: Product[]) {
 }
 
 function Sales() {
+  const { isAllGyms } = useAuth()
+  const [gymId, setGymId] = useState('')
   const [sales, setSales] = useState<Sale[]>([])
   const [users, setUsers] = useState<User[]>([])
   const [products, setProducts] = useState<Product[]>([])
@@ -120,18 +125,16 @@ function Sales() {
   }, [])
 
   useEffect(() => {
-    const realtimeSocket = connectSocket()
     const refreshFromEvent = () => {
       void refreshSales().catch((requestError: unknown) => {
         setError(requestError instanceof Error ? requestError.message : 'No se pudieron actualizar las ventas.')
       })
     }
     const events = ['sale-created', 'sale-updated', 'sale-deleted', 'sales-updated']
-    events.forEach((eventName) => realtimeSocket.on(eventName, refreshFromEvent))
+    events.forEach((eventName) => socket.on(eventName, refreshFromEvent))
 
     return () => {
-      events.forEach((eventName) => realtimeSocket.off(eventName, refreshFromEvent))
-      disconnectSocket()
+      events.forEach((eventName) => socket.off(eventName, refreshFromEvent))
     }
   }, [])
 
@@ -157,6 +160,12 @@ function Sales() {
     setForm((current) => ({ ...current, items: current.items.map((item) => item.productId === productId ? { ...item, quantity: Math.max(1, item.quantity + amount) } : item) }))
   }
 
+  // In the all-gyms view stock is shown for the gym chosen for the sale.
+  function availableStock(product: Product) {
+    if (!isAllGyms) return product.stock
+    return product.stockByGym?.find((item) => String(item.gymId) === gymId)?.quantity ?? 0
+  }
+
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault(); setModalError(null); setIsSubmitting(true)
     try {
@@ -167,6 +176,7 @@ function Sales() {
         items: form.items,
         status: form.status,
         promotionId: form.promotionId || undefined,
+        ...targetGymField(isAllGyms, gymId),
       }
       await createSale(payload)
       await refreshSales(); setError(null); closeModal()
@@ -246,8 +256,8 @@ function Sales() {
       </div>
 
       {isModalOpen && <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-900/50 px-4 py-8 backdrop-blur-sm"><div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl"><div className="flex items-start justify-between gap-4"><div><p className="text-sm font-medium uppercase tracking-[0.2em] text-emerald-700">Comercial</p><h2 className="mt-2 text-2xl font-semibold text-slate-900">Venta directa</h2></div><button className="text-2xl leading-none text-slate-400 transition hover:text-slate-700" type="button" aria-label="Cerrar modal" onClick={closeModal}>×</button></div>
-        <form className="mt-6 space-y-4" onSubmit={handleSubmit}><div><label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="sale-user">Usuario</label><select className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100" id="sale-user" value={form.userId} onChange={(event) => setForm({ ...form, userId: event.target.value })} required><option value="">Selecciona un usuario</option>{users.map((user, index) => <option key={recordId(user) || `user-${index}`} value={recordId(user)}>{user.name || user.firstName || user.email}</option>)}</select></div>
-          <div><label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="sale-product">Productos</label><div className="flex gap-2"><select className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-3 text-slate-900" id="sale-product" value={productToAdd} onChange={(event) => setProductToAdd(event.target.value)}><option value="">Selecciona un producto</option>{products.map((product, index) => <option key={recordId(product) || `product-${index}`} value={recordId(product)}>{product.name} ({product.stock} disponibles)</option>)}</select><input className="w-20 rounded-lg border border-slate-200 px-3 py-3" type="number" min="1" aria-label="Cantidad" value={quantityToAdd} onChange={(event) => setQuantityToAdd(event.target.value)} /><button className="rounded-lg border border-slate-200 px-3 text-slate-600 hover:bg-slate-50" type="button" aria-label="Agregar producto" onClick={addProduct}><Plus size={18} /></button></div><div className="mt-3 space-y-2">{form.items.map((item) => <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm" key={item.productId}><span>{products.find((product) => recordId(product) === item.productId)?.name || item.productId}</span><span className="inline-flex items-center gap-2"><button className="rounded border border-slate-200 p-1" type="button" aria-label="Reducir cantidad" onClick={() => changeQuantity(item.productId, -1)}><Minus size={14} /></button>{item.quantity}<button className="rounded border border-slate-200 p-1" type="button" aria-label="Aumentar cantidad" onClick={() => changeQuantity(item.productId, 1)}><Plus size={14} /></button><button className="ml-1 text-slate-400 hover:text-red-600" type="button" aria-label="Quitar producto" onClick={() => setForm({ ...form, items: form.items.filter((selected) => selected.productId !== item.productId) })}><Trash2 size={15} /></button></span></div>)}</div></div>
+        <form className="mt-6 space-y-4" onSubmit={handleSubmit}><GymSelect id="sale-gym" label="Sucursal de la venta" value={gymId} onChange={setGymId} /><div><label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="sale-user">Usuario</label><select className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100" id="sale-user" value={form.userId} onChange={(event) => setForm({ ...form, userId: event.target.value })} required><option value="">Selecciona un usuario</option>{users.map((user, index) => <option key={recordId(user) || `user-${index}`} value={recordId(user)}>{user.name || user.firstName || user.email}</option>)}</select></div>
+          <div><label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="sale-product">Productos</label><div className="flex gap-2"><select className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-3 text-slate-900" id="sale-product" value={productToAdd} onChange={(event) => setProductToAdd(event.target.value)}><option value="">Selecciona un producto</option>{products.map((product, index) => <option key={recordId(product) || `product-${index}`} value={recordId(product)}>{product.name} ({availableStock(product)} disponibles)</option>)}</select><input className="w-20 rounded-lg border border-slate-200 px-3 py-3" type="number" min="1" aria-label="Cantidad" value={quantityToAdd} onChange={(event) => setQuantityToAdd(event.target.value)} /><button className="rounded-lg border border-slate-200 px-3 text-slate-600 hover:bg-slate-50" type="button" aria-label="Agregar producto" onClick={addProduct}><Plus size={18} /></button></div><div className="mt-3 space-y-2">{form.items.map((item) => <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm" key={item.productId}><span>{products.find((product) => recordId(product) === item.productId)?.name || item.productId}</span><span className="inline-flex items-center gap-2"><button className="rounded border border-slate-200 p-1" type="button" aria-label="Reducir cantidad" onClick={() => changeQuantity(item.productId, -1)}><Minus size={14} /></button>{item.quantity}<button className="rounded border border-slate-200 p-1" type="button" aria-label="Aumentar cantidad" onClick={() => changeQuantity(item.productId, 1)}><Plus size={14} /></button><button className="ml-1 text-slate-400 hover:text-red-600" type="button" aria-label="Quitar producto" onClick={() => setForm({ ...form, items: form.items.filter((selected) => selected.productId !== item.productId) })}><Trash2 size={15} /></button></span></div>)}</div></div>
           <div><label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="sale-promotion">Aplicar Promoción (Opcional)</label><select className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900" id="sale-promotion" value={form.promotionId} onChange={(event) => setForm({ ...form, promotionId: event.target.value })}><option value="">Sin promoción</option>{availablePromotions.map((promotion, index) => { const promotionId = recordId(promotion); return <option key={promotionId || `promotion-${index}`} value={promotionId}>{promotion.title} - {promotion.discountPercentage}% OFF</option> })}</select></div>
           <div className="grid gap-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_auto]">
             <div className="space-y-3">
