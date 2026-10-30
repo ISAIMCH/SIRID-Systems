@@ -7,6 +7,7 @@ import GymSelect from '../components/GymSelect'
 import { ALL_GYMS, getActiveGymId } from '../services/activeGym'
 import { useAuth } from '../store/useAuth'
 import { targetGymField } from '../utils/targetGym'
+import { canAccessPage, useStaffRoles } from '../utils/access'
 
 type UsersResponse = User[] | { data?: unknown; users?: unknown }
 type PlansResponse = Plan[] | { data?: unknown; plans?: unknown; planes?: unknown }
@@ -136,6 +137,11 @@ function userDisplayName(user: User) {
 
 function Users() {
   const { isAllGyms } = useAuth()
+  const roles = useStaffRoles()
+  // The API only lists staff and allows creating or editing users to Admin; Coach and Recepcion see clients read-only.
+  // Plans follow the Suscripciones page.
+  const isAdmin = roles.has('Admin')
+  const canSeePlans = canAccessPage(roles, '/subscriptions')
   const [gymId, setGymId] = useState('')
   const [users, setUsers] = useState<User[]>([])
   const [plans, setPlans] = useState<Plan[]>([])
@@ -154,7 +160,7 @@ function Users() {
     let isMounted = true
 
     async function loadFormData() {
-      const [usersResult, plansResult] = await Promise.allSettled([fetchUsers(), fetchPlans()])
+      const [usersResult, plansResult] = await Promise.allSettled([fetchUsers(), canSeePlans ? fetchPlans() : []])
       if (!isMounted) return
 
       const errors: string[] = []
@@ -177,9 +183,10 @@ function Users() {
     return () => {
       isMounted = false
     }
-  }, [])
+  }, [canSeePlans])
 
   useEffect(() => {
+    if (!isAdmin) return
     const fetchCoaches = async () => {
       try {
         const response = await getUsers({ role: 'Coach' }) as any
@@ -196,7 +203,7 @@ function Users() {
     }
 
     fetchCoaches()
-  }, [])
+  }, [isAdmin])
 
   function openModal() {
     setEditingUser(null)
@@ -360,15 +367,17 @@ function Users() {
                     </span>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <button
-                      className="cursor-pointer text-slate-400 transition hover:text-green-600"
-                      type="button"
-                      aria-label={`Editar ${user?.name || 'usuario'}`}
-                      title="Editar"
-                      onClick={() => openEditModal(user)}
-                    >
-                      <Pencil className="h-4 w-4" aria-hidden="true" />
-                    </button>
+                    {isAdmin && (
+                      <button
+                        className="cursor-pointer text-slate-400 transition hover:text-green-600"
+                        type="button"
+                        aria-label={`Editar ${user?.name || 'usuario'}`}
+                        title="Editar"
+                        onClick={() => openEditModal(user)}
+                      >
+                        <Pencil className="h-4 w-4" aria-hidden="true" />
+                      </button>
+                    )}
                   </td>
                 </tr>
               )
@@ -393,13 +402,15 @@ function Users() {
           <h1 className="text-4xl font-semibold tracking-tight text-slate-900">Usuarios</h1>
           <p className="mt-3 text-slate-500">Consulta y gestiona los usuarios de la plataforma.</p>
         </div>
-        <button
-          className="rounded-lg bg-[#9BFF63] px-4 py-2 font-medium text-[#0F172A] transition hover:bg-[#abff7c]"
-          type="button"
-          onClick={openModal}
-        >
-          + Nuevo Usuario
-        </button>
+        {isAdmin && (
+          <button
+            className="rounded-lg bg-[#9BFF63] px-4 py-2 font-medium text-[#0F172A] transition hover:bg-[#abff7c]"
+            type="button"
+            onClick={openModal}
+          >
+            + Nuevo Usuario
+          </button>
+        )}
       </div>
 
       <div className="mt-8 overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
@@ -432,19 +443,21 @@ function Users() {
               >
                 Clientes {clients.length}
               </button>
-              <button
-                className={`px-4 py-2 ${activeTab === 'staff' ? 'border-b-2 border-green-500 font-semibold text-green-700' : 'text-gray-500'}`}
-                type="button"
-                onClick={() => setActiveTab('staff')}
-              >
-                Staff {staff.length}
-              </button>
+              {isAdmin && (
+                <button
+                  className={`px-4 py-2 ${activeTab === 'staff' ? 'border-b-2 border-green-500 font-semibold text-green-700' : 'text-gray-500'}`}
+                  type="button"
+                  onClick={() => setActiveTab('staff')}
+                >
+                  Staff {staff.length}
+                </button>
+              )}
             </div>
 
             <div className="overflow-x-auto">
               {renderUsersTable(
-                activeTab === 'clientes' ? clients : staff,
-                activeTab === 'clientes'
+                activeTab === 'clientes' || !isAdmin ? clients : staff,
+                activeTab === 'clientes' || !isAdmin
                   ? searchTerm ? 'No hay clientes que coincidan con la búsqueda.' : 'No hay clientes encontrados.'
                   : searchTerm ? 'No hay miembros del staff que coincidan con la búsqueda.' : 'No hay miembros del staff encontrados.',
               )}
