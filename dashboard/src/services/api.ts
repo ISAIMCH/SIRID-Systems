@@ -67,10 +67,11 @@ export function clearStoredSession() {
 }
 
 // Requests carry the selected gym unless withGym is false.
+// A 401 ends the session unless sessionOn401 is 'keep', for endpoints whose 401 is about what was sent, not about the user.
 export async function apiClient<T>(
   endpoint: string,
   options: RequestInit = {},
-  { withGym = true }: { withGym?: boolean } = {},
+  { withGym = true, sessionOn401 = 'clear' }: { withGym?: boolean; sessionOn401?: 'clear' | 'keep' } = {},
 ): Promise<T> {
   const token = localStorage.getItem('token')
   const headers = new Headers(options.headers)
@@ -96,7 +97,7 @@ export async function apiClient<T>(
   const data = (await response.json().catch(() => ({}))) as T & ApiErrorPayload
 
   if (!response.ok) {
-    if (response.status === 401) clearStoredSession()
+    if (response.status === 401 && sessionOn401 === 'clear') clearStoredSession()
     throw new ApiError(data.msg || data.message || 'No se pudo completar la solicitud.', data, response.status)
   }
 
@@ -647,9 +648,10 @@ export function revokeAccessDevice(id: string) {
 }
 
 // Staff scanning a client's QR; gymId is required in the all-gyms view.
+// The API answers 401 for an expired or invalid QR, which must not sign the receptionist out.
 export function registerQrAccess(data: { qrToken: string; gymId?: string }) {
   return apiClient<{ accepted: boolean; access: AccessResult }>('/iot/access', {
     method: 'POST',
     body: JSON.stringify(data),
-  })
+  }, { sessionOn401: 'keep' })
 }
