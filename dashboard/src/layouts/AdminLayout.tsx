@@ -52,13 +52,17 @@ const navigation: NavItem[] = [
 const APPLICATION_STATUS = { pending: 'está en revisión', rejected: 'fue rechazada', suspended: 'está suspendida', active: 'está activa' } as const
 
 function AdminLayout() {
-  const { signOut, session, activeGymId, setActiveGymId, canSeeAllGyms } = useAuth()
+  const { signOut, session, activeGymId, setActiveGymId, canSeeAllGyms, isPlatformMode } = useAuth()
   const gyms = session?.gyms ?? []
   const organizations = [...new Map(gyms.map((gym) => [gym.organization.id, gym.organization])).values()]
 
   const roles = useStaffRoles()
   const isPlatformAdmin = Boolean(session?.user.isPlatformAdmin)
-  const visibleNavigation = navigation.filter((item) => (item.platformOnly ? isPlatformAdmin : canAccessPage(roles, item.to)))
+  // In the SIRID panel the gym modules are hidden until a gym is picked in the selector.
+  const visibleNavigation = navigation.filter((item) => {
+    if (item.platformOnly) return isPlatformAdmin
+    return !isPlatformMode && canAccessPage(roles, item.to)
+  })
   // Staff of another gym who also applied to open their own see how the request is going.
   const applications = session?.organizationApplications ?? []
   // On phones the sidebar slides in over the page, so reception can use the access scanner there.
@@ -93,8 +97,9 @@ function AdminLayout() {
               id="active-gym"
               value={activeGymId ?? ''}
               onChange={(event) => setActiveGymId(event.target.value)}
-              disabled={gyms.length === 1}
+              disabled={gyms.length === 1 && !isPlatformAdmin}
             >
+              {isPlatformAdmin && <option value="">Panel SIRID</option>}
               {canSeeAllGyms && <option value={ALL_GYMS}>Todas las sucursales</option>}
               {organizations.length > 1
                 ? organizations.map((organization) => (

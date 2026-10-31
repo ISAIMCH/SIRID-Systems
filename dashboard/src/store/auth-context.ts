@@ -8,6 +8,8 @@ export interface AuthContextValue {
   // A gym id, or ALL_GYMS when an owner sees every gym.
   activeGymId: string | null
   isAllGyms: boolean
+  // SIRID staff in their panel, not working in any gym: only the platform pages apply.
+  isPlatformMode: boolean
   canSeeAllGyms: boolean
   // Gyms of the organization being worked in; forms pick from these in the all-gyms view.
   organizationGyms: SessionGym[]
