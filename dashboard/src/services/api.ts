@@ -657,3 +657,83 @@ export function registerQrAccess(data: { qrToken: string; gymId?: string }) {
     body: JSON.stringify(data),
   }, { sessionOn401: 'keep' })
 }
+
+export type DocumentKind = 'staff' | 'client'
+export type DocumentStatus = 'pending' | 'verified' | 'rejected'
+export type DocumentCategory = 'cv' | 'identification' | 'fiscal' | 'certification' | 'availability' | 'evaluation' | 'student_id' | 'other'
+export type DocumentAction = 'upload' | 'view' | 'download' | 'verify' | 'reject' | 'delete' | 'purge'
+
+export interface DocumentPerson {
+  id: string
+  name: string
+  lastName?: string
+  email?: string
+}
+
+export interface GymDocument {
+  id: string
+  owner: DocumentPerson | string | null
+  kind: DocumentKind
+  category: DocumentCategory
+  originalName: string
+  mimeType: string
+  size: number
+  status: DocumentStatus
+  rejectionReason: string
+  validUntil: string | null
+  reviewedBy: DocumentPerson | string | null
+  reviewedAt: string | null
+  uploadedBy: DocumentPerson | string | null
+  createdAt: string
+}
+
+export interface DocumentLog {
+  id: string
+  action: DocumentAction
+  actor: DocumentPerson | null
+  owner: DocumentPerson | null
+  document: { id: string; originalName: string; category: DocumentCategory; kind: DocumentKind } | null
+  ip: string
+  createdAt: string
+}
+
+export function getDocuments(params: { kind?: DocumentKind; status?: DocumentStatus; ownerId?: string } = {}) {
+  const query = new URLSearchParams(Object.entries(params).filter(([, value]) => value) as [string, string][]).toString()
+  return apiClient<{ documents: GymDocument[] }>(`/documents${query ? `?${query}` : ''}`)
+}
+
+export function uploadDocument(data: { file: File; category: DocumentCategory; ownerId: string }) {
+  const formData = new FormData()
+  formData.append('category', data.category)
+  formData.append('ownerId', data.ownerId)
+  formData.append('file', data.file)
+  return apiClient<{ document: GymDocument }>('/documents', { method: 'POST', body: formData })
+}
+
+// A link to R2 that expires in a few minutes; each one is recorded in the log.
+export function getDocumentUrl(id: string, download = false) {
+  return apiClient<{ url: string }>(`/documents/${id}/url${download ? '?download=1' : ''}`)
+}
+
+export function reviewDocument(id: string, data: { status: 'verified' | 'rejected'; rejectionReason?: string; validUntil?: string }) {
+  return apiClient<{ document: GymDocument }>(`/documents/${id}/review`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  })
+}
+
+export function deleteDocument(id: string) {
+  return apiClient<{ document: GymDocument }>(`/documents/${id}`, { method: 'DELETE' })
+}
+
+export function getDocumentLogs(params: { ownerId?: string; limit?: number } = {}) {
+  const query = new URLSearchParams()
+  if (params.ownerId) query.set('ownerId', params.ownerId)
+  if (params.limit) query.set('limit', String(params.limit))
+  return apiClient<{ logs: DocumentLog[] }>(`/documents/logs${query.size ? `?${query}` : ''}`)
+}
+
+// Destroys every file of the person in R2 (an LFPDPPP request made in person); owners only. The log keeps the records.
+export function purgeUserDocuments(userId: string) {
+  return apiClient<{ purged: number }>(`/documents/users/${userId}/purge`, { method: 'POST' })
+}

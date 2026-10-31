@@ -6,6 +6,7 @@ export type StaffRole = 'Admin' | 'Coach' | 'Recepcion'
 const PAGE_ROLES: Record<string, StaffRole[]> = {
   '/gyms': ['Admin', 'Recepcion'],
   '/access': ['Admin', 'Recepcion'],
+  '/documents': ['Admin', 'Recepcion'],
   '/equipment': ['Admin', 'Coach'],
   '/inventory': ['Admin'],
   '/exercises': ['Admin', 'Coach'],

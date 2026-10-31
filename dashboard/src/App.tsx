@@ -19,6 +19,7 @@ import { canAccessPage, useStaffRoles } from './utils/access'
 // The QR reader and generator only download when these pages open.
 const Access = lazy(() => import('./pages/Access'))
 const Gyms = lazy(() => import('./pages/Gyms'))
+const Documents = lazy(() => import('./pages/Documents'))
 
 function ProtectedRoute() {
   const { isAuthenticated } = useAuth()
@@ -63,6 +64,7 @@ function App() {
               <Route element={<RoleRoute />}>
                 <Route path="gyms" element={<Gyms />} />
                 <Route path="access" element={<Access />} />
+                <Route path="documents" element={<Documents />} />
                 <Route path="equipment" element={<Equipment />} />
                 <Route path="exercises" element={<Exercises />} />
                 <Route path="inventory" element={<Inventory />} />
