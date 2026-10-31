@@ -4,12 +4,13 @@ import QRCode from 'qrcode'
 import GymSelect from '../components/GymSelect'
 import {
   createAccessDevice,
+  createGym,
   getAccessDevices,
   getGyms,
   regenerateJoinCode,
   revokeAccessDevice,
 } from '../services/api'
-import type { AccessDevice, Gym } from '../services/api'
+import type { AccessDevice, Gym, GymLimits } from '../services/api'
 import { useAuth } from '../store/useAuth'
 import { useStaffRoles } from '../utils/access'
 import { targetGymField } from '../utils/targetGym'
@@ -334,16 +335,99 @@ function DevicesSection({ gyms, onError }: DevicesSectionProps) {
   )
 }
 
+interface NewGymDialogProps {
+  onClose: () => void
+  onCreated: () => Promise<void>
+}
+
+function NewGymDialog({ onClose, onCreated }: NewGymDialogProps) {
+  const [name, setName] = useState('')
+  const [address, setAddress] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault(); setError(null); setIsSubmitting(true)
+    try {
+      await createGym({ name: name.trim(), address: address.trim() || undefined })
+      await onCreated()
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'No se pudo abrir la sucursal.')
+      setIsSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/50 px-4" role="dialog" aria-modal="true" aria-labelledby="new-gym-title">
+      <form className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl" onSubmit={handleSubmit}>
+        <h2 className="text-xl font-semibold text-slate-900" id="new-gym-title">Nueva sucursal</h2>
+        <p className="mt-2 text-sm text-slate-500">Tendrá su propio código para que los clientes se unan desde la app.</p>
+        <div className="mt-6 space-y-4">
+          <div>
+            <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="gym-name">Nombre</label>
+            <input
+              className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
+              id="gym-name"
+              placeholder="Ej. Sucursal Norte"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              minLength={2}
+              maxLength={120}
+              required
+            />
+          </div>
+          <div>
+            <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="gym-address">Dirección (opcional)</label>
+            <input
+              className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
+              id="gym-address"
+              value={address}
+              onChange={(event) => setAddress(event.target.value)}
+              maxLength={200}
+            />
+          </div>
+        </div>
+        {error && <p className="mt-3 text-sm text-red-600" role="alert">{error}</p>}
+        <div className="mt-6 flex justify-end gap-3">
+          <button className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100" type="button" onClick={onClose}>Cancelar</button>
+          <button className="rounded-lg bg-[#0F172A] px-4 py-2 text-sm font-medium text-white disabled:opacity-50" type="submit" disabled={isSubmitting}>
+            {isSubmitting ? 'Abriendo...' : 'Abrir sucursal'}
+          </button>
+        </div>
+      </form>
+    </div>
+  )
+}
+
 function Gyms() {
   const canManage = useStaffRoles().has('Admin')
+  const { session, organizationGyms, refreshSession } = useAuth()
+  // Only the owner (or SIRID) opens gyms; managers also act as Admin but cannot.
+  const isOwner = Boolean(session?.user.isPlatformAdmin) || organizationGyms.some((gym) => gym.roles.includes('Propietario'))
   const [gyms, setGyms] = useState<Gym[]>([])
+  const [limits, setLimits] = useState<GymLimits | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isNewGymOpen, setIsNewGymOpen] = useState(false)
+  const isAtLimit = Boolean(limits && limits.activeGyms >= limits.gymLimit)
+
+  async function handleGymCreated() {
+    const response = await getGyms()
+    setGyms(response.gyms)
+    setLimits(response.limits ?? null)
+    setIsNewGymOpen(false)
+    // The new gym shows up in the sidebar selector.
+    await refreshSession()
+  }
 
   useEffect(() => {
     let isMounted = true
     getGyms()
-      .then((response) => { if (isMounted) setGyms(response.gyms) })
+      .then((response) => {
+        if (!isMounted) return
+        setGyms(response.gyms)
+        setLimits(response.limits ?? null)
+      })
       .catch((requestError: unknown) => {
         if (isMounted) setError(requestError instanceof Error ? requestError.message : 'No se pudieron cargar las sucursales.')
       })
@@ -365,7 +449,26 @@ function Gyms() {
     <section className="min-h-screen bg-[#F8FAFC] px-4 py-10 sm:px-8">
       <p className="text-sm font-medium uppercase tracking-[0.25em] text-slate-500">Operación</p>
       <h1 className="mt-3 text-4xl font-semibold tracking-tight text-slate-900">Gimnasios</h1>
-      <p className="mt-3 text-slate-500">Códigos para que los clientes se unan desde la app{canManage ? ' y torniquetes de cada sucursal' : ''}.</p>
+      <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-slate-500">Códigos para que los clientes se unan desde la app{canManage ? ' y torniquetes de cada sucursal' : ''}.</p>
+        {isOwner && limits && (
+          <div className="flex shrink-0 items-center gap-3">
+            <span className="text-sm text-slate-500">{limits.activeGyms} de {limits.gymLimit} sucursales</span>
+            <button
+              className="inline-flex items-center gap-2 rounded-lg bg-[#0F172A] px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+              type="button"
+              onClick={() => setIsNewGymOpen(true)}
+              disabled={isAtLimit}
+              title={isAtLimit ? 'Llegaste al límite de tu plan. Contacta a SIRID para ampliarlo.' : undefined}
+            >
+              <Plus size={16} aria-hidden="true" /> Nueva sucursal
+            </button>
+          </div>
+        )}
+      </div>
+      {isOwner && isAtLimit && (
+        <p className="mt-3 text-sm text-slate-500">Llegaste al límite de sucursales de tu plan. Contacta a SIRID para ampliarlo.</p>
+      )}
 
       {error && <div className="mt-6 rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">{error}</div>}
 
@@ -378,6 +481,8 @@ function Gyms() {
       </div>
 
       {canManage && !isLoading && <DevicesSection gyms={gyms} onError={setError} />}
+
+      {isNewGymOpen && <NewGymDialog onClose={() => setIsNewGymOpen(false)} onCreated={handleGymCreated} />}
     </section>
   )
 }
