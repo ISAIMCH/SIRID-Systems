@@ -5,6 +5,7 @@ import Equipment from './pages/Equipment'
 import Exercises from './pages/Exercises'
 import Inventory from './pages/Inventory'
 import Login from './pages/Login'
+import Signup from './pages/Signup'
 import Overview from './pages/Overview'
 import Promotions from './pages/Promotions'
 import Payments from './pages/Payments'
@@ -20,6 +21,7 @@ import { canAccessPage, useStaffRoles } from './utils/access'
 const Access = lazy(() => import('./pages/Access'))
 const Gyms = lazy(() => import('./pages/Gyms'))
 const Documents = lazy(() => import('./pages/Documents'))
+const Platform = lazy(() => import('./pages/Platform'))
 
 function ProtectedRoute() {
   const { isAuthenticated } = useAuth()
@@ -52,15 +54,33 @@ function RoleRoute() {
   )
 }
 
+// SIRID's panel is for platform staff only, whatever their roles in the active gym.
+function PlatformRoute() {
+  const { session } = useAuth()
+
+  if (!session) return null
+  if (!session.user.isPlatformAdmin) return <Navigate to="/" replace />
+
+  return (
+    <Suspense fallback={null}>
+      <Outlet />
+    </Suspense>
+  )
+}
+
 function App() {
   return (
     <AuthProvider>
       <BrowserRouter basename="/dashboard">
         <Routes>
           <Route path="login" element={<Login />} />
+          <Route path="signup" element={<Signup />} />
           <Route element={<ProtectedRoute />}>
             <Route element={<AdminLayout />}>
               <Route index element={<Overview />} />
+              <Route element={<PlatformRoute />}>
+                <Route path="platform" element={<Platform />} />
+              </Route>
               <Route element={<RoleRoute />}>
                 <Route path="gyms" element={<Gyms />} />
                 <Route path="access" element={<Access />} />

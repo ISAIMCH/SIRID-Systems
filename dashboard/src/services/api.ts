@@ -29,12 +29,24 @@ export interface SessionGym {
   roles: string[]
 }
 
+export type OrganizationStatus = 'pending' | 'active' | 'rejected' | 'suspended'
+
+// An organization that is not active yet (or anymore); the API sends it on 403 organization_* and in the session.
+export interface OrganizationNotice {
+  id: string
+  name: string
+  status: OrganizationStatus
+  reason: string | null
+}
+
 // Every gym the user works in, plus the one the API uses when no gym is selected.
 export interface SessionResponse {
   user: AuthUser
   organization: { id: string; name: string } | null
   gyms: SessionGym[]
   defaultGymId: string | null
+  // Organizations the user owns that SIRID has not approved, or rejected or suspended.
+  organizationApplications?: OrganizationNotice[]
 }
 
 export interface LoginResponse extends SessionResponse {
@@ -111,6 +123,34 @@ export function login(credentials: LoginCredentials) {
     method: 'POST',
     body: JSON.stringify(credentials),
   }, { withGym: false })
+}
+
+// The organization an API error says is blocked (403 with code organization_*), or null.
+export function blockedOrganization(error: unknown): OrganizationNotice | null {
+  if (!(error instanceof ApiError) || error.status !== 403) return null
+  const data = error.response.data as { code?: string; organization?: OrganizationNotice }
+  return data.code?.startsWith('organization_') && data.organization ? data.organization : null
+}
+
+export interface OwnerSignupPayload {
+  name: string
+  lastName?: string
+  email: string
+  password: string
+  phone: string
+  organizationName: string
+  legalName?: string
+  rfc?: string
+  gymName: string
+  gymAddress?: string
+}
+
+export function signupOwner(payload: OwnerSignupPayload) {
+  return apiClient<{ organization: { id: string; name: string; status: OrganizationStatus }; existingAccount: boolean; message: string }>(
+    '/organizations/signup',
+    { method: 'POST', body: JSON.stringify(payload) },
+    { withGym: false, sessionOn401: 'keep' },
+  )
 }
 
 export function getCurrentSession() {
@@ -625,8 +665,18 @@ export interface AccessResult {
   userName: string
 }
 
+export interface GymLimits {
+  activeGyms: number
+  gymLimit: number
+}
+
 export function getGyms() {
-  return apiClient<{ gyms: Gym[] }>('/gyms')
+  return apiClient<{ gyms: Gym[]; limits?: GymLimits }>('/gyms')
+}
+
+// Only the owner opens gyms, up to the limit SIRID set.
+export function createGym(payload: { name: string; address?: string }) {
+  return apiClient<{ gym: Gym; gyms: SessionGym[] }>('/gyms', { method: 'POST', body: JSON.stringify(payload) })
 }
 
 export function regenerateJoinCode(gymId: string) {
@@ -736,4 +786,51 @@ export function getDocumentLogs(params: { ownerId?: string; limit?: number } = {
 // Destroys every file of the person in R2 (an LFPDPPP request made in person); owners only. The log keeps the records.
 export function purgeUserDocuments(userId: string) {
   return apiClient<{ purged: number }>(`/documents/users/${userId}/purge`, { method: 'POST' })
+}
+
+// SIRID master panel: organizations with counts only, never the people inside them.
+export interface PlatformOrganization {
+  id: string
+  name: string
+  slug: string
+  legalName: string | null
+  rfc: string | null
+  status: OrganizationStatus
+  statusReason: string | null
+  gymLimit: number
+  allowedTransitions: OrganizationStatus[]
+  createdAt: string
+  approvedAt: string | null
+  owner: { name: string; lastName: string; email: string; phone: string | null } | null
+  counts: { gyms: number; staff: number; clients: number; activeMemberships: number }
+  gyms?: { id: string; name: string; address: string; timezone: string; isActive: boolean; createdAt: string }[]
+}
+
+export function getPlatformOrganizations(params: { status?: OrganizationStatus; search?: string } = {}) {
+  const query = new URLSearchParams(Object.entries(params).filter(([, value]) => value) as [string, string][]).toString()
+  return apiClient<{ organizations: PlatformOrganization[]; statusCounts: Record<OrganizationStatus, number> }>(
+    `/platform/organizations${query ? `?${query}` : ''}`,
+    {},
+    { withGym: false },
+  )
+}
+
+export function getPlatformOrganization(id: string) {
+  return apiClient<{ organization: PlatformOrganization }>(`/platform/organizations/${id}`, {}, { withGym: false })
+}
+
+export function updateOrganizationStatus(id: string, payload: { status: Exclude<OrganizationStatus, 'pending'>; reason?: string }) {
+  return apiClient<{ organization: PlatformOrganization }>(
+    `/platform/organizations/${id}/status`,
+    { method: 'PATCH', body: JSON.stringify(payload) },
+    { withGym: false },
+  )
+}
+
+export function updateOrganizationGymLimit(id: string, gymLimit: number) {
+  return apiClient<{ organization: PlatformOrganization }>(
+    `/platform/organizations/${id}`,
+    { method: 'PATCH', body: JSON.stringify({ gymLimit }) },
+    { withGym: false },
+  )
 }

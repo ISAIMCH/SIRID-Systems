@@ -14,6 +14,8 @@ export interface AuthContextValue {
   setActiveGymId: (gymId: string) => void
   signIn: (token: string, session: SessionResponse) => void
   signOut: () => void
+  // Reloads gyms and roles, e.g. after opening a gym.
+  refreshSession: () => Promise<void>
 }
 
 export const AuthContext = createContext<AuthContextValue | undefined>(undefined)

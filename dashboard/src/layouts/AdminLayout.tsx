@@ -1,4 +1,5 @@
 import {
+  Building2,
   CreditCard,
   ClipboardList,
   Dumbbell,
@@ -27,6 +28,8 @@ interface NavItem {
   end?: boolean
   section?: string
   disabled?: boolean
+  // Only for SIRID staff (User.isPlatformAdmin).
+  platformOnly?: boolean
 }
 
 const navigation: NavItem[] = [
@@ -43,7 +46,10 @@ const navigation: NavItem[] = [
   { label: 'Pagos', to: '/payments', icon: Receipt, section: 'Comercial' },
   { label: 'Ventas', to: '/sales', icon: ShoppingCart, section: 'Comercial' },
   { label: 'Suscripciones', to: '/subscriptions', icon: CreditCard, section: 'Comercial' },
+  { label: 'Organizaciones', to: '/platform', icon: Building2, section: 'SIRID', platformOnly: true },
 ]
+
+const APPLICATION_STATUS = { pending: 'está en revisión', rejected: 'fue rechazada', suspended: 'está suspendida', active: 'está activa' } as const
 
 function AdminLayout() {
   const { signOut, session, activeGymId, setActiveGymId, canSeeAllGyms } = useAuth()
@@ -51,7 +57,10 @@ function AdminLayout() {
   const organizations = [...new Map(gyms.map((gym) => [gym.organization.id, gym.organization])).values()]
 
   const roles = useStaffRoles()
-  const visibleNavigation = navigation.filter((item) => canAccessPage(roles, item.to))
+  const isPlatformAdmin = Boolean(session?.user.isPlatformAdmin)
+  const visibleNavigation = navigation.filter((item) => (item.platformOnly ? isPlatformAdmin : canAccessPage(roles, item.to)))
+  // Staff of another gym who also applied to open their own see how the request is going.
+  const applications = session?.organizationApplications ?? []
   // On phones the sidebar slides in over the page, so reception can use the access scanner there.
   const [isMenuOpen, setIsMenuOpen] = useState(false)
 
@@ -157,6 +166,12 @@ function AdminLayout() {
           </button>
           <p className="font-semibold tracking-tight">GymGo</p>
         </div>
+        {applications.map((application) => (
+          <div className="border-b border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 sm:px-8" key={application.id} role="status">
+            Tu organización <strong>{application.name}</strong> {APPLICATION_STATUS[application.status]}
+            {application.reason ? `: ${application.reason}` : '.'}
+          </div>
+        ))}
         {/* Pages remount when the gym changes, so they reload their data for it. */}
         <Outlet key={activeGymId ?? 'sin-sucursal'} />
       </main>

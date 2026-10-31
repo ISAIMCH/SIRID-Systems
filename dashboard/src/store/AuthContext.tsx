@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { AuthContext, type AuthContextValue } from './auth-context'
 import { disconnectSocket } from '../services/socket'
-import { clearStoredSession, getCurrentSession, type SessionResponse } from '../services/api'
+import { blockedOrganization, clearStoredSession, getCurrentSession, type SessionResponse } from '../services/api'
+import { storeOrganizationNotice } from './organizationNotice'
 import { ALL_GYMS, getActiveGymId, storeActiveGymId } from '../services/activeGym'
 
 const SESSION_KEY = 'session'
@@ -54,21 +55,31 @@ function AuthProvider({ children }: { children: ReactNode }) {
     setActiveGym(null)
   }, [])
 
+  const applySession = useCallback((nextSession: SessionResponse) => {
+    // Signed out while the request was on its way.
+    if (!localStorage.getItem('token')) return
+    if (nextSession.user.role === 'Cliente') signOut()
+    else saveSession(nextSession, getActiveGymId())
+  }, [saveSession, signOut])
+
+  // SIRID suspended the organization while the session was open: the login screen explains it.
+  const handleSessionError = useCallback((error: unknown) => {
+    const blocked = blockedOrganization(error)
+    if (!blocked) return
+    storeOrganizationNotice(blocked)
+    signOut()
+  }, [signOut])
+
+  const loadSession = useCallback(
+    () => getCurrentSession().then(applySession).catch(handleSessionError),
+    [applySession, handleSessionError],
+  )
+
   // Gyms and roles can change while a session is open, and older sessions have no gyms at all.
   useEffect(() => {
     if (!token) return
-    let isCurrent = true
-    getCurrentSession()
-      .then((nextSession) => {
-        if (!isCurrent) return
-        if (nextSession.user.role === 'Cliente') signOut()
-        else saveSession(nextSession, getActiveGymId())
-      })
-      .catch(() => undefined)
-    return () => {
-      isCurrent = false
-    }
-  }, [token, saveSession, signOut])
+    getCurrentSession().then(applySession).catch(handleSessionError)
+  }, [token, applySession, handleSessionError])
 
   const value = useMemo<AuthContextValue>(() => {
     const activeGym = session?.gyms.find((gym) => gym.id === activeGymId)
@@ -94,8 +105,9 @@ function AuthProvider({ children }: { children: ReactNode }) {
         setToken(nextToken)
       },
       signOut,
+      refreshSession: loadSession,
     }
-  }, [token, session, activeGymId, saveSession, signOut])
+  }, [token, session, activeGymId, saveSession, signOut, loadSession])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
