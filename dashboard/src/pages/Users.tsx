@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { History, Pencil, Trash2 } from 'lucide-react'
 import { API_BASE_URL, createUser, getPlans, getUsers, updateUser } from '../services/api'
 import type { UserPayload } from '../services/api'
-import type { Plan, User, UserReference, UserRole } from '../types'
+import type { AssignableRole, GymRole, MemberRole, Plan, User, UserReference } from '../types'
 import GymSelect from '../components/GymSelect'
 import ClientHistoryPanel from '../components/ClientHistoryPanel'
 import { ALL_GYMS, getActiveGymId } from '../services/activeGym'
@@ -23,12 +23,21 @@ const trainingDays = [
   { label: 'D', value: 0 },
 ]
 
+const ROLE_LABELS: Record<MemberRole, string> = {
+  Propietario: 'Propietario',
+  Gerente: 'Gerente',
+  Coach: 'Coach',
+  Recepcion: 'Recepción',
+  Cliente: 'Cliente',
+}
+const STAFF_ROLES: GymRole[] = ['Gerente', 'Coach', 'Recepcion']
+
 interface UserFormState {
   name: string
   lastName: string
   email: string
   password: string
-  role: UserRole
+  roles: AssignableRole[]
   phone: string
   address: string
   documents: string[]
@@ -47,7 +56,7 @@ const emptyUserForm: UserFormState = {
   lastName: '',
   email: '',
   password: '',
-  role: 'Cliente',
+  roles: ['Cliente'],
   phone: '',
   address: '',
   documents: [],
@@ -136,12 +145,34 @@ function userDisplayName(user: User) {
     || user.email
 }
 
+// Responses from an API without `roles` only carry the legacy role.
+function userRoles(user: User): MemberRole[] {
+  if (user.roles?.length) return user.roles
+  return user.role === 'Admin' ? ['Gerente'] : [user.role || 'Cliente']
+}
+
+function isClientUser(user: User) {
+  return userRoles(user).includes('Cliente')
+}
+
+// The roles the form edits: Cliente, or the staff roles the user holds in that gym.
+function assignableRoles(user: User, gymId: string): AssignableRole[] {
+  if (isClientUser(user)) return ['Cliente']
+  return user.gymRoles?.find((assignment) => assignment.gymId === gymId)?.roles ?? []
+}
+
+function sameRoles(first: AssignableRole[], second: AssignableRole[]) {
+  return first.length === second.length && first.every((role) => second.includes(role))
+}
+
 function Users() {
-  const { isAllGyms } = useAuth()
+  const { isAllGyms, activeGymId, session, organizationGyms } = useAuth()
   const roles = useStaffRoles()
   // The API only lists staff and allows creating or editing users to Admin; Coach and Recepcion see clients read-only.
   // Plans follow the Suscripciones page.
   const isAdmin = roles.has('Admin')
+  // Only the owner grants Gerente or edits other managers; a Gerente handles the rest of the staff.
+  const isOwner = Boolean(session?.user.isPlatformAdmin) || organizationGyms.some((gym) => gym.roles.includes('Propietario'))
   const canSeePlans = canAccessPage(roles, '/subscriptions')
   // Shared histories are for owners, managers and Coaches; reception never sees them.
   const canSeeHistory = isAdmin || roles.has('Coach')
@@ -191,23 +222,40 @@ function Users() {
 
   useEffect(() => {
     if (!isAdmin) return
-    const fetchCoaches = async () => {
-      try {
-        const response = await getUsers({ role: 'Coach' }) as any
-        console.log('Respuesta cruda del servidor:', response)
-        const usersArray = Array.isArray(response) ? response : (response?.data || response?.users || [])
-        console.log('Array a punto de ser filtrado:', usersArray)
-        const coachList = usersArray.filter((u: any) => String(u.role || u.rol || '').toLowerCase() === 'coach')
-        console.log('Entrenadores detectados:', coachList)
-
-        setCoaches(coachList)
-      } catch (error) {
-        console.error('Error al cargar entrenadores:', error)
-      }
-    }
-
-    fetchCoaches()
+    // The API lists everyone who coaches in the request's gyms, whatever their other roles.
+    getUsers<User[]>({ role: 'Coach' })
+      .then(setCoaches)
+      .catch((requestError: unknown) => console.error('Error al cargar entrenadores:', requestError))
   }, [isAdmin])
+
+  // Staff roles are edited in the active gym, or in the gym picked in the all-gyms view.
+  const roleGymId = isAllGyms ? gymId : activeGymId ?? ''
+  const isClientForm = form.roles.includes('Cliente')
+  const isOwnerRow = Boolean(editingUser && userRoles(editingUser).includes('Propietario'))
+  const canEditRoles = !isOwnerRow && (isOwner || !(editingUser && userRoles(editingUser).includes('Gerente')))
+  const rolesChanged = !editingUser || !sameRoles(form.roles, assignableRoles(editingUser, roleGymId))
+
+  function canEditUser(user: User) {
+    const isManager = userRoles(user).some((role) => role === 'Propietario' || role === 'Gerente')
+    return isOwner || !isManager || recordId(user.id ?? user._id) === session?.user.id
+  }
+
+  // Cliente stands alone; staff roles combine.
+  function toggleRole(role: AssignableRole, checked: boolean) {
+    setForm((currentForm) => {
+      if (role === 'Cliente') return { ...currentForm, roles: checked ? ['Cliente'] : [] }
+      const selected = currentForm.roles.filter((item) => item !== 'Cliente' && item !== role)
+      const next = checked ? [...selected, role] : selected
+      return { ...currentForm, roles: STAFF_ROLES.filter((staffRole) => next.includes(staffRole)) }
+    })
+  }
+
+  function changeRoleGym(nextGymId: string) {
+    setGymId(nextGymId)
+    if (editingUser && !isClientUser(editingUser)) {
+      setForm((currentForm) => ({ ...currentForm, roles: assignableRoles(editingUser, nextGymId) }))
+    }
+  }
 
   function openModal() {
     setEditingUser(null)
@@ -243,12 +291,13 @@ function Users() {
     }
 
     setEditingUser(user)
+    setGymId('')
     setForm({
       name: user.name || user.firstName || fallbackFirstName,
       lastName: user.lastName || fallbackLastNameParts.join(' '),
       email: user.email || '',
       password: '',
-      role: user.role || 'Cliente',
+      roles: assignableRoles(user, isAllGyms ? '' : activeGymId ?? ''),
       phone: user.phone || '',
       address: user.address || '',
       documents: user.documents ?? [],
@@ -271,27 +320,31 @@ function Users() {
     setIsSubmitting(true)
 
     try {
+      // Roles go only when they change, so editing other fields never touches them.
+      const sendRoles = canEditRoles && rolesChanged
+      if (sendRoles && form.roles.length === 0) throw new Error('Selecciona al menos un rol.')
       const payload: UserPayload = {
         name: form.name.trim(),
         lastName: form.lastName,
         email: form.email.trim(),
-        role: form.role,
-        ...(form.role === 'Cliente' && {
+        ...(sendRoles && { roles: form.roles }),
+        ...(isClientForm && {
           phone: form.phone.trim(),
           goal: form.goal,
           experienceLevel: form.experienceLevel,
           availableTrainingDays: form.availableTrainingDays,
           assignedCoach: form.assignedCoach,
-          planId: form.planId,
           observations: form.observations.trim(),
         }),
-        ...(form.role !== 'Cliente' && {
+        // The plan of an existing client changes by registering a payment.
+        ...(isClientForm && !editingUser && { planId: form.planId }),
+        ...(!isClientForm && {
           phone: form.phone.trim(),
           address: form.address.trim(),
           documents: form.documents,
           isActive: form.isActive,
         }),
-        ...(form.role !== 'Cliente' && form.pdfFiles?.length && {
+        ...(!isClientForm && form.pdfFiles?.length && {
           pdfFiles: form.pdfFiles,
         }),
         ...(editingUser && form.password.trim() && { password: form.password }),
@@ -302,7 +355,7 @@ function Users() {
       } else {
         const userId = editingUser._id || editingUser.id
         if (!userId) throw new Error('El usuario no tiene un identificador válido.')
-        await updateUser(userId, payload)
+        await updateUser(userId, { ...payload, ...(sendRoles && targetGymField(isAllGyms, gymId)) })
       }
 
       setUsers(await fetchUsers())
@@ -321,8 +374,8 @@ function Users() {
 
   const matchesSearch = (user: User) =>
     `${userDisplayName(user)} ${user.email || ''}`.toLocaleLowerCase().includes(searchTerm.trim().toLocaleLowerCase())
-  const clients = users.filter((user) => user.role === 'Cliente' && matchesSearch(user))
-  const staff = users.filter((user) => user.role !== 'Cliente' && matchesSearch(user))
+  const clients = users.filter((user) => isClientUser(user) && matchesSearch(user))
+  const staff = users.filter((user) => !isClientUser(user) && matchesSearch(user))
 
   function renderUsersTable(groupUsers: User[], emptyMessage: string) {
     return (
@@ -340,8 +393,8 @@ function Users() {
           {groupUsers.length > 0 ? (
             groupUsers.map((user, index) => {
               const userId = user?.id || user?._id || user?.email || `user-${index}`
-              const role = user?.role || 'Cliente'
-              const isStaff = role !== 'Cliente'
+              const rowRoles = userRoles(user)
+              const isStaff = !rowRoles.includes('Cliente')
               const isActive = user?.isActive === true
 
               return (
@@ -353,13 +406,18 @@ function Users() {
                     {user?.email || 'Sin correo'}
                   </td>
                   <td className="px-6 py-4">
-                    <span
-                      className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${
-                        isStaff ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-600'
-                      }`}
-                    >
-                      {role}
-                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {rowRoles.map((role) => (
+                        <span
+                          className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${
+                            isStaff ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-600'
+                          }`}
+                          key={role}
+                        >
+                          {ROLE_LABELS[role] ?? role}
+                        </span>
+                      ))}
+                    </div>
                   </td>
                   <td className="px-6 py-4">
                     <span
@@ -382,7 +440,7 @@ function Users() {
                         <History className="h-4 w-4" aria-hidden="true" />
                       </button>
                     )}
-                    {isAdmin && (
+                    {isAdmin && canEditUser(user) && (
                       <button
                         className="cursor-pointer text-slate-400 transition hover:text-green-600"
                         type="button"
@@ -566,34 +624,65 @@ function Users() {
                 </div>
               )}
 
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="user-role">
-                  Rol
-                </label>
-                <select
-                  className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
-                  id="user-role"
-                  value={form.role}
-                  onChange={(event) => setForm({ ...form, role: event.target.value as UserFormState['role'] })}
-                >
-                  <option value="Cliente">Cliente</option>
-                  <option value="Admin">Admin</option>
-                  <option value="Coach">Coach</option>
-                  {/* Reception is assigned per gym; it is shown when editing but not offered for new users yet. */}
-                  {form.role === 'Recepcion' && <option value="Recepcion">Recepción</option>}
-                </select>
-              </div>
+              <fieldset>
+                <legend className="mb-2 block text-sm font-medium text-slate-700">Roles</legend>
+                {isOwnerRow ? (
+                  <p className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                    Propietario de la organización. Su rol no se cambia desde aquí.
+                  </p>
+                ) : (
+                  <>
+                    <div className="flex flex-wrap gap-3">
+                      {(['Cliente', ...STAFF_ROLES] as AssignableRole[]).map((role) => {
+                        const isChecked = form.roles.includes(role)
+                        const isDisabled = !canEditRoles || (role === 'Gerente' && !isOwner)
+                        return (
+                          <label
+                            className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition ${
+                              isChecked ? 'border-green-500 bg-green-50 text-green-800' : 'border-slate-200 bg-white text-slate-700'
+                            } ${isDisabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
+                            key={role}
+                          >
+                            <input
+                              className="accent-green-600"
+                              type="checkbox"
+                              checked={isChecked}
+                              disabled={isDisabled}
+                              onChange={(event) => toggleRole(role, event.target.checked)}
+                            />
+                            {ROLE_LABELS[role]}
+                          </label>
+                        )
+                      })}
+                    </div>
+                    <p className="mt-2 text-xs text-slate-500">
+                      Cliente es un rol único. Gerente, Coach y Recepción se combinan y aplican a la sucursal {isAllGyms ? 'seleccionada' : 'activa'}.
+                      {!isOwner && ' Solo el propietario asigna el rol Gerente.'}
+                    </p>
+                  </>
+                )}
+              </fieldset>
 
               {!editingUser && (
                 <GymSelect
                   id="user-gym"
-                  label={form.role === 'Cliente' ? 'Sucursal base' : 'Sucursal donde trabaja'}
+                  label={isClientForm ? 'Sucursal base' : 'Sucursal donde trabaja'}
                   value={gymId}
                   onChange={setGymId}
                 />
               )}
 
-              {form.role === 'Cliente' && (
+              {/* Editing staff in the all-gyms view needs the gym whose roles change. */}
+              {editingUser && canEditRoles && (!isClientUser(editingUser) || rolesChanged) && (
+                <GymSelect
+                  id="user-role-gym"
+                  label="Sucursal de los roles"
+                  value={gymId}
+                  onChange={changeRoleGym}
+                />
+              )}
+
+              {isClientForm && (
                 <section className="space-y-5 rounded-xl border border-slate-200 bg-slate-50 p-5">
                   <div>
                     <h3 className="text-lg font-semibold text-slate-900">Perfil Deportivo y Membresía</h3>
@@ -679,10 +768,12 @@ function Users() {
                         Plan de membresía
                       </label>
                       <select
-                        className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                        className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100 disabled:bg-slate-100 disabled:text-slate-500"
                         id="user-plan"
                         value={form.planId}
                         onChange={(event) => setForm({ ...form, planId: event.target.value })}
+                        disabled={Boolean(editingUser)}
+                        aria-describedby={editingUser ? 'user-plan-hint' : undefined}
                       >
                         <option value="">Sin plan asignado</option>
                         {plans.map((plan, index) => {
@@ -694,6 +785,11 @@ function Users() {
                           )
                         })}
                       </select>
+                      {editingUser && (
+                        <p className="mt-1 text-xs text-slate-500" id="user-plan-hint">
+                          Para cambiar el plan registra un pago en Pagos.
+                        </p>
+                      )}
                     </div>
 
                     <div>
@@ -707,8 +803,8 @@ function Users() {
                         onChange={(event) => setForm({ ...form, assignedCoach: event.target.value })}
                       >
                         <option value="">Sin coach asignado</option>
-                        {coaches.map((coach: any) => (
-                          <option key={String(coach._id || coach.id)} value={String(coach._id || coach.id)}>
+                        {coaches.map((coach) => (
+                          <option key={recordId(coach.id ?? coach._id)} value={recordId(coach.id ?? coach._id)}>
                             {coach.name} {coach.lastName || ''}
                           </option>
                         ))}
@@ -731,7 +827,7 @@ function Users() {
                 </section>
               )}
 
-              {form.role !== 'Cliente' && (
+              {!isClientForm && (
                 <section className="space-y-5 rounded-xl border border-slate-200 bg-slate-50 p-5">
                   <div>
                     <h3 className="text-lg font-semibold text-slate-900">Perfil Administrativo</h3>

@@ -1,4 +1,4 @@
-import type { Equipment, User, UserRole } from '../types'
+import type { AssignableRole, Equipment, User, UserRole } from '../types'
 import { ALL_GYMS, getActiveGymId } from './activeGym'
 
 export const API_BASE_URL = import.meta.env.VITE_GYMGO_API_URL
@@ -172,7 +172,8 @@ export interface UserPayload {
   lastName: string
   email: string
   password?: string
-  role: UserRole
+  // Replaces the user's roles in the selected gym (`gymId` in the all-gyms view).
+  roles?: AssignableRole[]
   phone?: string
   address?: string
   documents?: string[]
