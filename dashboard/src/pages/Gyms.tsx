@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Copy, Plus, Printer, RefreshCw } from 'lucide-react'
+import { Clock, Copy, Pencil, Plus, Printer, RefreshCw, Users } from 'lucide-react'
 import QRCode from 'qrcode'
 import GymSelect from '../components/GymSelect'
 import {
@@ -9,6 +9,7 @@ import {
   getGyms,
   regenerateJoinCode,
   revokeAccessDevice,
+  updateGym,
 } from '../services/api'
 import type { AccessDevice, Gym, GymLimits } from '../services/api'
 import { useAuth } from '../store/useAuth'
@@ -71,10 +72,11 @@ interface GymCardProps {
   gym: Gym
   canManage: boolean
   onRegenerate: (gym: Gym) => Promise<void>
+  onEdit: (gym: Gym) => void
   onError: (message: string) => void
 }
 
-function GymCard({ gym, canManage, onRegenerate, onError }: GymCardProps) {
+function GymCard({ gym, canManage, onRegenerate, onEdit, onError }: GymCardProps) {
   const qrDataUrl = useJoinQr(gym.joinCode)
   const [isRegenerating, setIsRegenerating] = useState(false)
 
@@ -107,6 +109,10 @@ function GymCard({ gym, canManage, onRegenerate, onError }: GymCardProps) {
       <div className="min-w-0 flex-1">
         <h2 className="text-xl font-semibold text-slate-900">{gym.name}</h2>
         {gym.address && <p className="mt-1 text-sm text-slate-500">{gym.address}</p>}
+        <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-500">
+          <span className="inline-flex items-center gap-1.5"><Clock size={14} aria-hidden="true" /> {gym.timezone}</span>
+          <span className="inline-flex items-center gap-1.5"><Users size={14} aria-hidden="true" /> {gym.capacity ? `Aforo ${gym.capacity.toLocaleString('es-MX')}` : 'Sin aforo definido'}</span>
+        </p>
         <p className="mt-5 text-xs font-medium uppercase tracking-[0.2em] text-slate-500">Código para unirse</p>
         <p className="mt-1 font-mono text-3xl font-semibold tracking-[0.25em] text-slate-900">{gym.joinCode ?? '—'}</p>
         <p className="mt-2 text-sm text-slate-500">El cliente lo escanea o lo escribe en la app. Para entrar sigue necesitando una membresía activa.</p>
@@ -119,6 +125,15 @@ function GymCard({ gym, canManage, onRegenerate, onError }: GymCardProps) {
           >
             <Printer size={16} aria-hidden="true" /> Imprimir QR
           </button>
+          {canManage && (
+            <button
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+              type="button"
+              onClick={() => onEdit(gym)}
+            >
+              <Pencil size={16} aria-hidden="true" /> Editar
+            </button>
+          )}
           {canManage && (
             <button
               className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-red-300 hover:text-red-700 disabled:opacity-50"
@@ -335,38 +350,55 @@ function DevicesSection({ gyms, onError }: DevicesSectionProps) {
   )
 }
 
-interface NewGymDialogProps {
-  onClose: () => void
-  onCreated: () => Promise<void>
+// Mexican zones first; the rest come from the browser's list.
+const MEXICO_TIMEZONES = ['America/Mexico_City', 'America/Monterrey', 'America/Merida', 'America/Cancun', 'America/Chihuahua', 'America/Hermosillo', 'America/Mazatlan', 'America/Tijuana']
+const OTHER_TIMEZONES = Intl.supportedValuesOf('timeZone').filter((zone) => !MEXICO_TIMEZONES.includes(zone))
+
+function currentTime(timezone: string) {
+  return new Intl.DateTimeFormat('es-MX', { timeZone: timezone, timeStyle: 'short' }).format(new Date())
 }
 
-function NewGymDialog({ onClose, onCreated }: NewGymDialogProps) {
-  const [name, setName] = useState('')
-  const [address, setAddress] = useState('')
+interface GymDialogProps {
+  // Editing this gym; without it a new one is opened.
+  gym?: Gym
+  onClose: () => void
+  onSaved: () => Promise<void>
+}
+
+function GymDialog({ gym, onClose, onSaved }: GymDialogProps) {
+  const [name, setName] = useState(gym?.name ?? '')
+  const [address, setAddress] = useState(gym?.address ?? '')
+  const [timezone, setTimezone] = useState(gym?.timezone ?? 'America/Mexico_City')
+  const [capacity, setCapacity] = useState(gym?.capacity ? String(gym.capacity) : '')
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const timezoneChanged = Boolean(gym && gym.timezone !== timezone)
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault(); setError(null); setIsSubmitting(true)
     try {
-      await createGym({ name: name.trim(), address: address.trim() || undefined })
-      await onCreated()
+      const payload = { name: name.trim(), address: address.trim(), timezone, capacity: capacity ? Number(capacity) : null }
+      if (gym) await updateGym(gym.id, payload)
+      else await createGym(payload)
+      await onSaved()
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : 'No se pudo abrir la sucursal.')
+      setError(requestError instanceof Error ? requestError.message : gym ? 'No se pudo guardar la sucursal.' : 'No se pudo abrir la sucursal.')
       setIsSubmitting(false)
     }
   }
 
+  const inputClass = 'w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100'
+
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/50 px-4" role="dialog" aria-modal="true" aria-labelledby="new-gym-title">
+    <div className="fixed inset-0 z-40 flex items-center justify-center overflow-y-auto bg-slate-900/50 px-4 py-8" role="dialog" aria-modal="true" aria-labelledby="gym-dialog-title">
       <form className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl" onSubmit={handleSubmit}>
-        <h2 className="text-xl font-semibold text-slate-900" id="new-gym-title">Nueva sucursal</h2>
-        <p className="mt-2 text-sm text-slate-500">Tendrá su propio código para que los clientes se unan desde la app.</p>
+        <h2 className="text-xl font-semibold text-slate-900" id="gym-dialog-title">{gym ? `Editar ${gym.name}` : 'Nueva sucursal'}</h2>
+        {!gym && <p className="mt-2 text-sm text-slate-500">Tendrá su propio código para que los clientes se unan desde la app.</p>}
         <div className="mt-6 space-y-4">
           <div>
             <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="gym-name">Nombre</label>
             <input
-              className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
+              className={inputClass}
               id="gym-name"
               placeholder="Ej. Sucursal Norte"
               value={name}
@@ -379,19 +411,53 @@ function NewGymDialog({ onClose, onCreated }: NewGymDialogProps) {
           <div>
             <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="gym-address">Dirección (opcional)</label>
             <input
-              className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
+              className={inputClass}
               id="gym-address"
               value={address}
               onChange={(event) => setAddress(event.target.value)}
               maxLength={200}
             />
           </div>
+          <div>
+            <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="gym-timezone">Zona horaria</label>
+            <select className={inputClass} id="gym-timezone" value={timezone} onChange={(event) => setTimezone(event.target.value)} aria-describedby="gym-timezone-hint">
+              <optgroup label="México">
+                {MEXICO_TIMEZONES.map((zone) => <option key={zone} value={zone}>{zone.replace('America/', '').replace('_', ' ')} ({zone})</option>)}
+              </optgroup>
+              <optgroup label="Otras">
+                {OTHER_TIMEZONES.map((zone) => <option key={zone} value={zone}>{zone}</option>)}
+              </optgroup>
+            </select>
+            <p className="mt-1 text-xs text-slate-500" id="gym-timezone-hint">
+              Hora local ahora: {currentTime(timezone)}. Define los horarios de los planes, los días de asistencia y la bitácora de accesos.
+            </p>
+            {timezoneChanged && (
+              <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                Los horarios de acceso de los planes se evaluarán con la nueva zona desde que guardes.
+              </p>
+            )}
+          </div>
+          <div>
+            <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="gym-capacity">Aforo máximo (opcional)</label>
+            <input
+              className={inputClass}
+              id="gym-capacity"
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={100000}
+              placeholder="Sin límite"
+              value={capacity}
+              onChange={(event) => setCapacity(event.target.value)}
+            />
+            <p className="mt-1 text-xs text-slate-500">Personas dentro al mismo tiempo; el monitor de aforo avisa al acercarse.</p>
+          </div>
         </div>
         {error && <p className="mt-3 text-sm text-red-600" role="alert">{error}</p>}
         <div className="mt-6 flex justify-end gap-3">
           <button className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100" type="button" onClick={onClose}>Cancelar</button>
           <button className="rounded-lg bg-[#0F172A] px-4 py-2 text-sm font-medium text-white disabled:opacity-50" type="submit" disabled={isSubmitting}>
-            {isSubmitting ? 'Abriendo...' : 'Abrir sucursal'}
+            {isSubmitting ? 'Guardando...' : gym ? 'Guardar cambios' : 'Abrir sucursal'}
           </button>
         </div>
       </form>
@@ -408,15 +474,16 @@ function Gyms() {
   const [limits, setLimits] = useState<GymLimits | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [isNewGymOpen, setIsNewGymOpen] = useState(false)
+  // 'new' opens an empty form; a gym opens it for editing.
+  const [dialog, setDialog] = useState<'new' | Gym | null>(null)
   const isAtLimit = Boolean(limits && limits.activeGyms >= limits.gymLimit)
 
-  async function handleGymCreated() {
+  async function handleGymSaved() {
     const response = await getGyms()
     setGyms(response.gyms)
     setLimits(response.limits ?? null)
-    setIsNewGymOpen(false)
-    // The new gym shows up in the sidebar selector.
+    setDialog(null)
+    // A new or renamed gym shows up in the sidebar selector.
     await refreshSession()
   }
 
@@ -457,7 +524,7 @@ function Gyms() {
             <button
               className="inline-flex items-center gap-2 rounded-lg bg-[#0F172A] px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
               type="button"
-              onClick={() => setIsNewGymOpen(true)}
+              onClick={() => setDialog('new')}
               disabled={isAtLimit}
               title={isAtLimit ? 'Llegaste al límite de tu plan. Contacta a SIRID para ampliarlo.' : undefined}
             >
@@ -476,13 +543,13 @@ function Gyms() {
         {isLoading
           ? Array.from({ length: 2 }).map((_, index) => <div className="h-52 animate-pulse rounded-xl bg-slate-200" key={index} />)
           : gyms.length
-            ? gyms.map((gym) => <GymCard key={gym.id} gym={gym} canManage={canManage} onRegenerate={handleRegenerate} onError={setError} />)
+            ? gyms.map((gym) => <GymCard key={gym.id} gym={gym} canManage={canManage} onRegenerate={handleRegenerate} onEdit={setDialog} onError={setError} />)
             : <p className="text-sm text-slate-500">No hay sucursales activas.</p>}
       </div>
 
       {canManage && !isLoading && <DevicesSection gyms={gyms} onError={setError} />}
 
-      {isNewGymOpen && <NewGymDialog onClose={() => setIsNewGymOpen(false)} onCreated={handleGymCreated} />}
+      {dialog && <GymDialog gym={dialog === 'new' ? undefined : dialog} onClose={() => setDialog(null)} onSaved={handleGymSaved} />}
     </section>
   )
 }

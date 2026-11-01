@@ -5,19 +5,10 @@ import BarChart, { type BarDatum } from './BarChart'
 
 type Period = OperationsDashboard['period']
 
-// The API groups by UTC hour; the chart shows the browser's hour.
-function localHour(utcHour: number) {
-  const now = new Date()
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), utcHour)).getHours()
-}
-
 const hourName = (hour: number) => `${String(hour).padStart(2, '0')}:00`
 
 function hourlyBars(dashboard: OperationsDashboard): BarDatum[] {
-  return dashboard.hourlyDemand
-    .map((item) => ({ hour: localHour(item.hour), checkIns: item.checkIns }))
-    .sort((first, second) => first.hour - second.hour)
-    .map(({ hour, checkIns }) => ({
+  return dashboard.hourlyDemand.map(({ hour, checkIns }) => ({
       key: String(hour),
       label: hour % 3 === 0 ? String(hour) : '',
       name: hourName(hour),
@@ -25,10 +16,11 @@ function hourlyBars(dashboard: OperationsDashboard): BarDatum[] {
     }))
 }
 
-// Last seven UTC days, with the days nobody came in at zero.
+// The last seven days of the gym, with the days nobody came in at zero.
 function dailyBars(dashboard: OperationsDashboard): BarDatum[] {
   const byDate = new Map(dashboard.dailyAttendance.map((item) => [item.date, item.checkIns]))
-  const today = new Date()
+  // Today in the gym's zone (the browser's when the visible gyms use several).
+  const today = new Date(`${new Intl.DateTimeFormat('en-CA', { timeZone: dashboard.timezone ?? undefined }).format(new Date())}T00:00:00Z`)
   return Array.from({ length: 7 }, (_, index) => {
     const day = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() - 6 + index))
     const date = day.toISOString().slice(0, 10)
@@ -37,7 +29,8 @@ function dailyBars(dashboard: OperationsDashboard): BarDatum[] {
   })
 }
 
-// Check-ins at the turnstiles of the visible gyms (every gym of the organization in the all-gyms view).
+// Check-ins at the turnstiles of the visible gyms (every gym of the organization in the all-gyms view),
+// counted in each gym's own time zone.
 function AttendanceSection() {
   const [period, setPeriod] = useState<Period>('day')
   const [dashboard, setDashboard] = useState<OperationsDashboard | null>(null)
@@ -63,7 +56,7 @@ function AttendanceSection() {
     { label: 'Dentro ahora', value: dashboard.currentOccupancy.toLocaleString('es-MX'), icon: Activity },
     {
       label: period === 'day' ? 'Hora pico de hoy' : 'Hora pico (7 días)',
-      value: dashboard.peakHour ? hourName(localHour(dashboard.peakHour.hour)) : '—',
+      value: dashboard.peakHour ? hourName(dashboard.peakHour.hour) : '—',
       icon: Clock,
     },
   ] : []
@@ -71,7 +64,14 @@ function AttendanceSection() {
   return (
     <article className="mt-6 rounded-xl border border-slate-100 bg-white p-6 shadow-sm">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h2 className="text-lg font-semibold text-slate-900">Asistencia</h2>
+        <div>
+          <h2 className="text-lg font-semibold text-slate-900">Asistencia</h2>
+          {dashboard && (
+            <p className="mt-1 text-xs text-slate-500">
+              {dashboard.timezone ? `Hora local de la sucursal (${dashboard.timezone}).` : 'Cada sucursal cuenta en su propia hora local.'}
+            </p>
+          )}
+        </div>
         <div className="inline-flex rounded-lg border border-slate-200 p-0.5 text-sm" role="group" aria-label="Periodo de asistencia">
           {([['day', 'Hoy'], ['week', 'Últimos 7 días']] as const).map(([value, label]) => (
             <button

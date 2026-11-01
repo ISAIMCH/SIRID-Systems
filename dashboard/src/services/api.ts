@@ -724,8 +724,18 @@ export interface Gym {
   id: string
   name: string
   address: string
+  // IANA name; the gym's days and hours (plan schedules, attendance, access log) follow it.
   timezone: string
+  // Most people inside at once; null when no limit is set.
+  capacity: number | null
   joinCode: string | null
+}
+
+export interface GymPayload {
+  name: string
+  address?: string
+  timezone: string
+  capacity: number | null
 }
 
 export interface AccessDevice {
@@ -739,6 +749,7 @@ export interface AccessDevice {
 }
 
 export interface AccessResult {
+  id?: string
   event: 'check-in' | 'check-out'
   occurredAt: string
   gymId: string
@@ -756,8 +767,13 @@ export function getGyms() {
 }
 
 // Only the owner opens gyms, up to the limit SIRID set.
-export function createGym(payload: { name: string; address?: string }) {
+export function createGym(payload: GymPayload) {
   return apiClient<{ gym: Gym; gyms: SessionGym[] }>('/gyms', { method: 'POST', body: JSON.stringify(payload) })
+}
+
+// Owners edit every gym; managers the gyms they run.
+export function updateGym(gymId: string, payload: GymPayload) {
+  return apiClient<{ gym: Gym; gyms: SessionGym[] }>(`/gyms/${gymId}`, { method: 'PATCH', body: JSON.stringify(payload) })
 }
 
 export function regenerateJoinCode(gymId: string) {
@@ -1066,9 +1082,11 @@ export function updateClientObservations(clientId: string, observations: string)
   })
 }
 
-// Days and hours come in UTC.
+// Days and hours are local to each gym's time zone; `timezone` is null when the visible gyms use several.
 export interface OperationsDashboard {
   period: 'day' | 'week'
+  timezone: string | null
+  timezones: string[]
   today: { checkIns: number; checkOuts: number }
   currentOccupancy: number
   dailyAttendance: Array<{ date: string; checkIns: number; checkOuts: number }>
@@ -1078,4 +1096,63 @@ export interface OperationsDashboard {
 
 export function getOperationsDashboard(period: 'day' | 'week') {
   return apiClient<OperationsDashboard>(`/analytics/dashboard?period=${period}`)
+}
+
+export interface OccupancyGym {
+  id: string
+  name: string
+  timezone: string
+  capacity: number | null
+  count: number
+  // Newest first.
+  people: Array<{ id: string; name: string; since: string }>
+}
+
+// Who is inside each visible gym right now.
+export function getOccupancy() {
+  return apiClient<{ generatedAt: string; gyms: OccupancyGym[] }>('/access/occupancy')
+}
+
+export type AccessLogEvent = 'check-in' | 'check-out' | 'denied'
+
+// Socket `access:recorded`: an entry, an exit or a refused attempt at one of the user's gyms.
+export interface AccessRecordedEvent {
+  id: string
+  event: AccessLogEvent
+  occurredAt: string
+  gymId: string
+  userId: string
+  userName: string
+  reason?: { code: string; message: string }
+}
+
+export interface AccessLogEntry {
+  id: string
+  occurredAt: string
+  event: AccessLogEvent
+  // auto: the API closed a check-in left open when the client entered another gym.
+  source: 'qr' | 'pin' | 'auto'
+  reason: { code: string | null; message: string } | null
+  gym: { id: string; name: string; timezone: string | null }
+  client: { id: string; name: string; email?: string } | null
+  validatedBy: string | null
+  device: string | null
+}
+
+export interface AccessLogFilters {
+  gymId?: string
+  event?: AccessLogEvent
+  // YYYY-MM-DD in each gym's local time; both ends included.
+  from?: string
+  to?: string
+  search?: string
+  page?: number
+}
+
+export function getAccessLogs(filters: AccessLogFilters) {
+  const params = new URLSearchParams()
+  for (const [key, value] of Object.entries(filters)) {
+    if (value !== undefined && value !== '') params.set(key, String(value))
+  }
+  return apiClient<{ page: number; pageSize: number; total: number; entries: AccessLogEntry[] }>(`/access/logs?${params}`)
 }
