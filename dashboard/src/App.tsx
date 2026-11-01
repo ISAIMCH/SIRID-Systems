@@ -36,12 +36,13 @@ function ProtectedRoute() {
 
 // Typing the URL of a page the active gym's roles can't use sends the user to Inicio instead of hitting a 403.
 function RoleRoute() {
-  const { session } = useAuth()
+  const { session, isPlatformMode } = useAuth()
   const roles = useStaffRoles()
   const location = useLocation()
 
   // Sessions saved before gyms existed load as null until /auth/me answers; wait instead of redirecting.
   if (!session) return null
+  if (isPlatformMode) return <Navigate to="/platform" replace />
 
   if (!canAccessPage(roles, location.pathname)) {
     return <Navigate to="/" replace />
@@ -52,6 +53,14 @@ function RoleRoute() {
       <Outlet />
     </Suspense>
   )
+}
+
+// Inicio is the gym overview; SIRID staff without a gym land on their panel instead.
+function HomeRoute() {
+  const { isPlatformMode } = useAuth()
+
+  if (isPlatformMode) return <Navigate to="/platform" replace />
+  return <Overview />
 }
 
 // SIRID's panel is for platform staff only, whatever their roles in the active gym.
@@ -77,7 +86,7 @@ function App() {
           <Route path="signup" element={<Signup />} />
           <Route element={<ProtectedRoute />}>
             <Route element={<AdminLayout />}>
-              <Route index element={<Overview />} />
+              <Route index element={<HomeRoute />} />
               <Route element={<PlatformRoute />}>
                 <Route path="platform" element={<Platform />} />
               </Route>

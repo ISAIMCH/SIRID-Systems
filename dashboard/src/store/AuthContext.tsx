@@ -22,10 +22,12 @@ function canSeeAll(session: SessionResponse | null) {
     && session.gyms.some((gym) => gym.roles.includes('Propietario')))
 }
 
+// SIRID staff start in their own panel (no gym) and only work in a gym they pick.
 function resolveGymId(session: SessionResponse | null, gymId: string | null) {
   if (!session) return null
   if (gymId === ALL_GYMS && canSeeAll(session)) return ALL_GYMS
   if (gymId && session.gyms.some((gym) => gym.id === gymId)) return gymId
+  if (session.user.isPlatformAdmin) return null
   return canSeeAll(session) ? ALL_GYMS : session.defaultGymId
 }
 
@@ -90,6 +92,7 @@ function AuthProvider({ children }: { children: ReactNode }) {
       session,
       activeGymId,
       isAllGyms: activeGymId === ALL_GYMS,
+      isPlatformMode: Boolean(session?.user.isPlatformAdmin) && !activeGymId,
       canSeeAllGyms: canSeeAll(session),
       organizationGyms: session?.gyms.filter((gym) => gym.organization.id === organizationId) ?? [],
       setActiveGymId: (gymId) => {
