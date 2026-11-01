@@ -2,18 +2,32 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Camera, CameraOff, LogIn, LogOut, XCircle } from 'lucide-react'
 import jsQR from 'jsqr'
 import GymSelect from '../components/GymSelect'
-import { registerQrAccess } from '../services/api'
+import { ApiError, registerQrAccess } from '../services/api'
 import { useAuth } from '../store/useAuth'
 import { targetGymField } from '../utils/targetGym'
 
 type ScanResult =
   | { kind: 'check-in' | 'check-out'; name: string; at: string }
-  | { kind: 'error'; message: string; at: string }
+  | { kind: 'error'; title: string; message: string; at: string }
 
 const SCAN_INTERVAL_MS = 200
 // Time the result stays on screen before the next QR is read, so the same client isn't scanned twice.
 const RESULT_PAUSE_MS = 2500
 const MAX_FRAME_WIDTH = 640
+
+// Titles for the rules the API checks on entry (evaluateAccess); the API's message gives the details.
+const DENIAL_TITLES: Record<string, string> = {
+  account_disabled: 'Cuenta no habilitada',
+  membership_inactive: 'Membresía no vigente',
+  gym_not_included: 'Sucursal no incluida en el plan',
+  outside_schedule: 'Fuera del horario del plan',
+  document_required: 'Documento pendiente',
+}
+
+function denialTitle(error: unknown) {
+  const code = error instanceof ApiError ? (error.response.data as { code?: string } | null)?.code : undefined
+  return (code && DENIAL_TITLES[code]) || 'Acceso denegado'
+}
 
 function formatTime(value: string) {
   return new Intl.DateTimeFormat('es-MX', { timeStyle: 'short' }).format(new Date(value))
@@ -32,7 +46,7 @@ function ResultCard({ result }: { result: ScanResult }) {
       <div className="flex items-center gap-4 rounded-xl border border-red-200 bg-red-50 p-5 text-red-800" role="alert">
         <XCircle size={36} aria-hidden="true" />
         <div>
-          <p className="text-lg font-semibold">Acceso denegado</p>
+          <p className="text-lg font-semibold">{result.title}</p>
           <p className="text-sm">{result.message}</p>
         </div>
       </div>
@@ -77,7 +91,12 @@ function Access() {
       const response = await registerQrAccess({ qrToken, ...targetGymField(isAllGyms, gymId) })
       next = { kind: response.access.event, name: response.access.userName, at: response.access.occurredAt }
     } catch (requestError) {
-      next = { kind: 'error', message: requestError instanceof Error ? requestError.message : 'No se pudo validar el QR.', at: new Date().toISOString() }
+      next = {
+        kind: 'error',
+        title: denialTitle(requestError),
+        message: requestError instanceof Error ? requestError.message : 'No se pudo validar el QR.',
+        at: new Date().toISOString(),
+      }
     }
     setResult(next)
     setHistory((current) => [next, ...current].slice(0, 10))
@@ -214,7 +233,7 @@ function Access() {
               <ul className="mt-3 divide-y divide-slate-100 text-sm">
                 {history.map((item, index) => (
                   <li className="flex items-center justify-between gap-3 py-2" key={`${item.at}-${index}`}>
-                    <span className="min-w-0 truncate text-slate-700">{item.kind === 'error' ? item.message : item.name}</span>
+                    <span className="min-w-0 truncate text-slate-700">{item.kind === 'error' ? `${item.title}: ${item.message}` : item.name}</span>
                     <span className={`shrink-0 text-xs font-medium ${item.kind === 'error' ? 'text-red-600' : item.kind === 'check-in' ? 'text-green-700' : 'text-slate-500'}`}>
                       {item.kind === 'error' ? 'Denegado' : item.kind === 'check-in' ? 'Entrada' : 'Salida'} · {formatTime(item.at)}
                     </span>

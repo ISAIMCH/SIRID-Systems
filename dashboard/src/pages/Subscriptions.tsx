@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { MoreVertical, Pencil, Trash2 } from 'lucide-react'
+import { Clock, FileCheck, MapPin, MoreVertical, Pencil, Trash2 } from 'lucide-react'
 import { createPlan, deletePlan, getPlans, updatePlan } from '../services/api'
-import type { Plan } from '../types'
+import { useAuth } from '../store/useAuth'
+import type { GymAccessScope, Plan, PlanType } from '../types'
 
 type PlansResponse = Plan[] | {
   data?: unknown
@@ -25,12 +26,55 @@ function PlanSkeleton() {
   )
 }
 
-interface PlanFormState {
+interface PlanRules {
+  accessScope: GymAccessScope
+  gymIds: string[]
+  hasSchedule: boolean
+  startTime: string
+  endTime: string
+  requiredDocument: '' | 'student_id'
+}
+
+interface PlanFormState extends PlanRules {
   nombre: string
   precio: string
   duracion: string
   autoRenew: boolean
-  planType: 'standard' | 'promotional'
+  planType: PlanType
+}
+
+const PLAN_TYPE_LABELS: Record<PlanType, string> = {
+  standard: 'Estándar',
+  student: 'Estudiante',
+  limited_hours: 'Horario limitado',
+  single_gym: 'Una sucursal',
+  promotional: 'Promocional',
+}
+
+const PLAN_TYPE_BADGES: Record<PlanType, string> = {
+  standard: 'bg-slate-100 text-slate-600',
+  student: 'bg-sky-100 text-sky-800',
+  limited_hours: 'bg-violet-100 text-violet-800',
+  single_gym: 'bg-emerald-100 text-emerald-800',
+  promotional: 'bg-amber-100 text-amber-800',
+}
+
+const anyRules: PlanRules = {
+  accessScope: 'all',
+  gymIds: [],
+  hasSchedule: false,
+  startTime: '06:00',
+  endTime: '14:00',
+  requiredDocument: '',
+}
+
+// Choosing a type only fills in these rules; the admin can change them and the API stores what is sent.
+const PLAN_TYPE_PRESETS: Record<PlanType, PlanRules> = {
+  standard: anyRules,
+  student: { ...anyRules, requiredDocument: 'student_id' },
+  limited_hours: { ...anyRules, hasSchedule: true },
+  single_gym: { ...anyRules, accessScope: 'home' },
+  promotional: anyRules,
 }
 
 const emptyPlanForm: PlanFormState = {
@@ -39,6 +83,42 @@ const emptyPlanForm: PlanFormState = {
   duracion: '',
   autoRenew: true,
   planType: 'standard',
+  ...anyRules,
+}
+
+const fieldClassName = 'w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100'
+
+function planRulesFrom(plan: Plan): PlanRules {
+  return {
+    accessScope: plan.gymAccess?.scope ?? 'all',
+    gymIds: plan.gymAccess?.gymIds ?? [],
+    hasSchedule: Boolean(plan.schedule),
+    startTime: plan.schedule?.startTime ?? anyRules.startTime,
+    endTime: plan.schedule?.endTime ?? anyRules.endTime,
+    requiredDocument: plan.requiredDocument ?? '',
+  }
+}
+
+function PlanRulesList({ plan, gymNames }: { plan: Plan; gymNames: Map<string, string> }) {
+  const scope = plan.gymAccess?.scope ?? 'all'
+  const gyms = scope === 'home'
+    ? 'Solo la sucursal donde se vende'
+    : scope === 'list'
+      ? (plan.gymAccess?.gymIds ?? []).map((id) => gymNames.get(id) ?? 'Sucursal').join(', ')
+      : 'Todas las sucursales'
+  const schedule = plan.schedule
+    ? `De ${plan.schedule.startTime} a ${plan.schedule.endTime}`
+    : 'Cualquier hora'
+
+  return (
+    <ul className="mt-5 space-y-2 text-sm text-slate-600">
+      <li className="flex items-start gap-2"><MapPin className="mt-0.5 shrink-0 text-slate-400" size={16} aria-hidden="true" />{gyms}</li>
+      <li className="flex items-start gap-2"><Clock className="mt-0.5 shrink-0 text-slate-400" size={16} aria-hidden="true" />{schedule}</li>
+      {plan.requiredDocument === 'student_id' && (
+        <li className="flex items-start gap-2"><FileCheck className="mt-0.5 shrink-0 text-slate-400" size={16} aria-hidden="true" />Requiere credencial de estudiante verificada</li>
+      )}
+    </ul>
+  )
 }
 
 async function fetchPlans() {
@@ -52,6 +132,8 @@ async function fetchPlans() {
 }
 
 function Subscriptions() {
+  const { organizationGyms } = useAuth()
+  const gymNames = new Map(organizationGyms.map((gym) => [gym.id, gym.name]))
   const [plans, setPlans] = useState<Plan[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -120,8 +202,9 @@ function Subscriptions() {
       duracion: planDuration === undefined ? '' : String(planDuration),
       autoRenew: plan.autoRenew ?? true,
       planType: plan.planType ?? 'standard',
+      ...planRulesFrom(plan),
     })
-    setSpecificationsText(plan.caracteristicas?.join(', ') || '')
+    setSpecificationsText((plan.specifications ?? plan.caracteristicas)?.join(', ') || '')
     setModalError(null)
     setOpenMenuId(null)
     setIsModalOpen(true)
@@ -160,7 +243,12 @@ function Subscriptions() {
         autoRenew: form.autoRenew,
         planType: form.planType,
         specifications,
+        gymAccess: { scope: form.accessScope, gymIds: form.accessScope === 'list' ? form.gymIds : [] },
+        schedule: form.hasSchedule ? { startTime: form.startTime, endTime: form.endTime } : null,
+        requiredDocument: form.requiredDocument || null,
       }
+      if (form.accessScope === 'list' && form.gymIds.length === 0) throw new Error('Elige al menos una sucursal.')
+      if (form.hasSchedule && form.startTime === form.endTime) throw new Error('La hora de salida debe ser distinta a la de entrada.')
 
       const planId = editingPlan?._id || editingPlan?.id
       if (editingPlan && planId) {
@@ -233,6 +321,8 @@ function Subscriptions() {
               const planPrice = plan.price ?? plan.precio
               const planDuration = plan.durationInDays ?? plan.duration ?? plan.tipoCobro
               const isActive = plan.isActive ?? true
+              const planType = plan.planType ?? 'standard'
+              const specifications = plan.specifications ?? plan.caracteristicas ?? []
 
               return (
                 <article
@@ -242,12 +332,8 @@ function Subscriptions() {
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
                       <h2 className="text-xl font-semibold text-slate-900">{planName}</h2>
-                      <span className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
-                        plan.planType === 'promotional'
-                          ? 'bg-amber-100 text-amber-800'
-                          : 'bg-slate-100 text-slate-600'
-                      }`}>
-                        {plan.planType === 'promotional' ? 'Promocional' : 'Estándar'}
+                      <span className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${PLAN_TYPE_BADGES[planType]}`}>
+                        {PLAN_TYPE_LABELS[planType]}
                       </span>
                     </div>
                     <div className="relative flex items-center gap-2">
@@ -296,9 +382,11 @@ function Subscriptions() {
 
                   {plan.descripcion && <p className="mt-5 text-sm leading-6 text-slate-500">{plan.descripcion}</p>}
 
-                  {plan.caracteristicas && plan.caracteristicas.length > 0 && (
+                  <PlanRulesList plan={plan} gymNames={gymNames} />
+
+                  {specifications.length > 0 && (
                     <ul className="mt-6 space-y-2 border-t border-slate-100 pt-5 text-sm text-slate-600">
-                      {plan.caracteristicas.map((feature) => (
+                      {specifications.map((feature) => (
                         <li key={feature}>{feature}</li>
                       ))}
                     </ul>
@@ -316,7 +404,7 @@ function Subscriptions() {
 
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+          <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-sm font-medium uppercase tracking-[0.2em] text-emerald-700">Suscripciones</p>
@@ -357,11 +445,16 @@ function Subscriptions() {
                   className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
                   id="plan-type"
                   value={form.planType}
-                  onChange={(event) => setForm({ ...form, planType: event.target.value as 'standard' | 'promotional' })}
+                  onChange={(event) => {
+                    const planType = event.target.value as PlanType
+                    setForm({ ...form, planType, ...PLAN_TYPE_PRESETS[planType] })
+                  }}
                 >
-                  <option value="standard">Estándar</option>
-                  <option value="promotional">Promocional</option>
+                  {Object.entries(PLAN_TYPE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                 </select>
+                <p className="mt-2 text-xs text-slate-500">
+                  El tipo llena las reglas de acceso de abajo; puedes ajustarlas antes de guardar.
+                </p>
               </div>
 
               <div>
@@ -394,6 +487,108 @@ function Subscriptions() {
                   required
                 />
               </div>
+
+              <fieldset className="space-y-4 rounded-xl border border-slate-200 p-4">
+                <legend className="px-1 text-sm font-semibold text-slate-900">Reglas de acceso</legend>
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="plan-access-scope">
+                    Sucursales
+                  </label>
+                  <select
+                    className={fieldClassName}
+                    id="plan-access-scope"
+                    value={form.accessScope}
+                    onChange={(event) => setForm({ ...form, accessScope: event.target.value as GymAccessScope })}
+                  >
+                    <option value="all">Todas las sucursales</option>
+                    <option value="home">Solo la sucursal donde se vende</option>
+                    <option value="list">Sucursales específicas</option>
+                  </select>
+                  {form.accessScope === 'list' && (
+                    <div className="mt-3 max-h-40 space-y-2 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50 p-3">
+                      {organizationGyms.length > 0 ? organizationGyms.map((gym) => (
+                        <label className="flex items-center gap-3 rounded-md bg-white px-3 py-2 text-sm text-slate-700" key={gym.id}>
+                          <input
+                            className="h-4 w-4 accent-green-500"
+                            type="checkbox"
+                            checked={form.gymIds.includes(gym.id)}
+                            onChange={(event) => setForm({
+                              ...form,
+                              gymIds: event.target.checked ? [...form.gymIds, gym.id] : form.gymIds.filter((id) => id !== gym.id),
+                            })}
+                          />
+                          {gym.name}
+                        </label>
+                      )) : (
+                        <p className="text-sm text-slate-500">No hay sucursales disponibles.</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="flex items-center gap-3 text-sm font-medium text-slate-700" htmlFor="plan-has-schedule">
+                    <input
+                      className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                      id="plan-has-schedule"
+                      type="checkbox"
+                      checked={form.hasSchedule}
+                      onChange={(event) => setForm({ ...form, hasSchedule: event.target.checked })}
+                    />
+                    Limitar el horario de entrada
+                  </label>
+                  {form.hasSchedule && (
+                    <div className="mt-3 grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-slate-600" htmlFor="plan-start-time">Desde</label>
+                        <input
+                          className={fieldClassName}
+                          id="plan-start-time"
+                          type="time"
+                          value={form.startTime}
+                          onChange={(event) => setForm({ ...form, startTime: event.target.value })}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-slate-600" htmlFor="plan-end-time">Hasta</label>
+                        <input
+                          className={fieldClassName}
+                          id="plan-end-time"
+                          type="time"
+                          value={form.endTime}
+                          onChange={(event) => setForm({ ...form, endTime: event.target.value })}
+                          required
+                        />
+                      </div>
+                      <p className="col-span-2 text-xs text-slate-500">
+                        Hora local de cada sucursal. Si la hora de salida es menor que la de entrada, el horario cruza la medianoche. La salida del gimnasio siempre se permite.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="plan-required-document">
+                    Documento requerido
+                  </label>
+                  <select
+                    className={fieldClassName}
+                    id="plan-required-document"
+                    value={form.requiredDocument}
+                    onChange={(event) => setForm({ ...form, requiredDocument: event.target.value as PlanRules['requiredDocument'] })}
+                  >
+                    <option value="">Ninguno</option>
+                    <option value="student_id">Credencial de estudiante</option>
+                  </select>
+                  {form.requiredDocument && (
+                    <p className="mt-2 text-xs text-slate-500">
+                      Se puede vender sin el documento; el acceso se niega hasta que esté verificado y vigente.
+                    </p>
+                  )}
+                </div>
+              </fieldset>
 
               <label className="flex items-center gap-3 text-sm font-medium text-slate-700" htmlFor="plan-auto-renew">
                 <input

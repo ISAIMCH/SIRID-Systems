@@ -48,6 +48,15 @@ export interface UserMembership {
   planName?: string
 }
 
+export type PlanType = 'standard' | 'student' | 'limited_hours' | 'single_gym' | 'promotional'
+// all: every gym of the organization; home: the gym where it is sold; list: only gymIds.
+export type GymAccessScope = 'all' | 'home' | 'list'
+
+export interface PlanSchedule {
+  startTime: string
+  endTime: string
+}
+
 export interface Plan {
   id?: string
   _id?: string
@@ -60,7 +69,12 @@ export interface Plan {
   tipoCobro?: string
   isActive?: boolean
   autoRenew?: boolean
-  planType?: 'standard' | 'promotional'
+  planType?: PlanType
+  // Access rules; the type only prefills them in the form.
+  gymAccess?: { scope: GymAccessScope; gymIds?: string[] }
+  schedule?: PlanSchedule | null
+  requiredDocument?: 'student_id' | null
+  specifications?: string[]
   descripcion?: string
   destacado?: boolean
   caracteristicas?: string[]
