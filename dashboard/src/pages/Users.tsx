@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react'
-import { History, Pencil, Trash2 } from 'lucide-react'
-import { API_BASE_URL, ApiError, createUser, getPlans, getUsers, updateUser } from '../services/api'
+import { Link } from 'react-router-dom'
+import { History, Pencil } from 'lucide-react'
+import { ApiError, createUser, getPlans, getUsers, updateUser } from '../services/api'
 import type { UserPayload } from '../services/api'
 import type { AssignableRole, GymRole, MemberRole, Plan, User, UserReference } from '../types'
 import GymSelect from '../components/GymSelect'
 import ClientHistoryPanel from '../components/ClientHistoryPanel'
 import StaffInvitationsPanel, { type InvitePrefill } from '../components/StaffInvitationsPanel'
 import { ROLE_LABELS, STAFF_ROLES } from '../utils/roles'
-import { ALL_GYMS, getActiveGymId } from '../services/activeGym'
 import { useAuth } from '../store/useAuth'
 import { targetGymField } from '../utils/targetGym'
 import { canAccessPage, useStaffRoles } from '../utils/access'
@@ -33,8 +33,6 @@ interface UserFormState {
   roles: AssignableRole[]
   phone: string
   address: string
-  documents: string[]
-  pdfFiles?: File[]
   isActive: boolean
   goal: string
   experienceLevel: string
@@ -52,8 +50,6 @@ const emptyUserForm: UserFormState = {
   roles: ['Cliente'],
   phone: '',
   address: '',
-  documents: [],
-  pdfFiles: [],
   isActive: true,
   goal: '',
   experienceLevel: '',
@@ -93,38 +89,6 @@ async function fetchUsers() {
 
 async function fetchPlans() {
   return extractArray<Plan>(await getPlans<PlansResponse>(), ['data', 'plans', 'planes'])
-}
-
-async function openPrivateDocument(documentPath: string) {
-  const token = localStorage.getItem('token')
-  if (!token) throw new Error('La sesión expiró. Inicia sesión nuevamente.')
-
-  const documentWindow = window.open('', '_blank')
-  if (!documentWindow) {
-    throw new Error('El navegador bloqueó la nueva pestaña. Permite ventanas emergentes para ver el documento.')
-  }
-
-  try {
-    const activeGymId = getActiveGymId()
-    const response = await fetch(`${API_BASE_URL}${documentPath}`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        ...(activeGymId && activeGymId !== ALL_GYMS ? { 'X-Gym-Id': activeGymId } : {}),
-      },
-    })
-
-    if (!response.ok) {
-      throw new Error('No se pudo cargar el documento.')
-    }
-
-    const blob = await response.blob()
-    const objectUrl = URL.createObjectURL(blob)
-    documentWindow.location.href = objectUrl
-    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000)
-  } catch (error) {
-    documentWindow.close()
-    throw error
-  }
 }
 
 function recordId(value: string | UserReference | undefined) {
@@ -305,8 +269,6 @@ function Users() {
       roles: assignableRoles(user, isAllGyms ? '' : activeGymId ?? ''),
       phone: user.phone || '',
       address: user.address || '',
-      documents: user.documents ?? [],
-      pdfFiles: [],
       isActive: user.isActive ?? true,
       goal: user.goal || '',
       experienceLevel: user.experienceLevel || '',
@@ -347,11 +309,7 @@ function Users() {
         ...(!isClientForm && {
           phone: form.phone.trim(),
           address: form.address.trim(),
-          documents: form.documents,
           isActive: form.isActive,
-        }),
-        ...(!isClientForm && form.pdfFiles?.length && {
-          pdfFiles: form.pdfFiles,
         }),
         ...(editingUser && form.password.trim() && { password: form.password }),
       }
@@ -902,63 +860,10 @@ function Users() {
                     />
                   </div>
 
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="staff-documents">
-                      Documentos/Certificaciones
-                    </label>
-                    {form.documents.length > 0 && (
-                      <ul className="mb-3 space-y-2 rounded-lg border border-slate-200 bg-white p-3">
-                        {form.documents.map((document, index) => {
-                          const fileName = document.split('/').pop() || document
-                          return (
-                            <li className="flex items-center justify-between gap-3 rounded-md bg-slate-50 px-3 py-2" key={`${document}-${index}`}>
-                              <span className="min-w-0 truncate text-sm text-slate-700" title={fileName}>
-                                {fileName}
-                              </span>
-                              <div className="flex shrink-0 items-center gap-2">
-                                <a
-                                  className="text-sm font-medium text-green-700 transition hover:text-green-900"
-                                  href="#"
-                                  onClick={(event) => {
-                                    event.preventDefault()
-                                    void openPrivateDocument(document).catch((requestError: unknown) => {
-                                      setError(
-                                        requestError instanceof Error
-                                          ? requestError.message
-                                          : 'No se pudo abrir el documento.',
-                                      )
-                                    })
-                                  }}
-                                >
-                                  Ver
-                                </a>
-                                <button
-                                  className="rounded p-1 text-slate-400 transition hover:bg-red-50 hover:text-red-600"
-                                  type="button"
-                                  aria-label={`Eliminar ${fileName}`}
-                                  title="Eliminar"
-                                  onClick={() => setForm({
-                                    ...form,
-                                    documents: form.documents.filter((item) => item !== document),
-                                  })}
-                                >
-                                  <Trash2 className="h-4 w-4" aria-hidden="true" />
-                                </button>
-                              </div>
-                            </li>
-                          )
-                        })}
-                      </ul>
-                    )}
-                    <input
-                      className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
-                      id="staff-documents"
-                      type="file"
-                      accept=".pdf"
-                      multiple
-                      onChange={(event) => setForm({ ...form, pdfFiles: Array.from(event.target.files || []) })}
-                    />
-                  </div>
+                  <p className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                    Los documentos del empleado (CV, identificación, certificaciones…) se suben y verifican en{' '}
+                    <Link className="font-medium text-green-700 hover:text-green-900" to="/documents">Documentos › Expediente del personal</Link>.
+                  </p>
 
                   <div>
                     <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="staff-status">

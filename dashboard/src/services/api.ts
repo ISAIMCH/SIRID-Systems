@@ -176,8 +176,6 @@ export interface UserPayload {
   roles?: AssignableRole[]
   phone?: string
   address?: string
-  documents?: string[]
-  pdfFiles?: File[]
   isActive?: boolean
   goal?: string
   experienceLevel?: string
@@ -188,32 +186,17 @@ export interface UserPayload {
   gymId?: string
 }
 
-function userPayloadBody(userData: UserPayload): BodyInit {
-  if (!userData.pdfFiles?.length) {
-    const { pdfFiles: _pdfFiles, ...jsonUserData } = userData
-    return JSON.stringify(jsonUserData)
-  }
-
-  const formData = new FormData()
-  Object.entries(userData).forEach(([key, value]) => {
-    if (key === 'pdfFiles' || value === undefined) return
-    formData.append(key, Array.isArray(value) ? JSON.stringify(value) : String(value))
-  })
-  userData.pdfFiles.forEach((file) => formData.append('pdfFiles', file))
-  return formData
-}
-
 export function createUser(userData: UserPayload) {
   return apiClient('/auth/users', {
     method: 'POST',
-    body: userPayloadBody(userData),
+    body: JSON.stringify(userData),
   })
 }
 
 export function updateUser(id: string, userData: UserPayload) {
   return apiClient(`/auth/users/${id}`, {
     method: 'PUT',
-    body: userPayloadBody(userData),
+    body: JSON.stringify(userData),
   })
 }
 
@@ -644,6 +627,7 @@ export interface PromotionPayload {
   appliesTo: 'store' | 'membership'
   applicableProducts?: string[]
   applicablePlans?: string[]
+  requiredDocument?: 'student_id' | null
 }
 
 export function createPromotion(data: PromotionPayload) {

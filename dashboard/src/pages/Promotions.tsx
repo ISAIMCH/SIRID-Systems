@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Pencil, Plus, Tag, Trash2 } from 'lucide-react'
+import { FileCheck, Pencil, Plus, Tag, Trash2 } from 'lucide-react'
 import { createPromotion, deletePromotion, getPlans, getProducts, getPromotions, updatePromotion } from '../services/api'
 import type { Plan, Product, Promotion, PromotionTarget } from '../types'
 import { useStaffRoles } from '../utils/access'
@@ -19,6 +19,7 @@ interface PromotionFormState {
   appliesTo: PromotionTarget
   applicableProducts: string[]
   applicablePlans: string[]
+  requiredDocument: '' | 'student_id'
 }
 
 const emptyPromotionForm: PromotionFormState = {
@@ -31,6 +32,7 @@ const emptyPromotionForm: PromotionFormState = {
   appliesTo: 'store',
   applicableProducts: [],
   applicablePlans: [],
+  requiredDocument: '',
 }
 
 const TARGET_LABELS: Record<PromotionTarget, string> = {
@@ -191,6 +193,7 @@ function Promotions() {
       appliesTo: promotion.appliesTo ?? 'store',
       applicableProducts: toIds(promotion.applicableProducts),
       applicablePlans: toIds(promotion.applicablePlans),
+      requiredDocument: promotion.requiredDocument ?? '',
     })
     setModalError(null)
     setIsModalOpen(true)
@@ -235,6 +238,7 @@ function Promotions() {
         appliesTo: form.appliesTo,
         applicableProducts: form.appliesTo === 'store' ? form.applicableProducts : [],
         applicablePlans: form.appliesTo === 'membership' ? form.applicablePlans : [],
+        requiredDocument: form.requiredDocument || null,
         ...(imageUrl ? { imageUrl } : {}),
         ...(form.validUntil.trim()
           ? { validUntil: form.validUntil.trim() }
@@ -340,6 +344,12 @@ function Promotions() {
                               <p className="font-medium text-slate-900">{promotion.title || 'Sin título'}</p>
                               {promotion.description && (
                                 <p className="mt-1 max-w-xs truncate text-xs text-slate-500">{promotion.description}</p>
+                              )}
+                              {promotion.requiredDocument === 'student_id' && (
+                                <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-700">
+                                  <FileCheck size={12} aria-hidden="true" />
+                                  Requiere credencial de estudiante
+                                </span>
                               )}
                             </div>
                           </div>
@@ -533,6 +543,26 @@ function Promotions() {
                     <p className="text-sm text-slate-500">No hay planes disponibles.</p>
                   )}
                 </div>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="promotion-required-document">
+                  Documento requerido
+                </label>
+                <select
+                  className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                  id="promotion-required-document"
+                  value={form.requiredDocument}
+                  onChange={(event) => setForm({ ...form, requiredDocument: event.target.value as PromotionFormState['requiredDocument'] })}
+                >
+                  <option value="">Ninguno</option>
+                  <option value="student_id">Credencial de estudiante</option>
+                </select>
+                {form.requiredDocument && (
+                  <p className="mt-2 text-xs text-slate-500">
+                    El descuento solo se aplica si el cliente tiene ese documento verificado y vigente en Documentos.
+                  </p>
+                )}
               </div>
 
               <div>
