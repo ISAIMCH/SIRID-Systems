@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Pencil, Trash2 } from 'lucide-react'
+import { History, Pencil, Trash2 } from 'lucide-react'
 import { API_BASE_URL, createUser, getPlans, getUsers, updateUser } from '../services/api'
 import type { UserPayload } from '../services/api'
 import type { Plan, User, UserReference, UserRole } from '../types'
 import GymSelect from '../components/GymSelect'
+import ClientHistoryPanel from '../components/ClientHistoryPanel'
 import { ALL_GYMS, getActiveGymId } from '../services/activeGym'
 import { useAuth } from '../store/useAuth'
 import { targetGymField } from '../utils/targetGym'
@@ -142,6 +143,9 @@ function Users() {
   // Plans follow the Suscripciones page.
   const isAdmin = roles.has('Admin')
   const canSeePlans = canAccessPage(roles, '/subscriptions')
+  // Shared histories are for owners, managers and Coaches; reception never sees them.
+  const canSeeHistory = isAdmin || roles.has('Coach')
+  const [historyClient, setHistoryClient] = useState<{ id: string; name: string } | null>(null)
   const [gymId, setGymId] = useState('')
   const [users, setUsers] = useState<User[]>([])
   const [plans, setPlans] = useState<Plan[]>([])
@@ -366,7 +370,18 @@ function Users() {
                       {isActive ? 'Activo' : 'Inactivo'}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-right">
+                  <td className="whitespace-nowrap px-6 py-4 text-right">
+                    {canSeeHistory && !isStaff && recordId(user.id ?? user._id) && (
+                      <button
+                        className="mr-3 cursor-pointer text-slate-400 transition hover:text-green-600"
+                        type="button"
+                        aria-label={`Historial de ${user?.name || 'cliente'}`}
+                        title="Historial compartido"
+                        onClick={() => setHistoryClient({ id: recordId(user.id ?? user._id), name: userDisplayName(user) || 'Cliente' })}
+                      >
+                        <History className="h-4 w-4" aria-hidden="true" />
+                      </button>
+                    )}
                     {isAdmin && (
                       <button
                         className="cursor-pointer text-slate-400 transition hover:text-green-600"
@@ -465,6 +480,10 @@ function Users() {
           </div>
         )}
       </div>
+
+      {historyClient && (
+        <ClientHistoryPanel client={historyClient} canSeeLogs={isAdmin} onClose={() => setHistoryClient(null)} />
+      )}
 
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4 backdrop-blur-sm">
