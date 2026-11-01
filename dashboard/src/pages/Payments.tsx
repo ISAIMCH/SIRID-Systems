@@ -15,6 +15,7 @@ import { socket } from '../services/socket'
 import type { Plan, User } from '../types'
 import GymSelect from '../components/GymSelect'
 import { useAuth } from '../store/useAuth'
+import { useStaffRoles } from '../utils/access'
 import { targetGymField } from '../utils/targetGym'
 
 interface PaymentFormState {
@@ -136,6 +137,8 @@ function statusClasses(status: string) {
 
 function Payments() {
   const { isAllGyms } = useAuth()
+  // Recepcion charges and redeems PINs; only Admins edit or delete payments.
+  const canManage = useStaffRoles().has('Admin')
   const [gymId, setGymId] = useState('')
   const [payments, setPayments] = useState<Payment[]>([])
   const [users, setUsers] = useState<User[]>([])
@@ -146,7 +149,8 @@ function Payments() {
   const [form, setForm] = useState<PaymentFormState>(emptyForm)
   const [isEditing, setIsEditing] = useState(false)
   const [editingPaymentId, setEditingPaymentId] = useState('')
-  const [hasPlan, setHasPlan] = useState(false)
+  // A paid payment already activated its membership, so the API keeps its plan and amount.
+  const [isPaidRecord, setIsPaidRecord] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [modalError, setModalError] = useState<string | null>(null)
   const [reference, setReference] = useState('')
@@ -227,7 +231,7 @@ function Payments() {
     setForm(emptyForm)
     setIsEditing(false)
     setEditingPaymentId('')
-    setHasPlan(false)
+    setIsPaidRecord(false)
     setModalError(null)
     setIsModalOpen(true)
   }
@@ -237,7 +241,7 @@ function Payments() {
     setForm(emptyForm)
     setIsEditing(false)
     setEditingPaymentId('')
-    setHasPlan(false)
+    setIsPaidRecord(false)
     setReference('')
     setModalError(null)
     setIsModalOpen(false)
@@ -273,7 +277,7 @@ function Payments() {
       setForm(emptyForm)
       setIsEditing(false)
       setEditingPaymentId('')
-      setHasPlan(false)
+      setIsPaidRecord(false)
       setReference('')
       setIsModalOpen(false)
     } catch (requestError) {
@@ -285,6 +289,7 @@ function Payments() {
 
   function handleUserChange(userId: string) {
     const selectedUser = users.find((user) => getRecordId(user) === userId)
+    // Suggests the client's current plan to renew it; picking another one changes the plan when the payment is paid.
     const activePlan = selectedUser ? getAssignedPlan(selectedUser, plans) : undefined
     const activePlanPrice = activePlan?.price ?? activePlan?.precio
 
@@ -292,9 +297,8 @@ function Payments() {
       ...current,
       userId,
       planId: activePlan ? getRecordId(activePlan) : '',
-      amount: activePlanPrice === undefined ? '0' : String(activePlanPrice),
+      amount: activePlanPrice === undefined ? '' : String(activePlanPrice),
     }))
-    setHasPlan(Boolean(activePlan))
   }
 
   function handlePlanChange(planId: string) {
@@ -322,8 +326,6 @@ function Payments() {
       getRecordId(plan) === getRelationId(payment.planId ?? payment.plan)
       || (plan.name || plan.nombre) === paymentPlanName
     ))
-    const assignedPlan = users.find((user) => getRecordId(user) === userId)
-
     setForm({
       userId,
       planId: selectedPlan ? getRecordId(selectedPlan) : getRelationId(payment.planId ?? payment.plan),
@@ -334,7 +336,7 @@ function Payments() {
     setReference(payment.reference || '')
     setIsEditing(true)
     setEditingPaymentId(paymentId)
-    setHasPlan(Boolean(assignedPlan && getAssignedPlan(assignedPlan, plans)))
+    setIsPaidRecord(toPaymentStatus(payment.status) === 'paid')
     setModalError(null)
     setIsModalOpen(true)
   }
@@ -497,22 +499,26 @@ function Payments() {
                       <td className="whitespace-nowrap px-6 py-4 text-right">
                         <div className="inline-flex items-center gap-3">
                           {isPending && <span className="text-xs font-medium text-slate-400">Requiere PIN</span>}
-                          <button
-                            className="cursor-pointer text-slate-400 transition hover:text-green-600"
-                            type="button"
-                            aria-label="Editar pago"
-                            onClick={() => handleEditPayment(payment)}
-                          >
-                            <Pencil className="h-4 w-4" aria-hidden="true" />
-                          </button>
-                          <button
-                            className="cursor-pointer text-slate-400 transition hover:text-red-600"
-                            type="button"
-                            aria-label="Eliminar pago"
-                            onClick={() => handleDelete(payment)}
-                          >
-                            <Trash2 className="h-4 w-4" aria-hidden="true" />
-                          </button>
+                          {canManage && (
+                            <>
+                              <button
+                                className="cursor-pointer text-slate-400 transition hover:text-green-600"
+                                type="button"
+                                aria-label="Editar pago"
+                                onClick={() => handleEditPayment(payment)}
+                              >
+                                <Pencil className="h-4 w-4" aria-hidden="true" />
+                              </button>
+                              <button
+                                className="cursor-pointer text-slate-400 transition hover:text-red-600"
+                                type="button"
+                                aria-label="Eliminar pago"
+                                onClick={() => handleDelete(payment)}
+                              >
+                                <Trash2 className="h-4 w-4" aria-hidden="true" />
+                              </button>
+                            </>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -577,7 +583,7 @@ function Payments() {
                   id="payment-plan"
                   value={form.planId}
                   onChange={(event) => handlePlanChange(event.target.value)}
-                  disabled={isEditing || hasPlan}
+                  disabled={isPaidRecord}
                   required
                 >
                   <option value="">Selecciona un plan</option>
@@ -586,6 +592,7 @@ function Payments() {
                     return <option key={planId} value={getRecordId(plan)}>{plan.name || plan.nombre || 'Plan sin nombre'}</option>
                   })}
                 </select>
+                {isPaidRecord && <p className="mt-1 text-xs text-slate-500">El pago ya activó la membresía; para cambiar de plan registra un pago nuevo.</p>}
               </div>
 
               {quote && quote.promotions.length > 0 && (
@@ -621,19 +628,19 @@ function Payments() {
                 <div>
                   <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="payment-amount">Monto</label>
                   <input
-                    className={`w-full rounded-lg border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100 ${isEditing || hasPlan || selectedPromotion ? 'cursor-not-allowed bg-slate-100 text-slate-500' : 'bg-white'}`}
+                    className={`w-full rounded-lg border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100 ${isPaidRecord || selectedPromotion ? 'cursor-not-allowed bg-slate-100 text-slate-500' : 'bg-white'}`}
                     id="payment-amount"
                     type="number"
                     min="0"
                     step="0.01"
                     value={selectedPromotion ? String(selectedPromotion.amount) : form.amount}
                     onChange={(event) => setForm({ ...form, amount: event.target.value })}
-                    readOnly={isEditing || hasPlan || Boolean(selectedPromotion)}
+                    readOnly={isPaidRecord || Boolean(selectedPromotion)}
                     required
                   />
                   {selectedPromotion
                     ? <p className="mt-1 text-xs text-slate-500">Calculado con la promoción.</p>
-                    : (isEditing || hasPlan) && <p className="mt-1 text-xs text-slate-500">Monto protegido para conservar el registro.</p>}
+                    : isPaidRecord && <p className="mt-1 text-xs text-slate-500">Monto protegido para conservar el registro.</p>}
                 </div>
                 <div>
                   <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="payment-source">Método de pago</label>

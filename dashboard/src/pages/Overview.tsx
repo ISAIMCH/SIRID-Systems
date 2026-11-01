@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Activity, CreditCard, ShoppingBag, TrendingUp, Users } from 'lucide-react'
+import { CreditCard, PackageX, ShoppingBag, TrendingUp, Users } from 'lucide-react'
 import { getPayments, getProducts, getSales, getUsers } from '../services/api'
 import type { Sale } from '../services/api'
-import type { Product } from '../types'
+import type { Product, User } from '../types'
 import { canAccessPage, useStaffRoles } from '../utils/access'
 
 const LOW_STOCK_THRESHOLD = 5
@@ -18,15 +18,16 @@ interface DashboardPayment {
   status?: string
   method?: string
   source?: string
+  paymentDate?: string
   createdAt?: string
   date?: string
 }
 
 interface OverviewStats {
-  totalUsers: number
-  activeSubscriptions: number
-  revenue: number
-  systemStatus: string
+  clients: number
+  activeMemberships: number
+  monthRevenue: number
+  lowStock: number
 }
 
 interface ActivityItem {
@@ -38,15 +39,17 @@ interface ActivityItem {
   date?: string
 }
 
+const formatCount = (value: number) => value.toLocaleString('es-MX')
+
 const statCards = [
-  { key: 'totalUsers', label: 'Usuarios Totales', icon: Users, iconClass: 'text-slate-600', format: (value: number | string) => Number(value).toLocaleString('es-MX') },
-  { key: 'activeSubscriptions', label: 'Suscripciones Activas', icon: CreditCard, iconClass: 'text-green-600', format: (value: number | string) => Number(value).toLocaleString('es-MX') },
-  { key: 'revenue', label: 'Ingresos', icon: TrendingUp, iconClass: 'text-emerald-600', format: (value: number | string) => Number(value).toLocaleString('es-MX', { style: 'currency', currency: 'MXN' }) },
-  { key: 'systemStatus', label: 'Estado del Sistema', icon: Activity, iconClass: 'text-green-600', format: (value: number | string) => String(value) },
+  { key: 'clients', label: 'Clientes', icon: Users, iconClass: 'text-slate-600', format: formatCount },
+  { key: 'activeMemberships', label: 'Membresías vigentes', icon: CreditCard, iconClass: 'text-green-600', format: formatCount },
+  { key: 'monthRevenue', label: 'Ingresos del mes', icon: TrendingUp, iconClass: 'text-emerald-600', format: (value: number) => value.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' }) },
+  { key: 'lowStock', label: 'Productos con stock bajo', icon: PackageX, iconClass: 'text-amber-600', format: formatCount },
 ] as const
 
-// Revenue and subscriptions come from payments, which only Admin and Recepcion can read.
-const BILLING_STATS: readonly string[] = ['activeSubscriptions', 'revenue']
+// Revenue and stock come from payments, sales and the store, which Coaches do not manage.
+const BILLING_STATS: readonly string[] = ['monthRevenue', 'lowStock']
 
 function extractArray<T>(value: unknown, keys: string[]): T[] {
   if (Array.isArray(value)) return value as T[]
@@ -68,6 +71,33 @@ function isSuccessfulPayment(status: string | undefined) {
   return ['paid', 'pagado', 'completado', 'completada', 'completed'].includes(status?.toLowerCase() || '')
 }
 
+function isClient(user: User) {
+  return user.roles ? user.roles.includes('Cliente') : user.role === 'Cliente'
+}
+
+// Same rule as the API's hasActiveMembership: active, already started and not expired.
+function hasCurrentMembership(user: User, now: Date) {
+  const membership = user.membership
+  return membership?.status === 'active'
+    && (!membership.startsAt || new Date(membership.startsAt) <= now)
+    && (!membership.expiresAt || new Date(membership.expiresAt) >= now)
+}
+
+function isThisMonth(value: string | undefined, now: Date) {
+  if (!value) return false
+  const date = new Date(value)
+  return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth()
+}
+
+function statusLabel(status: string) {
+  switch (status.toLowerCase()) {
+    case 'paid': return 'Pagado'
+    case 'pending': return 'Pendiente'
+    case 'cancelled': return 'Cancelado'
+    default: return status
+  }
+}
+
 function relationName(value: unknown) {
   if (!value || typeof value !== 'object') return ''
   const relation = value as { name?: string; nombre?: string }
@@ -77,14 +107,14 @@ function relationName(value: unknown) {
 function paymentActivity(payments: DashboardPayment[]): ActivityItem[] {
   return payments.map((payment, index) => ({
     id: payment.id || payment._id || payment.orderId || `payment-${index}`,
-    title: 'Pago recibido',
+    title: 'Pago de membresía',
     detail: relationName(payment.user || payment.userId)
       || payment.method
       || payment.source
       || 'Pago de suscripción',
     amount: numericValue(payment.total ?? payment.amount),
-    status: payment.status || 'Sin estado',
-    date: payment.createdAt || payment.date,
+    status: statusLabel(payment.status || 'Sin estado'),
+    date: payment.paymentDate || payment.createdAt || payment.date,
   }))
 }
 
@@ -94,7 +124,7 @@ function saleActivity(sales: Sale[]): ActivityItem[] {
     title: 'Venta de tienda',
     detail: relationName(sale.userId) || 'Orden de tienda',
     amount: numericValue(sale.totalAmount),
-    status: sale.status || 'Sin estado',
+    status: statusLabel(sale.status || 'Sin estado'),
     date: sale.createdAt || sale.date,
   }))
 }
@@ -136,7 +166,7 @@ function Overview() {
         getUsers<unknown>(),
         canSeeBilling ? getPayments<unknown>() : undefined,
         canSeeBilling ? getSales<unknown>() : undefined,
-        getProducts<unknown>(),
+        canSeeBilling ? getProducts<unknown>() : undefined,
       ])
 
       if (!isMounted) return
@@ -149,28 +179,29 @@ function Overview() {
         return undefined
       }
 
-      const users = extractArray<unknown>(getResult(0, 'usuarios'), ['data', 'users'])
+      const users = extractArray<User>(getResult(0, 'usuarios'), ['data', 'users'])
       const payments = extractArray<DashboardPayment>(getResult(1, 'pagos'), ['data', 'payments', 'pagos'])
       const sales = extractArray<Sale>(getResult(2, 'ventas'), ['data', 'sales', 'ventas'])
       const products = extractArray<Product>(getResult(3, 'productos'), ['data', 'products', 'productos'])
-      const paidPayments = payments.filter((payment) => isSuccessfulPayment(payment.status))
+      const now = new Date()
+      const clients = users.filter(isClient)
+      const monthPayments = payments.filter((payment) => isSuccessfulPayment(payment.status)
+        && isThisMonth(payment.paymentDate || payment.createdAt || payment.date, now))
+      const monthSales = sales.filter((sale) => isSuccessfulPayment(sale.status) && isThisMonth(sale.createdAt || sale.date, now))
       // A product counts as low when any visible gym is running out of it.
       const lowStockCount = products.filter((product) => (product.stockByGym?.length
         ? product.stockByGym.some((item) => item.quantity <= LOW_STOCK_THRESHOLD)
         : numericValue(product.stock) <= LOW_STOCK_THRESHOLD)).length
 
       setStats({
-        totalUsers: users.length,
-        activeSubscriptions: paidPayments.length,
-        revenue: paidPayments.reduce((total, payment) => total + numericValue(payment.total ?? payment.amount), 0),
-        systemStatus: failures.length
-          ? 'Datos incompletos'
-          : lowStockCount
-            ? `${lowStockCount} producto${lowStockCount === 1 ? '' : 's'} con stock bajo`
-            : 'En línea',
+        clients: clients.length,
+        activeMemberships: clients.filter((user) => hasCurrentMembership(user, now)).length,
+        monthRevenue: monthPayments.reduce((total, payment) => total + numericValue(payment.total ?? payment.amount), 0)
+          + monthSales.reduce((total, sale) => total + numericValue(sale.totalAmount), 0),
+        lowStock: lowStockCount,
       })
 
-      const activity = (sales.length ? saleActivity(sales) : paymentActivity(payments))
+      const activity = [...saleActivity(sales), ...paymentActivity(payments)]
         .sort((first, second) => {
           const firstTime = first.date ? new Date(first.date).getTime() : 0
           const secondTime = second.date ? new Date(second.date).getTime() : 0
@@ -185,12 +216,7 @@ function Overview() {
     loadOverview().catch((requestError: unknown) => {
       if (!isMounted) return
       setError(requestError instanceof Error ? requestError.message : 'No se pudo cargar el resumen.')
-      setStats({
-        totalUsers: 0,
-        activeSubscriptions: 0,
-        revenue: 0,
-        systemStatus: 'Estado no disponible',
-      })
+      setStats({ clients: 0, activeMemberships: 0, monthRevenue: 0, lowStock: 0 })
       setIsLoading(false)
     })
 

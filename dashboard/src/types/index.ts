@@ -46,6 +46,9 @@ export interface UserMembership {
   planId?: string | UserReference
   plan?: string | UserReference
   planName?: string
+  status?: 'pending' | 'active' | 'suspended' | 'expired'
+  startsAt?: string
+  expiresAt?: string
 }
 
 export type PlanType = 'standard' | 'student' | 'limited_hours' | 'single_gym' | 'promotional'
