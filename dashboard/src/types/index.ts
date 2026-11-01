@@ -1,5 +1,11 @@
 export type UserRole = 'Admin' | 'Coach' | 'Recepcion' | 'Cliente'
 
+// Propietario and Cliente cover the whole organization; staff roles are held per gym and combine freely.
+export type GymRole = 'Gerente' | 'Coach' | 'Recepcion'
+export type MemberRole = 'Propietario' | 'Cliente' | GymRole
+// What the users form assigns: Cliente alone, or any mix of staff roles in one gym.
+export type AssignableRole = 'Cliente' | GymRole
+
 export interface User {
   id?: string
   _id?: string
@@ -7,7 +13,10 @@ export interface User {
   firstName?: string
   lastName?: string
   email: string
+  // Legacy single role (Propietario and Gerente are Admin); `roles` and `gymRoles` give the full picture.
   role: UserRole
+  roles?: MemberRole[]
+  gymRoles?: Array<{ gymId: string; roles: GymRole[] }>
   status?: string
   isActive?: boolean
   phone?: string
