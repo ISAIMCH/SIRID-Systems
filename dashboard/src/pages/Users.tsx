@@ -1,17 +1,19 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { History, KeyRound, Pencil } from 'lucide-react'
+import { ChartColumn, History, KeyRound, Pencil } from 'lucide-react'
 import { ApiError, createUser, getPlans, getUsers, regenerateActivationCode, updateUser } from '../services/api'
 import type { UserPayload } from '../services/api'
 import type { AssignableRole, GymRole, MemberRole, Plan, User, UserReference } from '../types'
 import GymSelect from '../components/GymSelect'
 import ClientHistoryPanel from '../components/ClientHistoryPanel'
+import ClientProgressPanel, { type ProgressClient } from '../components/ClientProgressPanel'
 import ClientEnrollmentModal, { type EnrollmentOutcome } from '../components/ClientEnrollmentModal'
 import StaffInvitationsPanel, { type InvitePrefill } from '../components/StaffInvitationsPanel'
 import { ROLE_LABELS, STAFF_ROLES } from '../utils/roles'
 import { useAuth } from '../store/useAuth'
 import { targetGymField } from '../utils/targetGym'
 import { canAccessPage, useStaffRoles } from '../utils/access'
+import { formatMembershipDate, membershipBadge } from '../utils/membership'
 
 type UsersResponse = User[] | { data?: unknown; users?: unknown }
 type PlansResponse = Plan[] | { data?: unknown; plans?: unknown; planes?: unknown }
@@ -135,12 +137,15 @@ function Users() {
   const canSeePlans = canAccessPage(roles, '/subscriptions')
   // Shared histories are for owners, managers and Coaches; reception never sees them.
   const canSeeHistory = isAdmin || roles.has('Coach')
+  // Managers and Coaches follow a client's progress and edit their notes; a Coach only sees assigned clients.
+  const canFollowUp = isAdmin || roles.has('Coach')
   // Reception registers clients who have no app yet and hands out their activation codes.
   const canEnroll = isAdmin || roles.has('Recepcion')
   // null: closed; 'form': new client; an outcome: the code view.
   const [enrollment, setEnrollment] = useState<'form' | EnrollmentOutcome | null>(null)
   const [regeneratingId, setRegeneratingId] = useState('')
   const [historyClient, setHistoryClient] = useState<{ id: string; name: string } | null>(null)
+  const [progressClient, setProgressClient] = useState<ProgressClient | null>(null)
   const [gymId, setGymId] = useState('')
   const [users, setUsers] = useState<User[]>([])
   const [plans, setPlans] = useState<Plan[]>([])
@@ -368,12 +373,30 @@ function Users() {
     }
   }
 
+  function openProgress(user: User) {
+    const coach = user.assignedCoach
+    setProgressClient({
+      id: recordId(user.id ?? user._id),
+      name: userDisplayName(user) || 'Cliente',
+      email: user.email,
+      goal: user.goal,
+      experienceLevel: user.experienceLevel,
+      coachName: typeof coach === 'object' ? coach?.name : undefined,
+      membership: user.membership,
+      observations: user.observations || '',
+    })
+  }
+
+  function handleObservationsSaved(clientId: string, observations: string) {
+    setUsers((current) => current.map((user) => (recordId(user.id ?? user._id) === clientId ? { ...user, observations } : user)))
+  }
+
   const matchesSearch = (user: User) =>
     `${userDisplayName(user)} ${user.email || ''}`.toLocaleLowerCase().includes(searchTerm.trim().toLocaleLowerCase())
   const clients = users.filter((user) => isClientUser(user) && matchesSearch(user))
   const staff = users.filter((user) => !isClientUser(user) && matchesSearch(user))
 
-  function renderUsersTable(groupUsers: User[], emptyMessage: string) {
+  function renderUsersTable(groupUsers: User[], emptyMessage: string, showMembership: boolean) {
     return (
       <table className="min-w-full text-left text-sm">
         <thead className="border-b border-slate-100 bg-slate-50/80 text-xs uppercase tracking-wider text-slate-500">
@@ -382,6 +405,8 @@ function Users() {
             <th className="px-6 py-4 font-medium">Email</th>
             <th className="px-6 py-4 font-medium">Rol</th>
             <th className="px-6 py-4 font-medium">Estado</th>
+            {showMembership && <th className="px-6 py-4 font-medium">Membresía</th>}
+            {showMembership && <th className="px-6 py-4 font-medium">Vence</th>}
             <th className="px-6 py-4 font-medium" />
           </tr>
         </thead>
@@ -393,6 +418,7 @@ function Users() {
               const isStaff = !rowRoles.includes('Cliente')
               const isActive = user?.isActive === true
               const isPendingActivation = !isStaff && user.pendingActivation === true
+              const badge = membershipBadge(user.membership)
 
               return (
                 <tr className="transition-colors hover:bg-slate-50" key={userId}>
@@ -435,6 +461,15 @@ function Users() {
                       )}
                     </div>
                   </td>
+                  {showMembership && (
+                    <td className="px-6 py-4">
+                      <p className="whitespace-nowrap font-medium text-slate-900">{user.membership?.planName || 'Sin plan'}</p>
+                      <span className={`mt-1 inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${badge.tone}`}>{badge.label}</span>
+                    </td>
+                  )}
+                  {showMembership && (
+                    <td className="whitespace-nowrap px-6 py-4 text-slate-500">{formatMembershipDate(user.membership?.expiresAt)}</td>
+                  )}
                   <td className="whitespace-nowrap px-6 py-4 text-right">
                     {canEnroll && isPendingActivation && recordId(user.id ?? user._id) && (
                       <button
@@ -446,6 +481,17 @@ function Users() {
                         disabled={regeneratingId === recordId(user.id ?? user._id)}
                       >
                         <KeyRound className="h-4 w-4" aria-hidden="true" />
+                      </button>
+                    )}
+                    {canFollowUp && !isStaff && recordId(user.id ?? user._id) && (
+                      <button
+                        className="mr-3 cursor-pointer text-slate-400 transition hover:text-green-600"
+                        type="button"
+                        aria-label={`Seguimiento de ${user?.name || 'cliente'}`}
+                        title="Progreso y observaciones"
+                        onClick={() => openProgress(user)}
+                      >
+                        <ChartColumn className="h-4 w-4" aria-hidden="true" />
                       </button>
                     )}
                     {canSeeHistory && !isStaff && recordId(user.id ?? user._id) && (
@@ -476,7 +522,7 @@ function Users() {
             })
           ) : (
             <tr>
-              <td className="px-6 py-10 text-center text-sm text-slate-500" colSpan={5}>
+              <td className="px-6 py-10 text-center text-sm text-slate-500" colSpan={showMembership ? 7 : 5}>
                 {emptyMessage}
               </td>
             </tr>
@@ -586,6 +632,7 @@ function Users() {
                   activeTab === 'clientes' || !isAdmin
                     ? searchTerm ? 'No hay clientes que coincidan con la búsqueda.' : 'No hay clientes encontrados.'
                     : searchTerm ? 'No hay miembros del staff que coincidan con la búsqueda.' : 'No hay miembros del staff encontrados.',
+                  activeTab === 'clientes' || !isAdmin,
                 )}
               </div>
             )}
@@ -603,6 +650,14 @@ function Users() {
 
       {historyClient && (
         <ClientHistoryPanel client={historyClient} canSeeLogs={isAdmin} onClose={() => setHistoryClient(null)} />
+      )}
+
+      {progressClient && (
+        <ClientProgressPanel
+          client={progressClient}
+          onObservationsSaved={handleObservationsSaved}
+          onClose={() => setProgressClient(null)}
+        />
       )}
 
       {isModalOpen && (

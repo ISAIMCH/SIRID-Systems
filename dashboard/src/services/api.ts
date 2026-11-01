@@ -1031,3 +1031,51 @@ export function getMyStaffInvitations() {
 export function respondToStaffInvitation(invitationId: string, answer: 'accept' | 'reject') {
   return apiClient<{ invitation: StaffInvitation }>(`/staff-invitations/me/${invitationId}/${answer}`, { method: 'POST' }, { withGym: false })
 }
+
+export type AnalyticsPeriod = 'day' | 'week' | 'month'
+
+export interface ClientAnalyticsPoint {
+  // HH:00 for a day, YYYY-MM-DD for a week or month.
+  label: string
+  durationMinutes: number
+  totalVolumeKg: number
+  caloriesBurned: number
+}
+
+// Staff only count the sessions the client trained with their organization.
+export interface ClientAnalytics {
+  clientId: string
+  period: AnalyticsPeriod
+  date: string
+  timezone: string
+  totals: { sessionCount: number; durationMinutes: number; totalVolumeKg: number; caloriesBurned: number }
+  bestLift: { weightKg: number; exerciseName?: string; completedAt: string } | null
+  chartData: ClientAnalyticsPoint[]
+}
+
+export function getClientAnalytics(clientId: string, params: { period: AnalyticsPeriod; date: string; timezone: string }) {
+  const query = new URLSearchParams(params).toString()
+  return apiClient<ClientAnalytics>(`/analytics/client/${clientId}?${query}`)
+}
+
+// Notes of the active organization; a Coach only edits those of their assigned clients.
+export function updateClientObservations(clientId: string, observations: string) {
+  return apiClient<{ user: { id: string; observations: string } }>(`/users/${clientId}/observations`, {
+    method: 'PATCH',
+    body: JSON.stringify({ observations }),
+  })
+}
+
+// Days and hours come in UTC.
+export interface OperationsDashboard {
+  period: 'day' | 'week'
+  today: { checkIns: number; checkOuts: number }
+  currentOccupancy: number
+  dailyAttendance: Array<{ date: string; checkIns: number; checkOuts: number }>
+  hourlyDemand: Array<{ hour: number; checkIns: number }>
+  peakHour: { hour: number; checkIns: number } | null
+}
+
+export function getOperationsDashboard(period: 'day' | 'week') {
+  return apiClient<OperationsDashboard>(`/analytics/dashboard?period=${period}`)
+}
