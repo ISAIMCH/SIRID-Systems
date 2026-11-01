@@ -106,7 +106,7 @@ function Sales() {
     async function loadData() {
       try {
         const [salesResponse, usersResponse, productsResponse, promotionsResponse] = await Promise.all([
-          getSales<SaleResponse>(), getUsers<UserResponse>(), getProducts<ProductResponse>(), getPromotions<PromotionResponse>(),
+          getSales<SaleResponse>(), getUsers<UserResponse>(), getProducts<ProductResponse>(), getPromotions<PromotionResponse>('store'),
         ])
         if (!isMounted) return
         setSales(extractArray<Sale>(salesResponse, ['data', 'sales', 'ventas']))

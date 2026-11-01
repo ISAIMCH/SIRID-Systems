@@ -3,13 +3,14 @@ import { Pencil, Plus, Trash2 } from 'lucide-react'
 import {
   createPayment,
   deletePayment,
+  getPaymentQuote,
   getPayments,
   getPlans,
   getUsers,
   redeemPaymentPin,
   updatePayment,
 } from '../services/api'
-import type { Payment, PaymentPayload, PaymentRelation, PaymentStatus } from '../services/api'
+import type { MembershipQuote, Payment, PaymentPayload, PaymentRelation, PaymentStatus } from '../services/api'
 import { socket } from '../services/socket'
 import type { Plan, User } from '../types'
 import GymSelect from '../components/GymSelect'
@@ -30,6 +31,10 @@ const emptyForm: PaymentFormState = {
   amount: '',
   paymentDate: new Date().toISOString().slice(0, 10),
   status: 'paid',
+}
+
+function formatMoney(value: number) {
+  return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(value)
 }
 
 function extractArray<T>(value: unknown, keys: string[]): T[] {
@@ -148,6 +153,9 @@ function Payments() {
   const [pin, setPin] = useState('')
   const [isRedeemingPin, setIsRedeemingPin] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
+  // The quote and the promotion picked belong to one plan and client (quoteKey); a new pair starts over.
+  const [quoteState, setQuoteState] = useState<{ key: string; quote: MembershipQuote } | null>(null)
+  const [chosenPromotion, setChosenPromotion] = useState<{ key: string; promotionId: string } | null>(null)
 
   async function refreshPayments() {
     const response = await getPayments<unknown>()
@@ -199,6 +207,22 @@ function Payments() {
     }
   }, [])
 
+  // New payments are priced by the API with the current membership promotions of the plan.
+  const quoteKey = isModalOpen && !isEditing && form.planId ? `${form.planId}:${form.userId}` : ''
+  const quote = quoteState?.key === quoteKey ? quoteState.quote : null
+  const selectedPromotionId = chosenPromotion?.key === quoteKey ? chosenPromotion.promotionId : quote?.best?.promotionId ?? ''
+  const selectedPromotion = quote?.promotions.find((option) => option.promotionId === selectedPromotionId) ?? null
+
+  useEffect(() => {
+    if (!quoteKey) return
+    let isCurrent = true
+    const [planId, userId] = quoteKey.split(':')
+    getPaymentQuote(planId, userId || undefined)
+      .then((result) => { if (isCurrent) setQuoteState({ key: quoteKey, quote: result }) })
+      .catch(() => { if (isCurrent) setQuoteState(null) })
+    return () => { isCurrent = false }
+  }, [quoteKey])
+
   function openCreateModal() {
     setForm(emptyForm)
     setIsEditing(false)
@@ -231,7 +255,8 @@ function Payments() {
       const payload: PaymentPayload = {
         userId: form.userId,
         planId: form.planId,
-        amount: Number(form.amount),
+        amount: selectedPromotion ? selectedPromotion.amount : Number(form.amount),
+        ...(!isEditing && selectedPromotion ? { promotionId: selectedPromotion.promotionId } : {}),
         source: 'reception',
         paymentDate: form.paymentDate,
         reference: reference.trim() || undefined,
@@ -452,7 +477,10 @@ function Payments() {
                         {resolvedPlanName || planName || 'Sin plan'}
                       </td>
                       <td className="whitespace-nowrap px-6 py-4 text-slate-700">
-                        {new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(Number(payment.amount) || 0)}
+                        {formatMoney(Number(payment.amount) || 0)}
+                        {Number(payment.discountApplied) > 0 && (
+                          <p className="text-xs text-emerald-700">Promoción −{formatMoney(Number(payment.discountApplied))}</p>
+                        )}
                       </td>
                       <td className="whitespace-nowrap px-6 py-4 text-slate-500">{formatSource(payment.source)}</td>
                       <td className="whitespace-nowrap px-6 py-4 text-slate-500">
@@ -560,21 +588,52 @@ function Payments() {
                 </select>
               </div>
 
+              {quote && quote.promotions.length > 0 && (
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="payment-promotion">Promoción</label>
+                  <select
+                    className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                    id="payment-promotion"
+                    value={selectedPromotionId}
+                    onChange={(event) => setChosenPromotion({ key: quoteKey, promotionId: event.target.value })}
+                  >
+                    <option value="">Sin promoción · {formatMoney(quote.listPrice)}</option>
+                    {quote.promotions.map((option) => (
+                      <option key={option.promotionId} value={option.promotionId} disabled={option.eligible === false}>
+                        {option.title} · −{option.discountPercentage}% · {formatMoney(option.amount)}
+                        {option.eligible === false ? ' (falta documento verificado)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                  {selectedPromotion ? (
+                    <p className="mt-2 text-xs text-emerald-700">
+                      {formatMoney(selectedPromotion.listPrice)} − {formatMoney(selectedPromotion.discountApplied)} de descuento = {formatMoney(selectedPromotion.amount)}
+                    </p>
+                  ) : quote.promotions.some((option) => option.eligible === false) && (
+                    <p className="mt-2 text-xs text-slate-500">
+                      Hay promociones que piden un documento verificado del cliente; revísalo en Documentos.
+                    </p>
+                  )}
+                </div>
+              )}
+
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="payment-amount">Monto</label>
                   <input
-                    className={`w-full rounded-lg border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100 ${isEditing || hasPlan ? 'cursor-not-allowed bg-slate-100 text-slate-500' : 'bg-white'}`}
+                    className={`w-full rounded-lg border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100 ${isEditing || hasPlan || selectedPromotion ? 'cursor-not-allowed bg-slate-100 text-slate-500' : 'bg-white'}`}
                     id="payment-amount"
                     type="number"
                     min="0"
                     step="0.01"
-                    value={form.amount}
+                    value={selectedPromotion ? String(selectedPromotion.amount) : form.amount}
                     onChange={(event) => setForm({ ...form, amount: event.target.value })}
-                    readOnly={isEditing || hasPlan}
+                    readOnly={isEditing || hasPlan || Boolean(selectedPromotion)}
                     required
                   />
-                  {(isEditing || hasPlan) && <p className="mt-1 text-xs text-slate-500">Monto protegido para conservar el registro.</p>}
+                  {selectedPromotion
+                    ? <p className="mt-1 text-xs text-slate-500">Calculado con la promoción.</p>
+                    : (isEditing || hasPlan) && <p className="mt-1 text-xs text-slate-500">Monto protegido para conservar el registro.</p>}
                 </div>
                 <div>
                   <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="payment-source">Método de pago</label>

@@ -117,5 +117,11 @@ export interface Promotion {
   validUntil?: string
   isActive: boolean
   imageUrl?: string
+  // store: products in sales and the app; membership: plans charged in Payments.
+  appliesTo?: PromotionTarget
   applicableProducts?: string[]
+  applicablePlans?: string[]
+  requiredDocument?: 'student_id' | null
 }
+
+export type PromotionTarget = 'store' | 'membership'
