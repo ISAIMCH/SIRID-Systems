@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { History, Pencil, Trash2 } from 'lucide-react'
-import { API_BASE_URL, createUser, getPlans, getUsers, updateUser } from '../services/api'
+import { API_BASE_URL, ApiError, createUser, getPlans, getUsers, updateUser } from '../services/api'
 import type { UserPayload } from '../services/api'
 import type { AssignableRole, GymRole, MemberRole, Plan, User, UserReference } from '../types'
 import GymSelect from '../components/GymSelect'
 import ClientHistoryPanel from '../components/ClientHistoryPanel'
+import StaffInvitationsPanel, { type InvitePrefill } from '../components/StaffInvitationsPanel'
+import { ROLE_LABELS, STAFF_ROLES } from '../utils/roles'
 import { ALL_GYMS, getActiveGymId } from '../services/activeGym'
 import { useAuth } from '../store/useAuth'
 import { targetGymField } from '../utils/targetGym'
@@ -22,15 +24,6 @@ const trainingDays = [
   { label: 'S', value: 6 },
   { label: 'D', value: 0 },
 ]
-
-const ROLE_LABELS: Record<MemberRole, string> = {
-  Propietario: 'Propietario',
-  Gerente: 'Gerente',
-  Coach: 'Coach',
-  Recepcion: 'Recepción',
-  Cliente: 'Cliente',
-}
-const STAFF_ROLES: GymRole[] = ['Gerente', 'Coach', 'Recepcion']
 
 interface UserFormState {
   name: string
@@ -189,7 +182,10 @@ function Users() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [modalError, setModalError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
-  const [activeTab, setActiveTab] = useState<'clientes' | 'staff'>('clientes')
+  const [activeTab, setActiveTab] = useState<'clientes' | 'staff' | 'invitaciones'>('clientes')
+  // Opens the invite form; set from the header or when "Nuevo usuario" finds the email already has an account.
+  const [invitePrefill, setInvitePrefill] = useState<InvitePrefill | null>(null)
+  const [existingAccount, setExistingAccount] = useState<InvitePrefill | null>(null)
 
   useEffect(() => {
     let isMounted = true
@@ -234,6 +230,8 @@ function Users() {
   const isOwnerRow = Boolean(editingUser && userRoles(editingUser).includes('Propietario'))
   const canEditRoles = !isOwnerRow && (isOwner || !(editingUser && userRoles(editingUser).includes('Gerente')))
   const rolesChanged = !editingUser || !sameRoles(form.roles, assignableRoles(editingUser, roleGymId))
+  // Accounts other organizations also use keep the email and password their holder chose.
+  const credentialsLocked = editingUser?.canEditCredentials === false
 
   function canEditUser(user: User) {
     const isManager = userRoles(user).some((role) => role === 'Propietario' || role === 'Gerente')
@@ -261,6 +259,7 @@ function Users() {
     setEditingUser(null)
     setForm(emptyUserForm)
     setModalError(null)
+    setExistingAccount(null)
     setIsModalOpen(true)
   }
 
@@ -269,7 +268,13 @@ function Users() {
     setEditingUser(null)
     setForm(emptyUserForm)
     setModalError(null)
+    setExistingAccount(null)
     setIsModalOpen(false)
+  }
+
+  function openInvite(prefill: InvitePrefill) {
+    setActiveTab('invitaciones')
+    setInvitePrefill(prefill)
   }
 
   function openEditModal(user: User) {
@@ -317,6 +322,7 @@ function Users() {
   async function handleSubmitUser(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setModalError(null)
+    setExistingAccount(null)
     setIsSubmitting(true)
 
     try {
@@ -364,9 +370,14 @@ function Users() {
       setEditingUser(null)
       setIsModalOpen(false)
     } catch (requestError) {
-      setModalError(
-        requestError instanceof Error ? requestError.message : 'No se pudo guardar el usuario.',
-      )
+      // Someone who already uses GymGo joins the staff by invitation instead of a second account.
+      const emailTaken = requestError instanceof ApiError && requestError.status === 409 && !editingUser
+      if (emailTaken && !isClientForm) {
+        setExistingAccount({ email: form.email.trim(), roles: form.roles.filter((role): role is GymRole => role !== 'Cliente') })
+      }
+      setModalError(emailTaken && isClientForm
+        ? 'Ese correo ya tiene una cuenta GymGo. El cliente puede unirse con el código del gimnasio desde la app.'
+        : requestError instanceof Error ? requestError.message : 'No se pudo guardar el usuario.')
     } finally {
       setIsSubmitting(false)
     }
@@ -476,13 +487,22 @@ function Users() {
           <p className="mt-3 text-slate-500">Consulta y gestiona los usuarios de la plataforma.</p>
         </div>
         {isAdmin && (
-          <button
-            className="rounded-lg bg-[#9BFF63] px-4 py-2 font-medium text-[#0F172A] transition hover:bg-[#abff7c]"
-            type="button"
-            onClick={openModal}
-          >
-            + Nuevo Usuario
-          </button>
+          <div className="flex flex-wrap gap-3">
+            <button
+              className="rounded-lg border border-slate-200 bg-white px-4 py-2 font-medium text-slate-700 transition hover:bg-slate-50"
+              type="button"
+              onClick={() => openInvite({ email: '', roles: [] })}
+            >
+              Invitar cuenta existente
+            </button>
+            <button
+              className="rounded-lg bg-[#9BFF63] px-4 py-2 font-medium text-[#0F172A] transition hover:bg-[#abff7c]"
+              type="button"
+              onClick={openModal}
+            >
+              + Nuevo Usuario
+            </button>
+          </div>
         )}
       </div>
 
@@ -493,7 +513,7 @@ function Users() {
           </div>
         )}
 
-        <div className="border-b border-slate-100 p-4">
+        <div className={`border-b border-slate-100 p-4 ${activeTab === 'invitaciones' ? 'hidden' : ''}`}>
           <input
             className="w-full max-w-sm rounded-lg border border-slate-200 px-4 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-100"
             type="search"
@@ -525,16 +545,29 @@ function Users() {
                   Staff {staff.length}
                 </button>
               )}
-            </div>
-
-            <div className="overflow-x-auto">
-              {renderUsersTable(
-                activeTab === 'clientes' || !isAdmin ? clients : staff,
-                activeTab === 'clientes' || !isAdmin
-                  ? searchTerm ? 'No hay clientes que coincidan con la búsqueda.' : 'No hay clientes encontrados.'
-                  : searchTerm ? 'No hay miembros del staff que coincidan con la búsqueda.' : 'No hay miembros del staff encontrados.',
+              {isAdmin && (
+                <button
+                  className={`px-4 py-2 ${activeTab === 'invitaciones' ? 'border-b-2 border-green-500 font-semibold text-green-700' : 'text-gray-500'}`}
+                  type="button"
+                  onClick={() => setActiveTab('invitaciones')}
+                >
+                  Invitaciones
+                </button>
               )}
             </div>
+
+            {isAdmin && activeTab === 'invitaciones' ? (
+              <StaffInvitationsPanel isOwner={isOwner} invitePrefill={invitePrefill} onCloseInvite={() => setInvitePrefill(null)} />
+            ) : (
+              <div className="overflow-x-auto">
+                {renderUsersTable(
+                  activeTab === 'clientes' || !isAdmin ? clients : staff,
+                  activeTab === 'clientes' || !isAdmin
+                    ? searchTerm ? 'No hay clientes que coincidan con la búsqueda.' : 'No hay clientes encontrados.'
+                    : searchTerm ? 'No hay miembros del staff que coincidan con la búsqueda.' : 'No hay miembros del staff encontrados.',
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -597,14 +630,21 @@ function Users() {
                   Correo Electrónico
                 </label>
                 <input
-                  className="w-full rounded-lg border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                  className="w-full rounded-lg border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100 disabled:bg-slate-100 disabled:text-slate-500"
                   id="user-email"
                   type="email"
                   autoComplete="email"
                   value={form.email}
                   onChange={(event) => setForm({ ...form, email: event.target.value })}
+                  disabled={credentialsLocked}
+                  aria-describedby={credentialsLocked ? 'user-credentials-hint' : undefined}
                   required
                 />
+                {credentialsLocked && (
+                  <p className="mt-1 text-xs text-slate-500" id="user-credentials-hint">
+                    Esta cuenta también se usa en otro gimnasio: solo su titular puede cambiar el correo o la contraseña desde su cuenta.
+                  </p>
+                )}
               </div>
 
               {!editingUser && (
@@ -941,13 +981,15 @@ function Users() {
                         Reset de Contraseña
                       </label>
                       <input
-                        className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                        className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100 disabled:bg-slate-100 disabled:text-slate-500"
                         id="staff-password-reset"
                         type="password"
                         autoComplete="new-password"
-                        placeholder="Nueva contraseña (dejar en blanco para conservar actual)"
+                        placeholder={credentialsLocked ? 'Solo su titular puede cambiarla' : 'Nueva contraseña (dejar en blanco para conservar actual)'}
                         value={form.password}
                         onChange={(event) => setForm({ ...form, password: event.target.value })}
+                        disabled={credentialsLocked}
+                        aria-describedby={credentialsLocked ? 'user-credentials-hint' : undefined}
                       />
                     </div>
                   )}
@@ -955,9 +997,22 @@ function Users() {
               )}
 
               {modalError && (
-                <p className="border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
-                  {modalError}
-                </p>
+                <div className="border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
+                  <p>{modalError}</p>
+                  {existingAccount && (
+                    <button
+                      className="mt-2 font-medium text-red-800 underline underline-offset-2 hover:text-red-900"
+                      type="button"
+                      onClick={() => {
+                        const prefill = existingAccount
+                        closeModal()
+                        openInvite(prefill)
+                      }}
+                    >
+                      Invitar esa cuenta a tu staff
+                    </button>
+                  )}
+                </div>
               )}
 
               <div className="flex justify-end gap-3 pt-2">

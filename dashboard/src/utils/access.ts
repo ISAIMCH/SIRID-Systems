@@ -1,6 +1,18 @@
 import { useAuth } from '../store/useAuth'
+import type { SessionGym, SessionResponse } from '../services/api'
 
 export type StaffRole = 'Admin' | 'Coach' | 'Recepcion'
+
+// The dashboard is for staff: gyms of organizations where the person is only a client are left out.
+export function isStaffGym(gym: SessionGym) {
+  return gym.roles.some((role) => role !== 'Cliente')
+}
+
+// SIRID staff, or staff of some gym of any organization. The legacy `role` of a session opened without a gym
+// follows the person's first organization, so it can say Cliente for someone who works in another one.
+export function canUseDashboard(session: SessionResponse) {
+  return Boolean(session.user.isPlatformAdmin) || session.gyms.some(isStaffGym)
+}
 
 // Mirrors the API's authorize() for each page's main data; pages not listed are open to every staff role.
 const PAGE_ROLES: Record<string, StaffRole[]> = {

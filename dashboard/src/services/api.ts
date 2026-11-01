@@ -1,4 +1,4 @@
-import type { AssignableRole, Equipment, User, UserRole } from '../types'
+import type { AssignableRole, Equipment, GymRole, User, UserRole } from '../types'
 import { ALL_GYMS, getActiveGymId } from './activeGym'
 
 export const API_BASE_URL = import.meta.env.VITE_GYMGO_API_URL
@@ -912,4 +912,42 @@ export function getSharedHistory(shareId: string) {
 
 export function getHistoryAccessLogs(clientId?: string) {
   return apiClient<{ logs: HistoryAccessLogEntry[] }>(`/history-shares/logs${clientId ? `?clientId=${clientId}` : ''}`)
+}
+
+export type StaffInvitationStatus = 'pending' | 'accepted' | 'rejected' | 'cancelled' | 'expired'
+
+// A gym's offer to an existing GymGo account to join its staff; it takes effect when the person accepts.
+export interface StaffInvitation {
+  id: string
+  email: string
+  roles: GymRole[]
+  status: StaffInvitationStatus
+  gym: { id: string; name: string | null }
+  organization: { id: string; name: string | null }
+  invitedBy: { id: string; name: string | null } | null
+  createdAt: string
+  expiresAt: string
+  respondedAt: string | null
+}
+
+export function getStaffInvitations() {
+  return apiClient<{ invitations: StaffInvitation[] }>('/staff-invitations')
+}
+
+// The API answers the same whether the account exists or not; `message` says so.
+export function createStaffInvitation(payload: { email: string; roles: GymRole[]; gymId?: string }) {
+  return apiClient<{ invitation: StaffInvitation; message: string }>('/staff-invitations', { method: 'POST', body: JSON.stringify(payload) })
+}
+
+export function cancelStaffInvitation(invitationId: string) {
+  return apiClient<{ invitation: StaffInvitation }>(`/staff-invitations/${invitationId}/cancel`, { method: 'POST' })
+}
+
+// The signed-in person's own invitations, from any organization.
+export function getMyStaffInvitations() {
+  return apiClient<{ invitations: StaffInvitation[] }>('/staff-invitations/me', {}, { withGym: false })
+}
+
+export function respondToStaffInvitation(invitationId: string, answer: 'accept' | 'reject') {
+  return apiClient<{ invitation: StaffInvitation }>(`/staff-invitations/me/${invitationId}/${answer}`, { method: 'POST' }, { withGym: false })
 }
