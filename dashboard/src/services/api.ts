@@ -395,6 +395,10 @@ export interface Payment {
   createdAt?: string
   reference?: string
   status: string
+  // Set when a membership promotion priced the payment.
+  promotionId?: string | null
+  listPrice?: number
+  discountApplied?: number
 }
 
 export function createPayment(paymentData: PaymentPayload) {
@@ -490,7 +494,9 @@ export type PaymentStatus = 'paid' | 'pending' | 'cancelled'
 export interface PaymentPayload {
   userId: string
   planId: string
+  // Ignored by the API when promotionId is sent: it prices the plan with the promotion.
   amount: number
+  promotionId?: string | null
   source: 'reception'
   paymentDate: string
   reference?: string
@@ -599,8 +605,33 @@ export function deleteExercise(id: string) {
   })
 }
 
-export function getPromotions<T = unknown[]>() {
-  return apiClient<T>('/promotions')
+export function getPromotions<T = unknown[]>(appliesTo?: 'store' | 'membership') {
+  return apiClient<T>(appliesTo ? `/promotions?appliesTo=${appliesTo}` : '/promotions')
+}
+
+export interface MembershipQuoteOption {
+  promotionId: string
+  title: string
+  discountPercentage: number
+  requiredDocument: string | null
+  validUntil: string | null
+  // false: the client lacks the required document; null: no client chosen yet.
+  eligible: boolean | null
+  listPrice: number
+  discountApplied: number
+  amount: number
+}
+
+export interface MembershipQuote {
+  listPrice: number
+  promotions: MembershipQuoteOption[]
+  best: MembershipQuoteOption | null
+}
+
+// Current membership promotions for the plan and the price with each one.
+export function getPaymentQuote(planId: string, userId?: string) {
+  const query = new URLSearchParams({ planId, ...(userId ? { userId } : {}) })
+  return apiClient<MembershipQuote>(`/payments/quote?${query}`)
 }
 
 export interface PromotionPayload {
@@ -610,7 +641,9 @@ export interface PromotionPayload {
   validUntil?: string
   isActive: boolean
   imageUrl?: string
+  appliesTo: 'store' | 'membership'
   applicableProducts?: string[]
+  applicablePlans?: string[]
 }
 
 export function createPromotion(data: PromotionPayload) {

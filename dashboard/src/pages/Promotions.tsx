@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Pencil, Plus, Tag, Trash2 } from 'lucide-react'
-import { createPromotion, deletePromotion, getProducts, getPromotions, updatePromotion } from '../services/api'
-import type { Product, Promotion } from '../types'
+import { createPromotion, deletePromotion, getPlans, getProducts, getPromotions, updatePromotion } from '../services/api'
+import type { Plan, Product, Promotion, PromotionTarget } from '../types'
 import { isValidImageValue } from '../utils/imageValidation'
 
 type PromotionsResponse = Promotion[] | { data?: unknown; promotions?: unknown }
 type ProductsResponse = Product[] | { data?: unknown; products?: unknown }
+type PlansResponse = Plan[] | { data?: unknown; plans?: unknown }
 
 interface PromotionFormState {
   title: string
@@ -14,7 +15,9 @@ interface PromotionFormState {
   validUntil: string
   isActive: boolean
   imageUrl: string
+  appliesTo: PromotionTarget
   applicableProducts: string[]
+  applicablePlans: string[]
 }
 
 const emptyPromotionForm: PromotionFormState = {
@@ -24,7 +27,14 @@ const emptyPromotionForm: PromotionFormState = {
   validUntil: '',
   isActive: true,
   imageUrl: '',
+  appliesTo: 'store',
   applicableProducts: [],
+  applicablePlans: [],
+}
+
+const TARGET_LABELS: Record<PromotionTarget, string> = {
+  store: 'Productos de tienda',
+  membership: 'Planes de membresía',
 }
 
 async function fetchPromotions() {
@@ -34,6 +44,23 @@ async function fetchPromotions() {
     : response?.data || response?.promotions || []
 
   return Array.isArray(promotionsCandidate) ? promotionsCandidate as Promotion[] : []
+}
+
+async function fetchPlans() {
+  const response = await getPlans<PlansResponse>()
+  const plansCandidate = Array.isArray(response) ? response : response?.data || response?.plans || []
+  return Array.isArray(plansCandidate) ? plansCandidate as Plan[] : []
+}
+
+// The API returns ids, or documents when populated.
+function toIds(values: unknown[] = []) {
+  return values.map((value) => {
+    if (typeof value === 'object' && value !== null) {
+      const populated = value as { _id?: string; id?: string }
+      return String(populated._id || populated.id || '')
+    }
+    return String(value)
+  }).filter(Boolean)
 }
 
 async function fetchProducts() {
@@ -77,6 +104,7 @@ function PromotionSkeleton() {
 function Promotions() {
   const [promotions, setPromotions] = useState<Promotion[]>([])
   const [products, setProducts] = useState<Product[]>([])
+  const [plans, setPlans] = useState<Plan[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -119,16 +147,17 @@ function Promotions() {
 
     async function loadCatalog() {
       try {
-        const productsArray = await fetchProducts()
+        const [productsArray, plansArray] = await Promise.all([fetchProducts(), fetchPlans()])
         if (isMounted) {
           setProducts(productsArray)
+          setPlans(plansArray)
         }
       } catch (requestError) {
         if (isMounted) {
           setError(
             requestError instanceof Error
               ? requestError.message
-              : 'No se pudieron cargar los productos.',
+              : 'No se pudieron cargar los productos y planes.',
           )
         }
       }
@@ -148,14 +177,6 @@ function Promotions() {
   }
 
   function openEditModal(promotion: Promotion) {
-    const applicableProducts = (promotion.applicableProducts || []).map((product) => {
-      if (typeof product === 'object' && product !== null) {
-        const populatedProduct = product as unknown as { _id?: string; id?: string }
-        return String(populatedProduct._id || populatedProduct.id || '')
-      }
-      return String(product)
-    }).filter(Boolean)
-
     setEditingPromotion(promotion)
     setForm({
       title: promotion.title || '',
@@ -164,7 +185,9 @@ function Promotions() {
       validUntil: toDateInputValue(promotion.validUntil),
       isActive: promotion.isActive,
       imageUrl: promotion.imageUrl || '',
-      applicableProducts,
+      appliesTo: promotion.appliesTo ?? 'store',
+      applicableProducts: toIds(promotion.applicableProducts),
+      applicablePlans: toIds(promotion.applicablePlans),
     })
     setModalError(null)
     setIsModalOpen(true)
@@ -206,7 +229,9 @@ function Promotions() {
         description: form.description.trim(),
         discountPercentage: Number(form.discountPercentage),
         isActive: form.isActive,
-        applicableProducts: form.applicableProducts,
+        appliesTo: form.appliesTo,
+        applicableProducts: form.appliesTo === 'store' ? form.applicableProducts : [],
+        applicablePlans: form.appliesTo === 'membership' ? form.applicablePlans : [],
         ...(imageUrl ? { imageUrl } : {}),
         ...(form.validUntil.trim()
           ? { validUntil: form.validUntil.trim() }
@@ -288,6 +313,7 @@ function Promotions() {
               <thead className="border-b border-slate-100 bg-slate-50/80 text-xs uppercase tracking-wider text-slate-500">
                 <tr>
                   <th className="px-6 py-4 font-medium">Título</th>
+                  <th className="px-6 py-4 font-medium">Aplica a</th>
                   <th className="px-6 py-4 font-medium">Descuento</th>
                   <th className="px-6 py-4 font-medium">Vigencia</th>
                   <th className="px-6 py-4 font-medium">Estado</th>
@@ -312,6 +338,9 @@ function Promotions() {
                               )}
                             </div>
                           </div>
+                        </td>
+                        <td className="whitespace-nowrap px-6 py-4 text-slate-500">
+                          {TARGET_LABELS[promotion.appliesTo ?? 'store']}
                         </td>
                         <td className="px-6 py-4 font-medium text-slate-700">
                           {Number(promotion.discountPercentage)}%
@@ -349,7 +378,7 @@ function Promotions() {
                   })
                 ) : (
                   <tr>
-                    <td className="px-6 py-10 text-center text-sm text-slate-500" colSpan={5}>
+                    <td className="px-6 py-10 text-center text-sm text-slate-500" colSpan={6}>
                       No hay promociones registradas.
                     </td>
                   </tr>
@@ -427,35 +456,74 @@ function Promotions() {
               </div>
 
               <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="promotion-target-type">
+                  Aplica para
+                </label>
+                <select
+                  className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                  id="promotion-target-type"
+                  value={form.appliesTo}
+                  onChange={(event) => setForm({ ...form, appliesTo: event.target.value as PromotionTarget })}
+                >
+                  {Object.entries(TARGET_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                </select>
+                {form.appliesTo === 'membership' && (
+                  <p className="mt-2 text-xs text-slate-500">
+                    Solo cambia el precio al cobrar en Pagos; las reglas de acceso viven en el plan.
+                  </p>
+                )}
+              </div>
+
+              <div>
                 <p className="mb-1 block text-sm font-medium text-slate-700">
-                  Productos aplicables (Opcional)
+                  {form.appliesTo === 'store' ? 'Productos aplicables' : 'Planes aplicables'} (Opcional)
                 </p>
                 <p className="mb-3 text-xs text-slate-500">
-                  Si lo dejas en blanco, la promoción aplicará a todos los productos en la Venta Directa.
+                  Si lo dejas en blanco, la promoción aplicará a {form.appliesTo === 'store' ? 'todos los productos en la Venta Directa' : 'todos los planes'}.
                 </p>
                 <div className="max-h-48 space-y-2 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50 p-3">
-                  {products.length > 0 ? products.map((product) => {
-                    const productId = product._id || product.id || ''
+                  {form.appliesTo === 'store' ? (
+                    products.length > 0 ? products.map((product) => {
+                      const productId = product._id || product.id || ''
+                      return (
+                        <label className="flex items-center gap-3 rounded-md bg-white px-3 py-2 text-sm text-slate-700" key={productId}>
+                          <input
+                            className="h-4 w-4 accent-green-500"
+                            type="checkbox"
+                            checked={form.applicableProducts.includes(productId)}
+                            onChange={(event) => {
+                              const selected = form.applicableProducts
+                              const applicableProducts = event.target.checked ? [...selected, productId] : selected.filter((id) => id !== productId)
+                              setForm({ ...form, applicableProducts })
+                            }}
+                            disabled={!productId}
+                          />
+                          <span>{product.name}</span>
+                        </label>
+                      )
+                    }) : (
+                      <p className="text-sm text-slate-500">No hay productos disponibles.</p>
+                    )
+                  ) : plans.length > 0 ? plans.map((plan) => {
+                    const planId = plan._id || plan.id || ''
                     return (
-                      <label className="flex items-center gap-3 rounded-md bg-white px-3 py-2 text-sm text-slate-700" key={productId}>
+                      <label className="flex items-center gap-3 rounded-md bg-white px-3 py-2 text-sm text-slate-700" key={planId}>
                         <input
                           className="h-4 w-4 accent-green-500"
                           type="checkbox"
-                          checked={form.applicableProducts.includes(productId)}
+                          checked={form.applicablePlans.includes(planId)}
                           onChange={(event) => {
-                            const selectedProducts = form.applicableProducts
-                            const applicableProducts = event.target.checked
-                              ? [...selectedProducts, productId]
-                              : selectedProducts.filter((id) => id !== productId)
-                            setForm({ ...form, applicableProducts })
+                            const selected = form.applicablePlans
+                            const applicablePlans = event.target.checked ? [...selected, planId] : selected.filter((id) => id !== planId)
+                            setForm({ ...form, applicablePlans })
                           }}
-                          disabled={!productId}
+                          disabled={!planId}
                         />
-                        <span>{product.name}</span>
+                        <span>{plan.name || plan.nombre || 'Plan sin nombre'}</span>
                       </label>
                     )
                   }) : (
-                    <p className="text-sm text-slate-500">No hay productos disponibles.</p>
+                    <p className="text-sm text-slate-500">No hay planes disponibles.</p>
                   )}
                 </div>
               </div>
