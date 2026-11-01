@@ -4,6 +4,7 @@ import { disconnectSocket } from '../services/socket'
 import { blockedOrganization, clearStoredSession, getCurrentSession, type SessionResponse } from '../services/api'
 import { storeOrganizationNotice } from './organizationNotice'
 import { ALL_GYMS, getActiveGymId, storeActiveGymId } from '../services/activeGym'
+import { canUseDashboard, isStaffGym } from '../utils/access'
 
 const SESSION_KEY = 'session'
 
@@ -28,7 +29,14 @@ function resolveGymId(session: SessionResponse | null, gymId: string | null) {
   if (gymId === ALL_GYMS && canSeeAll(session)) return ALL_GYMS
   if (gymId && session.gyms.some((gym) => gym.id === gymId)) return gymId
   if (session.user.isPlatformAdmin) return null
-  return canSeeAll(session) ? ALL_GYMS : session.defaultGymId
+  if (canSeeAll(session)) return ALL_GYMS
+  // The API's default gym can be one where the person is a client; then the first gym they work in.
+  return session.gyms.some((gym) => gym.id === session.defaultGymId) ? session.defaultGymId : session.gyms[0]?.id ?? null
+}
+
+// Only the gyms the person works in reach the selector and the role checks.
+function staffSession(session: SessionResponse): SessionResponse {
+  return { ...session, gyms: session.gyms.filter(isStaffGym) }
 }
 
 function AuthProvider({ children }: { children: ReactNode }) {
@@ -41,7 +49,8 @@ function AuthProvider({ children }: { children: ReactNode }) {
     return gymId
   })
 
-  const saveSession = useCallback((nextSession: SessionResponse, preferredGymId: string | null) => {
+  const saveSession = useCallback((receivedSession: SessionResponse, preferredGymId: string | null) => {
+    const nextSession = staffSession(receivedSession)
     const gymId = resolveGymId(nextSession, preferredGymId)
     localStorage.setItem(SESSION_KEY, JSON.stringify(nextSession))
     storeActiveGymId(gymId)
@@ -60,7 +69,7 @@ function AuthProvider({ children }: { children: ReactNode }) {
   const applySession = useCallback((nextSession: SessionResponse) => {
     // Signed out while the request was on its way.
     if (!localStorage.getItem('token')) return
-    if (nextSession.user.role === 'Cliente') signOut()
+    if (!canUseDashboard(nextSession)) signOut()
     else saveSession(nextSession, getActiveGymId())
   }, [saveSession, signOut])
 

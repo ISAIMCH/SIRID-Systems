@@ -17,6 +17,8 @@ export interface User {
   role: UserRole
   roles?: MemberRole[]
   gymRoles?: Array<{ gymId: string; roles: GymRole[] }>
+  // False when other organizations also use the account: only its holder changes the email or password.
+  canEditCredentials?: boolean
   status?: string
   isActive?: boolean
   phone?: string

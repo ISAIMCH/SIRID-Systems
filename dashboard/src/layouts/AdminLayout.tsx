@@ -20,6 +20,7 @@ import { useAuth } from '../store/useAuth'
 import { ALL_GYMS } from '../services/activeGym'
 import { connectSocket, disconnectSocket } from '../services/socket'
 import { canAccessPage, useStaffRoles } from '../utils/access'
+import StaffInvitationsNotice from '../components/StaffInvitationsNotice'
 
 interface NavItem {
   label: string
@@ -177,6 +178,7 @@ function AdminLayout() {
             {application.reason ? `: ${application.reason}` : '.'}
           </div>
         ))}
+        <StaffInvitationsNotice />
         {/* Pages remount when the gym changes, so they reload their data for it. */}
         <Outlet key={activeGymId ?? 'sin-sucursal'} />
       </main>

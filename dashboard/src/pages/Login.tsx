@@ -4,6 +4,7 @@ import OrganizationStatusCard from '../components/OrganizationStatusCard'
 import { blockedOrganization, login, type OrganizationNotice } from '../services/api'
 import { clearOrganizationNotice, readOrganizationNotice } from '../store/organizationNotice'
 import { useAuth } from '../store/useAuth'
+import { canUseDashboard } from '../utils/access'
 
 function Login() {
   const navigate = useNavigate()
@@ -23,11 +24,11 @@ function Login() {
 
     try {
       const response = await login({ email, password })
-      if (response.user.role === 'Cliente') {
+      if (!canUseDashboard(response)) {
         // A client of another gym who applied as owner sees their request instead.
         const application = response.organizationApplications?.[0]
         if (application) setNotice(application)
-        else setError('Las cuentas de cliente usan la app móvil de GymGo.')
+        else setError('Las cuentas de cliente usan la app móvil de GymGo. Si un gimnasio te invitó a su staff, acepta la invitación en la app.')
         return
       }
       clearOrganizationNotice()
