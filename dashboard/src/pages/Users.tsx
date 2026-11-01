@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { History, Pencil } from 'lucide-react'
-import { ApiError, createUser, getPlans, getUsers, updateUser } from '../services/api'
+import { History, KeyRound, Pencil } from 'lucide-react'
+import { ApiError, createUser, getPlans, getUsers, regenerateActivationCode, updateUser } from '../services/api'
 import type { UserPayload } from '../services/api'
 import type { AssignableRole, GymRole, MemberRole, Plan, User, UserReference } from '../types'
 import GymSelect from '../components/GymSelect'
 import ClientHistoryPanel from '../components/ClientHistoryPanel'
+import ClientEnrollmentModal, { type EnrollmentOutcome } from '../components/ClientEnrollmentModal'
 import StaffInvitationsPanel, { type InvitePrefill } from '../components/StaffInvitationsPanel'
 import { ROLE_LABELS, STAFF_ROLES } from '../utils/roles'
 import { useAuth } from '../store/useAuth'
@@ -125,7 +126,8 @@ function sameRoles(first: AssignableRole[], second: AssignableRole[]) {
 function Users() {
   const { isAllGyms, activeGymId, session, organizationGyms } = useAuth()
   const roles = useStaffRoles()
-  // The API only lists staff and allows creating or editing users to Admin; Coach and Recepcion see clients read-only.
+  // The API only lists staff and allows creating or editing users to Admin; Coach and Recepcion see clients read-only
+  // (Recepcion registers new clients through ClientEnrollmentModal).
   // Plans follow the Suscripciones page.
   const isAdmin = roles.has('Admin')
   // Only the owner grants Gerente or edits other managers; a Gerente handles the rest of the staff.
@@ -133,6 +135,11 @@ function Users() {
   const canSeePlans = canAccessPage(roles, '/subscriptions')
   // Shared histories are for owners, managers and Coaches; reception never sees them.
   const canSeeHistory = isAdmin || roles.has('Coach')
+  // Reception registers clients who have no app yet and hands out their activation codes.
+  const canEnroll = isAdmin || roles.has('Recepcion')
+  // null: closed; 'form': new client; an outcome: the code view.
+  const [enrollment, setEnrollment] = useState<'form' | EnrollmentOutcome | null>(null)
+  const [regeneratingId, setRegeneratingId] = useState('')
   const [historyClient, setHistoryClient] = useState<{ id: string; name: string } | null>(null)
   const [gymId, setGymId] = useState('')
   const [users, setUsers] = useState<User[]>([])
@@ -334,10 +341,30 @@ function Users() {
         setExistingAccount({ email: form.email.trim(), roles: form.roles.filter((role): role is GymRole => role !== 'Cliente') })
       }
       setModalError(emailTaken && isClientForm
-        ? 'Ese correo ya tiene una cuenta GymGo. El cliente puede unirse con el código del gimnasio desde la app.'
+        ? 'Ese correo ya tiene una cuenta GymGo. Usa «Registrar cliente» para vincularla a este gimnasio, o el cliente puede unirse con el código del gimnasio desde la app.'
         : requestError instanceof Error ? requestError.message : 'No se pudo guardar el usuario.')
     } finally {
       setIsSubmitting(false)
+    }
+  }
+
+  function handleEnrolled(user: User) {
+    const enrolledId = recordId(user.id ?? user._id)
+    setUsers((current) => [user, ...current.filter((item) => recordId(item.id ?? item._id) !== enrolledId)])
+  }
+
+  async function handleNewActivationCode(user: User) {
+    const userId = recordId(user.id ?? user._id)
+    const name = userDisplayName(user) || 'Cliente'
+    if (!window.confirm(`Se generará un código nuevo para ${name} y el anterior dejará de funcionar. ¿Continuar?`)) return
+    setRegeneratingId(userId)
+    try {
+      const { activation } = await regenerateActivationCode(userId)
+      setEnrollment({ client: { id: userId, name, email: user.email }, activation, linkedExisting: false })
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'No se pudo generar el código.')
+    } finally {
+      setRegeneratingId('')
     }
   }
 
@@ -365,6 +392,7 @@ function Users() {
               const rowRoles = userRoles(user)
               const isStaff = !rowRoles.includes('Cliente')
               const isActive = user?.isActive === true
+              const isPendingActivation = !isStaff && user.pendingActivation === true
 
               return (
                 <tr className="transition-colors hover:bg-slate-50" key={userId}>
@@ -389,15 +417,37 @@ function Users() {
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <span
-                      className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${
-                        isActive ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-600'
-                      }`}
-                    >
-                      {isActive ? 'Activo' : 'Inactivo'}
-                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      <span
+                        className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${
+                          isActive ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-600'
+                        }`}
+                      >
+                        {isActive ? 'Activo' : 'Inactivo'}
+                      </span>
+                      {isPendingActivation && (
+                        <span
+                          className="inline-flex rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-800"
+                          title="Registrado en recepción; aún no activa su cuenta en la app."
+                        >
+                          Sin activar
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="whitespace-nowrap px-6 py-4 text-right">
+                    {canEnroll && isPendingActivation && recordId(user.id ?? user._id) && (
+                      <button
+                        className="mr-3 cursor-pointer text-slate-400 transition hover:text-green-600 disabled:opacity-50"
+                        type="button"
+                        aria-label={`Código de activación nuevo para ${user?.name || 'cliente'}`}
+                        title="Código de activación nuevo"
+                        onClick={() => void handleNewActivationCode(user)}
+                        disabled={regeneratingId === recordId(user.id ?? user._id)}
+                      >
+                        <KeyRound className="h-4 w-4" aria-hidden="true" />
+                      </button>
+                    )}
                     {canSeeHistory && !isStaff && recordId(user.id ?? user._id) && (
                       <button
                         className="mr-3 cursor-pointer text-slate-400 transition hover:text-green-600"
@@ -444,22 +494,35 @@ function Users() {
           <h1 className="text-4xl font-semibold tracking-tight text-slate-900">Usuarios</h1>
           <p className="mt-3 text-slate-500">Consulta y gestiona los usuarios de la plataforma.</p>
         </div>
-        {isAdmin && (
+        {canEnroll && (
           <div className="flex flex-wrap gap-3">
             <button
-              className="rounded-lg border border-slate-200 bg-white px-4 py-2 font-medium text-slate-700 transition hover:bg-slate-50"
+              className={isAdmin
+                ? 'rounded-lg border border-slate-200 bg-white px-4 py-2 font-medium text-slate-700 transition hover:bg-slate-50'
+                : 'rounded-lg bg-[#9BFF63] px-4 py-2 font-medium text-[#0F172A] transition hover:bg-[#abff7c]'}
               type="button"
-              onClick={() => openInvite({ email: '', roles: [] })}
+              onClick={() => setEnrollment('form')}
             >
-              Invitar cuenta existente
+              Registrar cliente
             </button>
-            <button
-              className="rounded-lg bg-[#9BFF63] px-4 py-2 font-medium text-[#0F172A] transition hover:bg-[#abff7c]"
-              type="button"
-              onClick={openModal}
-            >
-              + Nuevo Usuario
-            </button>
+            {isAdmin && (
+              <>
+                <button
+                  className="rounded-lg border border-slate-200 bg-white px-4 py-2 font-medium text-slate-700 transition hover:bg-slate-50"
+                  type="button"
+                  onClick={() => openInvite({ email: '', roles: [] })}
+                >
+                  Invitar cuenta existente
+                </button>
+                <button
+                  className="rounded-lg bg-[#9BFF63] px-4 py-2 font-medium text-[#0F172A] transition hover:bg-[#abff7c]"
+                  type="button"
+                  onClick={openModal}
+                >
+                  + Nuevo Usuario
+                </button>
+              </>
+            )}
           </div>
         )}
       </div>
@@ -529,6 +592,14 @@ function Users() {
           </div>
         )}
       </div>
+
+      {enrollment && (
+        <ClientEnrollmentModal
+          initialOutcome={enrollment === 'form' ? null : enrollment}
+          onEnrolled={handleEnrolled}
+          onClose={() => setEnrollment(null)}
+        />
+      )}
 
       {historyClient && (
         <ClientHistoryPanel client={historyClient} canSeeLogs={isAdmin} onClose={() => setHistoryClient(null)} />

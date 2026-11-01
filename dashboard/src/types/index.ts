@@ -19,6 +19,8 @@ export interface User {
   gymRoles?: Array<{ gymId: string; roles: GymRole[] }>
   // False when other organizations also use the account: only its holder changes the email or password.
   canEditCredentials?: boolean
+  // Opened by reception and not activated in the app yet.
+  pendingActivation?: boolean
   status?: string
   isActive?: boolean
   phone?: string
