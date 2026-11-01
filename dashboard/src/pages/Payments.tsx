@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Pencil, Plus, Trash2 } from 'lucide-react'
 import {
   createPayment,
@@ -81,6 +82,16 @@ function getAssignedPlan(user: User, plans: Plan[]) {
   ))
 }
 
+// Suggests the client's current plan to renew it; picking another one changes the plan when the payment is paid.
+function clientFormFields(user: User | undefined, plans: Plan[]) {
+  const activePlan = user ? getAssignedPlan(user, plans) : undefined
+  const activePlanPrice = activePlan?.price ?? activePlan?.precio
+  return {
+    planId: activePlan ? getRecordId(activePlan) : '',
+    amount: activePlanPrice === undefined ? '' : String(activePlanPrice),
+  }
+}
+
 function formatSource(source: string | undefined) {
   switch (source?.toLowerCase()) {
     case 'reception': return 'Recepción'
@@ -160,6 +171,9 @@ function Payments() {
   // The quote and the promotion picked belong to one plan and client (quoteKey); a new pair starts over.
   const [quoteState, setQuoteState] = useState<{ key: string; quote: MembershipQuote } | null>(null)
   const [chosenPromotion, setChosenPromotion] = useState<{ key: string; promotionId: string } | null>(null)
+  // ?cliente=<id> (from "Registrar cliente") opens a new payment for that client once the data loads.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [preselectedClientId] = useState(() => searchParams.get('cliente'))
 
   async function refreshPayments() {
     const response = await getPayments<unknown>()
@@ -178,10 +192,19 @@ function Payments() {
         ])
         if (!isMounted) return
 
+        const loadedUsers = extractArray<User>(usersResponse, ['data', 'users'])
+        const loadedPlans = extractArray<Plan>(plansResponse, ['data', 'plans', 'planes'])
         setPayments(extractArray<Payment>(paymentsResponse, ['data', 'payments', 'pagos']))
-        setUsers(extractArray<User>(usersResponse, ['data', 'users']))
-        setPlans(extractArray<Plan>(plansResponse, ['data', 'plans', 'planes']))
+        setUsers(loadedUsers)
+        setPlans(loadedPlans)
         setError(null)
+        const preselectedUser = preselectedClientId
+          ? loadedUsers.find((user) => getRecordId(user) === preselectedClientId)
+          : undefined
+        if (preselectedUser) {
+          setForm({ ...emptyForm, userId: preselectedClientId ?? '', ...clientFormFields(preselectedUser, loadedPlans) })
+          setIsModalOpen(true)
+        }
       } catch (requestError) {
         if (isMounted) {
           setError(requestError instanceof Error ? requestError.message : 'No se pudieron cargar los pagos.')
@@ -195,7 +218,7 @@ function Payments() {
     return () => {
       isMounted = false
     }
-  }, [])
+  }, [preselectedClientId])
 
   useEffect(() => {
     const refreshFromEvent = () => {
@@ -238,6 +261,7 @@ function Payments() {
 
   function closeModal() {
     if (isSubmitting) return
+    if (searchParams.has('cliente')) setSearchParams({}, { replace: true })
     setForm(emptyForm)
     setIsEditing(false)
     setEditingPaymentId('')
@@ -280,6 +304,7 @@ function Payments() {
       setIsPaidRecord(false)
       setReference('')
       setIsModalOpen(false)
+      if (searchParams.has('cliente')) setSearchParams({}, { replace: true })
     } catch (requestError) {
       setModalError(requestError instanceof Error ? requestError.message : 'No se pudo guardar el pago.')
     } finally {
@@ -289,16 +314,7 @@ function Payments() {
 
   function handleUserChange(userId: string) {
     const selectedUser = users.find((user) => getRecordId(user) === userId)
-    // Suggests the client's current plan to renew it; picking another one changes the plan when the payment is paid.
-    const activePlan = selectedUser ? getAssignedPlan(selectedUser, plans) : undefined
-    const activePlanPrice = activePlan?.price ?? activePlan?.precio
-
-    setForm((current) => ({
-      ...current,
-      userId,
-      planId: activePlan ? getRecordId(activePlan) : '',
-      amount: activePlanPrice === undefined ? '' : String(activePlanPrice),
-    }))
+    setForm((current) => ({ ...current, userId, ...clientFormFields(selectedUser, plans) }))
   }
 
   function handlePlanChange(planId: string) {

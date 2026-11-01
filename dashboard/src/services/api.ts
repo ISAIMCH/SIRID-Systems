@@ -176,8 +176,6 @@ export interface UserPayload {
   roles?: AssignableRole[]
   phone?: string
   address?: string
-  documents?: string[]
-  pdfFiles?: File[]
   isActive?: boolean
   goal?: string
   experienceLevel?: string
@@ -188,32 +186,50 @@ export interface UserPayload {
   gymId?: string
 }
 
-function userPayloadBody(userData: UserPayload): BodyInit {
-  if (!userData.pdfFiles?.length) {
-    const { pdfFiles: _pdfFiles, ...jsonUserData } = userData
-    return JSON.stringify(jsonUserData)
-  }
-
-  const formData = new FormData()
-  Object.entries(userData).forEach(([key, value]) => {
-    if (key === 'pdfFiles' || value === undefined) return
-    formData.append(key, Array.isArray(value) ? JSON.stringify(value) : String(value))
-  })
-  userData.pdfFiles.forEach((file) => formData.append('pdfFiles', file))
-  return formData
-}
-
 export function createUser(userData: UserPayload) {
   return apiClient('/auth/users', {
     method: 'POST',
-    body: userPayloadBody(userData),
+    body: JSON.stringify(userData),
   })
+}
+
+// The plain code comes back once; the API keeps only its hash.
+export interface ActivationCode {
+  code: string
+  expiresAt: string
+}
+
+export interface ClientEnrollmentPayload {
+  name: string
+  lastName?: string
+  email: string
+  phone: string
+  gymId?: string
+}
+
+// A new account brings an activation code; an existing GymGo account is linked (its holder gets a notice in the app),
+// or gets a new code when it was never activated.
+export interface ClientEnrollmentResult {
+  user: User
+  linkedExisting: boolean
+  alreadyClient?: boolean
+  activation: ActivationCode | null
+}
+
+// Reception registers a client who has no app yet, so a membership can be charged right away.
+export function enrollClient(payload: ClientEnrollmentPayload) {
+  return apiClient<ClientEnrollmentResult>('/auth/clients', { method: 'POST', body: JSON.stringify(payload) })
+}
+
+// Only while the account is not activated; the previous code stops working.
+export function regenerateActivationCode(userId: string) {
+  return apiClient<{ activation: ActivationCode }>(`/auth/clients/${userId}/activation-code`, { method: 'POST' })
 }
 
 export function updateUser(id: string, userData: UserPayload) {
   return apiClient(`/auth/users/${id}`, {
     method: 'PUT',
-    body: userPayloadBody(userData),
+    body: JSON.stringify(userData),
   })
 }
 
@@ -644,6 +660,7 @@ export interface PromotionPayload {
   appliesTo: 'store' | 'membership'
   applicableProducts?: string[]
   applicablePlans?: string[]
+  requiredDocument?: 'student_id' | null
 }
 
 export function createPromotion(data: PromotionPayload) {
