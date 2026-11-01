@@ -4,6 +4,8 @@ import { getPayments, getProducts, getSales, getUsers } from '../services/api'
 import type { Sale } from '../services/api'
 import type { Product, User } from '../types'
 import { canAccessPage, useStaffRoles } from '../utils/access'
+import { hasCurrentMembership } from '../utils/membership'
+import AttendanceSection from '../components/AttendanceSection'
 
 const LOW_STOCK_THRESHOLD = 5
 
@@ -73,14 +75,6 @@ function isSuccessfulPayment(status: string | undefined) {
 
 function isClient(user: User) {
   return user.roles ? user.roles.includes('Cliente') : user.role === 'Cliente'
-}
-
-// Same rule as the API's hasActiveMembership: active, already started and not expired.
-function hasCurrentMembership(user: User, now: Date) {
-  const membership = user.membership
-  return membership?.status === 'active'
-    && (!membership.startsAt || new Date(membership.startsAt) <= now)
-    && (!membership.expiresAt || new Date(membership.expiresAt) >= now)
 }
 
 function isThisMonth(value: string | undefined, now: Date) {
@@ -153,6 +147,8 @@ function StatsSkeleton() {
 function Overview() {
   const roles = useStaffRoles()
   const canSeeBilling = canAccessPage(roles, '/payments')
+  // The API's attendance analytics are for managers and Coaches.
+  const canSeeAttendance = roles.has('Admin') || roles.has('Coach')
   const [stats, setStats] = useState<OverviewStats | null>(null)
   const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -195,7 +191,7 @@ function Overview() {
 
       setStats({
         clients: clients.length,
-        activeMemberships: clients.filter((user) => hasCurrentMembership(user, now)).length,
+        activeMemberships: clients.filter((user) => hasCurrentMembership(user.membership, now)).length,
         monthRevenue: monthPayments.reduce((total, payment) => total + numericValue(payment.total ?? payment.amount), 0)
           + monthSales.reduce((total, sale) => total + numericValue(sale.totalAmount), 0),
         lowStock: lowStockCount,
@@ -255,6 +251,8 @@ function Overview() {
                 </article>
               ))}
             </div>
+
+            {canSeeAttendance && <AttendanceSection />}
 
             {canSeeBilling ? (
             <article className="mt-6 rounded-xl border border-slate-100 bg-white p-6 shadow-sm">
