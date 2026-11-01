@@ -834,3 +834,81 @@ export function updateOrganizationGymLimit(id: string, gymLimit: number) {
     { withGym: false },
   )
 }
+
+// Etapa 6: a client's consent for one gym's staff to see their history from every organization.
+export type HistoryShareStatus = 'pending' | 'approved' | 'rejected' | 'revoked'
+
+export interface HistoryShare {
+  id: string
+  status: HistoryShareStatus
+  includeSensitive: boolean
+  requestedAt: string
+  respondedAt: string | null
+  revokedAt: string | null
+  clientId: string
+  clientName?: string
+  gym: { id: string; name: string | null }
+  organization: { id: string; name: string | null }
+  requestedBy: { id: string; name: string | null } | null
+}
+
+export interface HistoryOrigin {
+  organization: { id: string; name: string | null }
+  gym: { id: string; name: string | null } | null
+}
+
+export interface SharedWorkout extends HistoryOrigin {
+  _id: string
+  routineTitle: string
+  routineGoal?: string
+  completedAt: string
+  durationMinutes: number
+  totalVolumeKg: number
+  caloriesBurned?: number
+  perceivedExertion?: number
+  clientNotes?: string
+  completedSets?: number
+}
+
+export interface SharedRoutine extends HistoryOrigin {
+  id?: string
+  _id?: string
+  title: string
+  goal?: string
+  status?: string
+  updatedAt?: string
+}
+
+export interface SharedHistory {
+  share: HistoryShare
+  client: { id: string; name: string | null }
+  workouts: SharedWorkout[]
+  routines: SharedRoutine[]
+  sensitive: { weightKg: number | null; heightCm: number | null; restrictions: string } | null
+}
+
+export interface HistoryAccessLogEntry {
+  id: string
+  viewer: { id: string; name: string | null }
+  client: { id: string; name: string | null }
+  gym: { id: string; name: string | null }
+  sections: ('workouts' | 'routines' | 'sensitive')[]
+  createdAt: string
+}
+
+export function getHistoryShares(clientId?: string) {
+  return apiClient<{ shares: HistoryShare[] }>(`/history-shares${clientId ? `?clientId=${clientId}` : ''}`)
+}
+
+// In the all-gyms view the gym that asks is required.
+export function requestHistoryShare(payload: { clientId: string; gymId?: string }) {
+  return apiClient<{ share: HistoryShare }>('/history-shares', { method: 'POST', body: JSON.stringify(payload) })
+}
+
+export function getSharedHistory(shareId: string) {
+  return apiClient<SharedHistory>(`/history-shares/${shareId}/history`)
+}
+
+export function getHistoryAccessLogs(clientId?: string) {
+  return apiClient<{ logs: HistoryAccessLogEntry[] }>(`/history-shares/logs${clientId ? `?clientId=${clientId}` : ''}`)
+}
