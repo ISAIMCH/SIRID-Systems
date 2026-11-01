@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Clock, FileCheck, MapPin, MoreVertical, Pencil, Trash2 } from 'lucide-react'
 import { createPlan, deletePlan, getPlans, updatePlan } from '../services/api'
 import { useAuth } from '../store/useAuth'
+import { useStaffRoles } from '../utils/access'
 import type { GymAccessScope, Plan, PlanType } from '../types'
 
 type PlansResponse = Plan[] | {
@@ -134,6 +135,8 @@ async function fetchPlans() {
 function Subscriptions() {
   const { organizationGyms } = useAuth()
   const gymNames = new Map(organizationGyms.map((gym) => [gym.id, gym.name]))
+  // Recepcion reads plans to charge them; only Admins manage them.
+  const canManage = useStaffRoles().has('Admin')
   const [plans, setPlans] = useState<Plan[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -295,13 +298,15 @@ function Subscriptions() {
           <h1 className="text-4xl font-semibold tracking-tight text-slate-900">Suscripciones</h1>
           <p className="mt-3 text-slate-500">Supervisa los planes y suscripciones activas.</p>
         </div>
-        <button
-          className="rounded-lg bg-[#9BFF63] px-4 py-2 font-medium text-[#0F172A] transition hover:bg-[#abff7c]"
-          type="button"
-          onClick={openModal}
-        >
-          + Nuevo Plan
-        </button>
+        {canManage && (
+          <button
+            className="rounded-lg bg-[#9BFF63] px-4 py-2 font-medium text-[#0F172A] transition hover:bg-[#abff7c]"
+            type="button"
+            onClick={openModal}
+          >
+            + Nuevo Plan
+          </button>
+        )}
       </div>
 
       <div className="mt-8">
@@ -344,15 +349,17 @@ function Subscriptions() {
                       >
                         {isActive ? 'Activo' : 'Inactivo'}
                       </span>
-                      <button
-                        className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
-                        type="button"
-                        aria-label={`Acciones de ${planName}`}
-                        onClick={() => setOpenMenuId(openMenuId === planId ? null : planId)}
-                      >
-                        <MoreVertical size={18} />
-                      </button>
-                      {openMenuId === planId && (
+                      {canManage && (
+                        <button
+                          className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                          type="button"
+                          aria-label={`Acciones de ${planName}`}
+                          onClick={() => setOpenMenuId(openMenuId === planId ? null : planId)}
+                        >
+                          <MoreVertical size={18} />
+                        </button>
+                      )}
+                      {canManage && openMenuId === planId && (
                         <div className="absolute right-0 top-9 z-10 w-36 rounded-lg border border-slate-100 bg-white py-1 shadow-lg">
                           <button
                             className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Pencil, Plus, Tag, Trash2 } from 'lucide-react'
 import { createPromotion, deletePromotion, getPlans, getProducts, getPromotions, updatePromotion } from '../services/api'
 import type { Plan, Product, Promotion, PromotionTarget } from '../types'
+import { useStaffRoles } from '../utils/access'
 import { isValidImageValue } from '../utils/imageValidation'
 
 type PromotionsResponse = Promotion[] | { data?: unknown; promotions?: unknown }
@@ -102,6 +103,8 @@ function PromotionSkeleton() {
 }
 
 function Promotions() {
+  // Recepcion reads promotions to apply them in sales; only Admins manage them.
+  const canManage = useStaffRoles().has('Admin')
   const [promotions, setPromotions] = useState<Promotion[]>([])
   const [products, setProducts] = useState<Product[]>([])
   const [plans, setPlans] = useState<Plan[]>([])
@@ -288,14 +291,16 @@ function Promotions() {
           <h1 className="text-4xl font-semibold tracking-tight text-slate-900">Promociones</h1>
           <p className="mt-3 text-slate-500">Crea y administra las ofertas comerciales del gimnasio.</p>
         </div>
-        <button
-          className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#9BFF63] px-4 py-2 font-medium text-[#0F172A] transition hover:bg-[#abff7c]"
-          type="button"
-          onClick={openCreateModal}
-        >
-          <Plus size={18} aria-hidden="true" />
-          Nueva Promoción
-        </button>
+        {canManage && (
+          <button
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#9BFF63] px-4 py-2 font-medium text-[#0F172A] transition hover:bg-[#abff7c]"
+            type="button"
+            onClick={openCreateModal}
+          >
+            <Plus size={18} aria-hidden="true" />
+            Nueva Promoción
+          </button>
+        )}
       </div>
 
       <div className="mt-8 overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
@@ -352,26 +357,28 @@ function Promotions() {
                           </span>
                         </td>
                         <td className="px-6 py-4 text-right">
-                          <div className="inline-flex items-center gap-3">
-                            <button
-                              className="cursor-pointer text-slate-400 transition hover:text-green-600"
-                              type="button"
-                              aria-label={`Editar ${promotion.title || 'promoción'}`}
-                              title="Editar"
-                              onClick={() => openEditModal(promotion)}
-                            >
-                              <Pencil size={17} aria-hidden="true" />
-                            </button>
-                            <button
-                              className="cursor-pointer text-slate-400 transition hover:text-red-600"
-                              type="button"
-                              aria-label={`Eliminar ${promotion.title || 'promoción'}`}
-                              title="Eliminar"
-                              onClick={() => handleDelete(promotion)}
-                            >
-                              <Trash2 size={17} aria-hidden="true" />
-                            </button>
-                          </div>
+                          {canManage && (
+                            <div className="inline-flex items-center gap-3">
+                              <button
+                                className="cursor-pointer text-slate-400 transition hover:text-green-600"
+                                type="button"
+                                aria-label={`Editar ${promotion.title || 'promoción'}`}
+                                title="Editar"
+                                onClick={() => openEditModal(promotion)}
+                              >
+                                <Pencil size={17} aria-hidden="true" />
+                              </button>
+                              <button
+                                className="cursor-pointer text-slate-400 transition hover:text-red-600"
+                                type="button"
+                                aria-label={`Eliminar ${promotion.title || 'promoción'}`}
+                                title="Eliminar"
+                                onClick={() => handleDelete(promotion)}
+                              >
+                                <Trash2 size={17} aria-hidden="true" />
+                              </button>
+                            </div>
+                          )}
                         </td>
                       </tr>
                     )

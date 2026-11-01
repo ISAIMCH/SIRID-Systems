@@ -321,7 +321,7 @@ export function createTemplate(data: RoutineTemplatePayload) {
 
 export function updateTemplate(id: string, data: RoutineTemplatePayload) {
   return apiClient(`/routine-templates/${id}`, {
-    method: 'PUT',
+    method: 'PATCH',
     body: JSON.stringify(data),
   })
 }
