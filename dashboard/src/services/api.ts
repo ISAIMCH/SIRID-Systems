@@ -499,6 +499,36 @@ export function updateSale(id: string, data: Partial<SalePayload>) {
   })
 }
 
+// Reports clients send from the app about broken equipment.
+export type MaintenanceStatus = 'pending' | 'in_progress' | 'resolved'
+
+export interface MaintenanceReport {
+  _id: string
+  gymId?: string
+  equipment: { _id: string; name?: string; zone?: string; brand?: string; status?: string } | null
+  reportedBy: { _id: string; name?: string; email?: string } | null
+  description: string
+  status: MaintenanceStatus
+  adminNote?: string
+  // Whether the report holds one unit of the equipment out of service.
+  equipmentOutOfService?: boolean
+  resolvedAt?: string
+  createdAt: string
+}
+
+export function getMaintenanceReports(status?: MaintenanceStatus) {
+  return apiClient<{ reports: MaintenanceReport[] }>(`/maintenance/reports${status ? `?status=${status}` : ''}`)
+}
+
+// Resolving always gives the unit back; while in progress equipmentStatus takes one unit out of service or returns it.
+export function updateMaintenanceReport(id: string, data: {
+  status: 'in_progress' | 'resolved'
+  equipmentStatus?: 'available' | 'out_of_service'
+  adminNote?: string
+}) {
+  return apiClient<{ report: MaintenanceReport }>(`/maintenance/reports/${id}`, { method: 'PATCH', body: JSON.stringify(data) })
+}
+
 export function deletePayment(id: string) {
   return apiClient(`/payments/${id}`, {
     method: 'DELETE',

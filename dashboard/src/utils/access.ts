@@ -20,6 +20,7 @@ const PAGE_ROLES: Record<string, StaffRole[]> = {
   '/access': ['Admin', 'Recepcion'],
   '/documents': ['Admin', 'Recepcion'],
   '/equipment': ['Admin', 'Coach'],
+  '/maintenance': ['Admin'],
   '/inventory': ['Admin'],
   '/exercises': ['Admin', 'Coach'],
   '/routines': ['Admin', 'Coach'],

@@ -22,6 +22,7 @@ const Access = lazy(() => import('./pages/Access'))
 const Gyms = lazy(() => import('./pages/Gyms'))
 const Documents = lazy(() => import('./pages/Documents'))
 const Platform = lazy(() => import('./pages/Platform'))
+const Maintenance = lazy(() => import('./pages/Maintenance'))
 
 function ProtectedRoute() {
   const { isAuthenticated } = useAuth()
@@ -95,6 +96,7 @@ function App() {
                 <Route path="access" element={<Access />} />
                 <Route path="documents" element={<Documents />} />
                 <Route path="equipment" element={<Equipment />} />
+                <Route path="maintenance" element={<Maintenance />} />
                 <Route path="exercises" element={<Exercises />} />
                 <Route path="inventory" element={<Inventory />} />
                 <Route path="promotions" element={<Promotions />} />
