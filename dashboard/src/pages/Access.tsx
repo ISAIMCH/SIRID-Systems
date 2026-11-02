@@ -2,9 +2,12 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Camera, CameraOff, LogIn, LogOut, XCircle } from 'lucide-react'
 import jsQR from 'jsqr'
 import GymSelect from '../components/GymSelect'
+import OccupancyMonitor from '../components/OccupancyMonitor'
+import AccessLog from '../components/AccessLog'
 import { ApiError, registerQrAccess } from '../services/api'
 import { useAuth } from '../store/useAuth'
 import { targetGymField } from '../utils/targetGym'
+import { denialTitleForCode } from '../utils/accessReasons'
 
 type ScanResult =
   | { kind: 'check-in' | 'check-out'; name: string; at: string }
@@ -15,18 +18,8 @@ const SCAN_INTERVAL_MS = 200
 const RESULT_PAUSE_MS = 2500
 const MAX_FRAME_WIDTH = 640
 
-// Titles for the rules the API checks on entry (evaluateAccess); the API's message gives the details.
-const DENIAL_TITLES: Record<string, string> = {
-  account_disabled: 'Cuenta no habilitada',
-  membership_inactive: 'Membresía no vigente',
-  gym_not_included: 'Sucursal no incluida en el plan',
-  outside_schedule: 'Fuera del horario del plan',
-  document_required: 'Documento pendiente',
-}
-
 function denialTitle(error: unknown) {
-  const code = error instanceof ApiError ? (error.response.data as { code?: string } | null)?.code : undefined
-  return (code && DENIAL_TITLES[code]) || 'Acceso denegado'
+  return denialTitleForCode(error instanceof ApiError ? (error.response.data as { code?: string } | null)?.code : undefined)
 }
 
 function formatTime(value: string) {
@@ -65,9 +58,15 @@ function ResultCard({ result }: { result: ScanResult }) {
   )
 }
 
-// Reception validates the client's QR with a phone or webcam when there is no turnstile.
+type AccessTab = 'scanner' | 'occupancy' | 'log'
+
+const TABS: Array<[AccessTab, string]> = [['scanner', 'Escáner'], ['occupancy', 'Aforo en vivo'], ['log', 'Bitácora']]
+
+// Reception validates the client's QR with a phone or webcam when there is no turnstile,
+// watches how full each gym is and looks up past entries and refusals.
 function Access() {
   const { isAllGyms } = useAuth()
+  const [tab, setTab] = useState<AccessTab>('scanner')
   const [gymId, setGymId] = useState('')
   const [isCameraOn, setIsCameraOn] = useState(false)
   const [cameraError, setCameraError] = useState<string | null>(null)
@@ -163,13 +162,37 @@ function Access() {
 
   const needsGym = isAllGyms && !gymId
 
+  function changeTab(next: AccessTab) {
+    // Leaving the scanner turns the camera off.
+    if (next !== 'scanner') stopCamera()
+    setTab(next)
+  }
+
   return (
     <section className="min-h-screen bg-[#F8FAFC] px-4 py-10 sm:px-8">
       <p className="text-sm font-medium uppercase tracking-[0.25em] text-slate-500">Operación</p>
       <h1 className="mt-3 text-4xl font-semibold tracking-tight text-slate-900">Control de acceso</h1>
-      <p className="mt-3 text-slate-500">Escanea el QR del cliente con la cámara para registrar su entrada o salida.</p>
+      <p className="mt-3 text-slate-500">Registra entradas y salidas, vigila el aforo de cada sucursal y consulta la bitácora.</p>
 
-      <div className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
+      <div className="mt-6 flex border-b border-gray-200" role="tablist">
+        {TABS.map(([value, label]) => (
+          <button
+            className={`px-4 py-2 ${tab === value ? 'border-b-2 border-green-500 font-semibold text-green-700' : 'text-gray-500'}`}
+            type="button"
+            role="tab"
+            aria-selected={tab === value}
+            key={value}
+            onClick={() => changeTab(value)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'occupancy' && <div className="mt-6"><OccupancyMonitor /></div>}
+      {tab === 'log' && <div className="mt-6"><AccessLog /></div>}
+
+      <div className={`mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] ${tab === 'scanner' ? '' : 'hidden'}`}>
         <div className="space-y-4">
           {isAllGyms && (
             <div className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
