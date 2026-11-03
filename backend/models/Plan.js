@@ -9,6 +9,8 @@ const planSchema = new mongoose.Schema({
     tipoCobro: { type: String, default: 'Mensual' },
     destacado: { type: Boolean, default: false },
     isActive: { type: Boolean, default: true },
+    stock: { type: Number, default: 10, min: 0 },
+    garantia: { type: String, default: 'Soporte y garantía de implementación incluidos.' },
     caracteristicas: [{ type: String }] // Arreglo para listar los beneficios (ej. Pagos in-app, Upselling)
 });
 

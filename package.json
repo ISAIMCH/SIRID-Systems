@@ -6,7 +6,8 @@
   "main": "backend/server.js",
   "scripts": {
     "start": "node backend/server.js",
-    "local:user": "node backend/seed-local.js"
+    "local:user": "node backend/seed-local.js",
+    "local:stock": "node backend/restock-local.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

@@ -23,6 +23,20 @@ function authenticateToken(req, res, next) {
     }
 }
 
+async function requireAdmin(req, res, next) {
+    try {
+        const user = await User.findById(req.userId).select('role');
+        if (!user || user.role !== 'Admin') {
+            return res.status(403).json({ msg: 'No tienes permisos de administrador.' });
+        }
+        req.adminUser = user;
+        next();
+    } catch (error) {
+        console.error('Error validando permisos administrativos:', error.message);
+        res.status(500).json({ msg: 'No se pudieron validar los permisos.' });
+    }
+}
+
 const verificationSender = process.env.EMAIL_USER || 'project.gymgo@gmail.com';
 const transporter = nodemailer.createTransport({
     service: 'gmail',
@@ -85,7 +99,10 @@ const isValidBirthDate = (value) => {
 router.post('/register', async (req, res) => {
     let createdUser;
     try {
-        const { nombre, apellidos, fechaNacimiento, email, password } = req.body;
+        const { nombre, apellidos, fechaNacimiento, email, password, privacyConsent } = req.body;
+        if (privacyConsent !== true) {
+            return res.status(400).json({ msg: 'Debes aceptar el aviso de privacidad para crear tu cuenta.' });
+        }
 
         if (typeof email !== 'string' || email.trim().length > 254 || !EMAIL_PATTERN.test(email.trim())) {
             return res.status(400).json({ msg: 'El correo electrónico no tiene un formato válido' });
@@ -126,7 +143,8 @@ router.post('/register', async (req, res) => {
             email: normalizedEmail,
             password: hashedPassword,
             verificado: localMode,
-            tokenVerificacion
+            tokenVerificacion,
+            privacyConsent: { accepted: true, version: '2026-09-18', acceptedAt: new Date() }
         });
 
         await createdUser.save();
@@ -337,10 +355,11 @@ router.patch('/me', authenticateToken, async (req, res) => {
     }
 });
 
-router.get('/users', authenticateToken, getUsers);
-router.post('/users', authenticateToken, createUser);
-router.put('/users/:id', authenticateToken, updateUser);
-router.patch('/users/:id', authenticateToken, updateUser);
+router.get('/users', authenticateToken, requireAdmin, getUsers);
+router.post('/users', authenticateToken, requireAdmin, createUser);
+router.put('/users/:id', authenticateToken, requireAdmin, updateUser);
+router.patch('/users/:id', authenticateToken, requireAdmin, updateUser);
 
 module.exports = router;
 module.exports.authenticateToken = authenticateToken;
+module.exports.requireAdmin = requireAdmin;

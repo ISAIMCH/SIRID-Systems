@@ -9,9 +9,13 @@ const UserSchema = new mongoose.Schema({
     role: { type: String, enum: ['Admin', 'Coach', 'Cliente'], default: 'Cliente' },
     verificado: { type: Boolean, default: false },
     tokenVerificacion: { type: String },
+    privacyConsent: {
+        accepted: { type: Boolean, default: false },
+        version: { type: String },
+        acceptedAt: { type: Date }
+    },
     passwordResetToken: { type: String },
     passwordResetExpires: { type: Date }
 });
 
 module.exports = mongoose.model('User', UserSchema);
-

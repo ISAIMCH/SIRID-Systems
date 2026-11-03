@@ -1,0 +1,45 @@
+body.admin-page { background: #f1f2f3; color: #1d1d1f; }
+.admin-shell { display: flex; min-height: 100vh; }
+.admin-sidebar { width: 250px; flex: 0 0 250px; background: #1d1d1f; color: #fff; padding: 2rem 1.25rem 1.25rem; display: flex; flex-direction: column; }
+.admin-brand { color: #fff; font-size: 1.2rem; font-weight: 800; text-decoration: none; letter-spacing: -.04em; }
+.admin-brand span { color: #aaa; font-weight: 500; }
+.admin-kicker { color: #8d8e93; font-size: .68rem; font-weight: 700; letter-spacing: .14em; }
+.admin-nav { display: grid; gap: .35rem; }
+.admin-nav button, .admin-sidebar-footer button, .admin-sidebar-footer a { border: 0; background: transparent; color: #b7b7ba; border-radius: 12px; padding: .8rem .85rem; text-align: left; text-decoration: none; font-size: .9rem; }
+.admin-nav button i, .admin-sidebar-footer i { width: 1.5rem; display: inline-block; }
+.admin-nav button:hover, .admin-nav button.active, .admin-sidebar-footer button:hover, .admin-sidebar-footer a:hover { background: #343438; color: #fff; }
+.admin-sidebar-footer { margin-top: auto; display: grid; gap: .3rem; }
+.admin-main { width: 100%; max-width: 1500px; padding: 2.3rem clamp(1.2rem, 4vw, 4.5rem); }
+.admin-topbar { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2rem; }
+.admin-topbar h1 { font-size: clamp(1.7rem, 3vw, 2.5rem); letter-spacing: -.05em; margin: 0; }
+.admin-operator { display: flex; align-items: center; gap: .5rem; color: #62656b; font-size: .85rem; }
+.admin-live-dot { width: .5rem; height: .5rem; border-radius: 50%; background: #343438; }
+.metric-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
+.metric-card, .admin-card { background: #fff; border: 1px solid #d3d5d9; border-radius: 20px; box-shadow: 0 14px 36px rgba(29,29,31,.06); }
+.metric-card { padding: 1.35rem; }
+.metric-card span, .metric-card small { color: #777a80; font-size: .78rem; display: block; }
+.metric-card strong { display: block; margin: .55rem 0 .4rem; font-size: 1.7rem; letter-spacing: -.05em; }
+.metric-card small i { color: #3a3c42; }
+.admin-card { padding: 1.35rem; }
+.card-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; margin-bottom: 1.25rem; }
+.card-heading h2 { font-size: 1.15rem; margin: 0; letter-spacing: -.03em; }
+.card-heading > i { color: #55575c; font-size: 1.3rem; }
+.admin-link { border: 0; background: none; color: #3a3c42; font-size: .8rem; }
+.compact-list { display: grid; gap: .8rem; }
+.compact-order { display: flex; justify-content: space-between; gap: .6rem; padding-bottom: .75rem; border-bottom: 1px solid #ececf0; font-size: .82rem; }
+.compact-order:last-child { border-bottom: 0; }
+.compact-order small { display: block; color: #777a80; }
+.admin-table { --bs-table-bg: transparent; margin: 0; vertical-align: middle; font-size: .84rem; }
+.admin-table th { color: #777a80; font-size: .7rem; letter-spacing: .08em; text-transform: uppercase; font-weight: 700; border-bottom-color: #e5e5e8; }
+.admin-table td { border-bottom-color: #ececf0; padding: 1rem .5rem; }
+.admin-table tr:last-child td { border-bottom: 0; }
+.admin-badge { border-radius: 99px; padding: .35rem .65rem; font-size: .7rem; background: #ececf0; color: #3a3c42; }
+.admin-badge.alert { background: #f3e8e7; color: #7d3e37; }
+.admin-primary { background: #1d1d1f; border-color: #1d1d1f; color: #fff; border-radius: 10px; }
+.admin-primary:hover { background: #3a3c42; border-color: #3a3c42; color: #fff; }
+.review-admin-list { display: grid; gap: .8rem; }
+.review-admin-item { border: 1px solid #e5e5e8; border-radius: 14px; padding: 1rem; display: flex; justify-content: space-between; gap: 1rem; }
+.review-admin-item p { color: #62656b; margin: .35rem 0 0; font-size: .85rem; }
+.admin-modal { border: 0; border-radius: 18px; }
+@media (max-width: 900px) { .admin-sidebar { width: 78px; flex-basis: 78px; padding-inline: .7rem; } .admin-brand, .admin-kicker, .admin-nav button:not(.active)::after, .admin-nav button { font-size: 0; } .admin-nav button i, .admin-sidebar-footer i { font-size: 1rem; width: auto; } .admin-nav button.active { font-size: 0; } .admin-sidebar-footer a, .admin-sidebar-footer button { text-align: center; } .metric-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 575px) { .admin-main { padding: 1.3rem .8rem; } .admin-topbar { gap: 1rem; } .admin-operator { font-size: 0; } .metric-grid { grid-template-columns: 1fr 1fr; gap: .6rem; } .metric-card { padding: 1rem; } .metric-card strong { font-size: 1.35rem; } }

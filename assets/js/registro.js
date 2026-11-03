@@ -73,6 +73,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const birthYear = document.getElementById('regAnioNac');
     const birthDateStatus = document.getElementById('birthDateStatus');
     const acceptTerms = document.getElementById('acceptTerms');
+    const acceptPrivacy = document.getElementById('acceptPrivacy');
     const today = new Date();
     const currentDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
@@ -117,6 +118,10 @@ document.addEventListener('DOMContentLoaded', () => {
             alert('Debes aceptar los términos y condiciones para crear tu cuenta.');
             return;
         }
+        if (!acceptPrivacy.checked) {
+            alert('Debes aceptar el aviso de privacidad para crear tu cuenta.');
+            return;
+        }
         if (!isValidEmail(userData.email) || !validateBirthDateFields() || userData.fechaNacimiento > currentDate) {
             alert('Revisa el formato del correo y la fecha de nacimiento.');
             return;
@@ -126,7 +131,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         try {
-            const response = await fetch(`${window.SIRID_API_URL}/api/auth/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(userData) });
+            const response = await fetch(`${window.SIRID_API_URL}/api/auth/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...userData, privacyConsent: true }) });
             const data = await response.json();
             if (!response.ok) throw new Error(data.msg || 'No se pudo crear la cuenta.');
             alert('Cuenta creada exitosamente.');

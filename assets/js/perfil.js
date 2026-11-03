@@ -40,7 +40,7 @@ function setProfile(user) {
 async function request(path, options = {}) {
     const response = await fetch(`${API_URL}${path}`, {
         ...options,
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...(options.headers || {}) }
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token, ...(options.headers || {}) }
     });
     const data = await response.json().catch(() => ({}));
     if (response.status === 401) {
@@ -54,6 +54,23 @@ async function request(path, options = {}) {
     return data;
 }
 
+
+async function requestFrom(path) {
+    const response = await fetch(`${window.SIRID_API_URL}${path}`, { headers: { Authorization: 'Bearer ' + token } });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.msg || 'No se pudo cargar el historial.');
+    return data;
+}
+
+async function loadPurchaseHistory() {
+    const history = document.getElementById('purchaseHistory');
+    try {
+        const data = await requestFrom('/api/payments');
+        const payments = data.payments || [];
+        history.innerHTML = payments.length ? payments.map((payment) => `<div class="border-bottom py-3"><strong>${payment.id}</strong><span class="float-end">$${Number(payment.total).toFixed(2)} MXN</span><div class="small text-muted">${payment.status} · ${new Date(payment.date).toLocaleString('es-MX')}</div><div class="small">${(payment.items || []).map((item) => `${item.title} x${item.quantity}`).join(' · ')}</div></div>`).join('') : '<p class="profile-muted">Aún no tienes compras registradas.</p>';
+    } catch (error) { history.innerHTML = `<p class="text-danger">${error.message}</p>`; }
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
     if (!token) {
         window.location.href = 'login.html';
@@ -64,6 +81,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         setProfile(data.user);
         loading.classList.add('d-none');
         content.classList.remove('d-none');
+        loadPurchaseHistory();
     } catch (error) {
         if (error.message !== 'Sesión expirada.') showAlert(error.message, 'danger');
         loading.classList.add('d-none');
