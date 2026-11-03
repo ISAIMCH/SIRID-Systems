@@ -18,7 +18,7 @@ dns.setServers(dnsServers);
 // ==========================================
 // 1. MIDDLEWARES (Configuraciones de seguridad y datos)
 // ==========================================
-const allowedOrigins = (process.env.FRONTEND_ORIGINS || 'http://localhost:3000,http://127.0.0.1:3000,http://localhost:5500,http://127.0.0.1:5500')
+const allowedOrigins = (process.env.FRONTEND_ORIGINS || 'https://sirid-systems-1.onrender.com,http://localhost:3000,http://127.0.0.1:3000,http://localhost:5500,http://127.0.0.1:5500')
     .split(',')
     .map((origin) => origin.trim())
     .filter(Boolean);
@@ -41,7 +41,10 @@ app.use(cors({
     }
 })); // Solo permite los frontends configurados
 app.use(express.json()); // Permite que el servidor lea los datos en formato JSON enviados por fetch()
-app.use(express.static(frontendRoot));
+// Solo en local: en Render el frontend lo sirve el Static Site y esta API no debe exponer archivos del repo
+if (process.env.RENDER !== 'true' && process.env.NODE_ENV !== 'production') {
+    app.use(express.static(frontendRoot));
+}
 
 // ==========================================
 // 2. CONEXIÓN A LA BASE DE DATOS
