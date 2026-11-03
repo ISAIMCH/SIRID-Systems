@@ -281,6 +281,35 @@
     background-color: transparent; color: #ffffff; border: 1px solid rgba(255,255,255,0.4);
     border-radius: 20px; padding: 8px 20px; font-weight: 400; font-size: 0.85rem;
 }
+.cookie-settings-modal .modal-dialog { max-width: 760px; }
+.cookie-settings-modal .modal-content { max-height: 90vh; border: 0; border-radius: 12px; color: #1d1d1f; }
+.cookie-settings-modal .modal-header { padding: 24px 28px 16px; border: 0; }
+.cookie-settings-modal .modal-title { font-size: 1.65rem; font-weight: 600; }
+.cookie-settings-modal .modal-body { padding: 0 28px 24px; overflow-y: auto; }
+.cookie-settings-modal .cookie-info { display: flex; gap: 12px; margin-bottom: 18px; padding: 16px; border-radius: 9px; background: #edf4ff; color: #29394e; }
+.cookie-settings-modal .cookie-info i { color: #3483fa; font-size: 1.25rem; }
+.cookie-settings-modal .cookie-info p { margin: 0; line-height: 1.5; }
+.cookie-settings-modal .cookie-info a { display: inline-block; margin-top: 8px; color: #3483fa; text-decoration: none; }
+.cookie-settings-modal .cookie-info a:hover { text-decoration: underline; }
+.cookie-category { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; margin-bottom: 16px; padding: 22px 24px; border-radius: 10px; background: #fff; box-shadow: 0 8px 24px rgba(0,0,0,.1); }
+.cookie-category h3 { margin: 0 0 8px; font-size: 1.1rem; }
+.cookie-category p { margin: 0; color: #777; line-height: 1.5; }
+.cookie-category .form-check { flex: 0 0 auto; margin: 2px 0 0; }
+.cookie-category .form-check-input { width: 2.5rem; height: 1.35rem; margin-left: 0; cursor: pointer; }
+.cookie-category .form-check-input:checked { background-color: #3483fa; border-color: #3483fa; }
+.cookie-settings-modal .cookie-note { margin: 20px 0 0; color: #626262; line-height: 1.5; }
+.cookie-settings-modal .modal-footer { justify-content: flex-start; padding: 14px 28px; border-top: 1px solid #eee; box-shadow: 0 -4px 14px rgba(0,0,0,.06); }
+.cookie-settings-modal .btn-cookie-save { padding: 12px 28px; border: 0; border-radius: 8px; background: #3483fa; color: #fff; font-weight: 600; }
+.cookie-settings-modal .btn-cookie-save:hover { background: #2968c8; }
+@media (max-width: 575px) {
+    .cookie-settings-modal .modal-dialog { margin: 0; min-height: 100%; }
+    .cookie-settings-modal .modal-content { min-height: 100vh; max-height: 100vh; border-radius: 0; }
+    .cookie-settings-modal .modal-header { padding: 20px 18px 14px; }
+    .cookie-settings-modal .modal-title { font-size: 1.35rem; }
+    .cookie-settings-modal .modal-body { padding: 0 18px 20px; }
+    .cookie-category { padding: 18px; }
+    .cookie-settings-modal .modal-footer { padding: 12px 18px; }
+}
 .journey-section,
 .stories-section,
 .faq-section {
@@ -1042,6 +1071,7 @@
                     <ul class="list-unstyled mt-3 text-start">
                         <li class="mb-2"><a href="pages/politica-privacidad.html" class="text-white-50 text-decoration-none"><i class="bi bi-shield-check me-2 text-white"></i>Política de Privacidad</a></li>
                         <li class="mb-2"><a href="pages/terminos.html" class="text-white-50 text-decoration-none"><i class="bi bi-file-earmark-text me-2 text-white"></i>Términos de Servicio</a></li>
+                        <li class="mb-2"><button type="button" class="btn btn-link p-0 text-white-50 text-decoration-none" data-cookie-settings>Configurar cookies</button></li>
                     </ul>
                 </div>
 
