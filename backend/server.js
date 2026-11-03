@@ -18,7 +18,28 @@ dns.setServers(dnsServers);
 // ==========================================
 // 1. MIDDLEWARES (Configuraciones de seguridad y datos)
 // ==========================================
-app.use(cors()); // Permite peticiones HTTP entre el cliente y el servidor intermedio seguro
+const allowedOrigins = (process.env.FRONTEND_ORIGINS || 'http://localhost:3000,http://127.0.0.1:3000,http://localhost:5500,http://127.0.0.1:5500')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+app.use((req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+    if (process.env.NODE_ENV === 'production') {
+        res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    }
+    next();
+});
+
+app.use(cors({
+    origin(origin, callback) {
+        if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+        return callback(new Error('Origen no autorizado por la API.'));
+    }
+})); // Solo permite los frontends configurados
 app.use(express.json()); // Permite que el servidor lea los datos en formato JSON enviados por fetch()
 app.use(express.static(frontendRoot));
 

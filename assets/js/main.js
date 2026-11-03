@@ -221,6 +221,7 @@ function getCookiePreferences() {
 function saveCookiePreferences(preferences) {
     setCookie('cookiePreferences', encodeURIComponent(JSON.stringify(preferences)), 365);
     setCookie('cookiesAceptadas', 'true', 365);
+    document.dispatchEvent(new CustomEvent('sirid:cookie-preferences-updated'));
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -253,6 +254,7 @@ document.addEventListener('DOMContentLoaded', () => {
             performance: true,
             functional: true
         });
+        window.siridTrack?.('cookie_consent', { analytics: true });
         banner.style.display = 'none';
     });
 
@@ -267,6 +269,9 @@ document.addEventListener('DOMContentLoaded', () => {
             advertising: document.getElementById('cookieAdvertising').checked,
             performance: document.getElementById('cookiePerformance').checked,
             functional: document.getElementById('cookieFunctional').checked
+        });
+        window.siridTrack?.('cookie_preferences_saved', {
+            analytics: document.getElementById('cookieAnalytics').checked
         });
         banner.style.display = 'none';
         bootstrap.Modal.getOrCreateInstance(settingsModalElement).hide();

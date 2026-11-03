@@ -47,6 +47,32 @@ Después de actualizar el código del backend, reinicia `npm start` para que Exp
 
 Para producción, elimina `LOCAL_MODE` o configúralo como `false`, y usa valores reales para las URLs públicas y las credenciales.
 
+### Publicación en GitHub Pages
+
+GitHub Pages aloja el frontend estático mediante `.github/workflows/pages.yml`. En GitHub entra a `Settings > Pages`, selecciona `GitHub Actions` como fuente y publica la rama `main`; cada push posterior desplegará automáticamente la interfaz.
+
+La API no se ejecuta en GitHub Pages. Debe permanecer desplegada en Render u otro hosting Node.js. Para producción configura en Render:
+
+```text
+FRONTEND_PUBLIC_URL=https://TU_USUARIO.github.io/TU_REPOSITORIO
+FRONTEND_ORIGINS=https://TU_USUARIO.github.io
+```
+
+La aplicación detecta el dominio de GitHub Pages y usa `https://sirid-systems.onrender.com` como API. Si la API cambia de dominio, actualiza `assets/js/config.js`.
+
+### Seguridad y compatibilidad
+
+La API usa JWT, bcrypt, validación de datos en servidor, control de rol `Admin`, reserva segura de inventario, cabeceras HTTP de seguridad y CORS restringido a los orígenes configurados. No subas `backend/.env`, contraseñas, claves JWT ni credenciales de Stripe/PayPal al repositorio.
+
+Antes de entregar, comprueba el flujo principal en Chrome, Edge, Firefox y Safari: navegación, registro, login, catálogo, carrito, checkout, descarga de ticket y dashboard. Repite la prueba en móvil y escritorio; GitHub Pages sirve el frontend, pero la compatibilidad también depende de la API desplegada.
+
+### Google Analytics
+
+1. Crea una propiedad web en Google Analytics y copia el identificador `G-XXXXXXXXXX`.
+2. Colócalo en `assets/js/config.js`, por ejemplo: `window.SIRID_GA_ID = 'G-XXXXXXXXXX';`.
+3. El script `assets/js/analytics.js` solo carga Google Analytics después de aceptar la categoría de cookies analíticas.
+4. Publica de nuevo en GitHub Pages y verifica visitas en el informe `Tiempo real`.
+
 ### Recibos de pago
 
 Las órdenes registradas pueden descargarse como recibos PDF desde el modal de confirmación de `pages/pagos.html`. El backend genera el documento bajo demanda con los datos almacenados en MongoDB mediante el endpoint autenticado:
