@@ -96,7 +96,7 @@
     background-color: #1d1d1f;
     color: #f5f5f7;
     padding: 18px 20px;
-    z-index: 2000;
+    z-index: 1040;
     display: none;
     box-shadow: 0 -4px 20px rgba(0,0,0,0.3);
 }
@@ -109,6 +109,36 @@
 .cookie-banner .btn-cookie-config {
     background-color: transparent; color: #ffffff; border: 1px solid rgba(255,255,255,0.4);
     border-radius: 20px; padding: 8px 20px; font-weight: 400; font-size: 0.85rem;
+}
+.cookie-settings-modal .modal-dialog { max-width: 760px; }
+.cookie-settings-modal .modal-content { max-height: 90vh; border: 0; border-radius: 12px; color: #1d1d1f; }
+.cookie-settings-modal .modal-header { padding: 24px 28px 16px; border: 0; }
+.cookie-settings-modal .modal-title { font-size: 1.65rem; font-weight: 600; }
+.cookie-settings-modal .modal-body { padding: 0 28px 24px; overflow-y: auto; }
+.cookie-settings-modal .cookie-info { display: flex; gap: 12px; margin-bottom: 18px; padding: 16px; border-radius: 9px; background: #edf4ff; color: #29394e; }
+.cookie-settings-modal .cookie-info i { color: #3483fa; font-size: 1.25rem; }
+.cookie-settings-modal .cookie-info p { margin: 0; line-height: 1.5; }
+.cookie-settings-modal .cookie-info a { display: inline-block; margin-top: 8px; color: #3483fa; text-decoration: none; }
+.cookie-settings-modal .cookie-info a:hover { text-decoration: underline; }
+.cookie-category { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; margin-bottom: 16px; padding: 22px 24px; border-radius: 10px; background: #fff; box-shadow: 0 8px 24px rgba(0,0,0,.1); }
+.cookie-category h3 { margin: 0 0 8px; font-size: 1.1rem; }
+.cookie-category p { margin: 0; color: #777; line-height: 1.5; }
+.cookie-category .form-check { flex: 0 0 auto; margin: 2px 0 0; }
+.cookie-category .form-check-input { width: 2.5rem; height: 1.35rem; margin-left: 0; cursor: pointer; }
+.cookie-category .form-check-input:checked { background-color: #3483fa; border-color: #3483fa; }
+.cookie-category .form-check-input:disabled { opacity: .8; cursor: not-allowed; }
+.cookie-settings-modal .cookie-note { margin: 20px 0 0; color: #626262; line-height: 1.5; }
+.cookie-settings-modal .modal-footer { justify-content: flex-start; padding: 14px 28px; border-top: 1px solid #eee; box-shadow: 0 -4px 14px rgba(0,0,0,.06); }
+.cookie-settings-modal .btn-cookie-save { padding: 12px 28px; border: 0; border-radius: 8px; background: #3483fa; color: #fff; font-weight: 600; }
+.cookie-settings-modal .btn-cookie-save:hover { background: #2968c8; }
+@media (max-width: 575px) {
+    .cookie-settings-modal .modal-dialog { margin: 0; min-height: 100%; }
+    .cookie-settings-modal .modal-content { min-height: 100vh; max-height: 100vh; border-radius: 0; }
+    .cookie-settings-modal .modal-header { padding: 20px 18px 14px; }
+    .cookie-settings-modal .modal-title { font-size: 1.35rem; }
+    .cookie-settings-modal .modal-body { padding: 0 18px 20px; }
+    .cookie-category { padding: 18px; }
+    .cookie-settings-modal .modal-footer { padding: 12px 18px; }
 }
     </style>
 </head>
@@ -472,10 +502,75 @@
                 <!-- BANNER DE COOKIES -->
 <div id="cookieBanner" class="cookie-banner">
     <div class="container d-flex flex-wrap justify-content-between align-items-center gap-3">
-        <p>Usamos cookies para mejorar tu experiencia en Project-GymGo. Consulta más en nuestra <a href="#">Política de Privacidad</a>.</p>
+        <p>Usamos cookies para mejorar tu experiencia en Project-GymGo. Puedes revisar tus preferencias en cualquier momento.</p>
         <div class="d-flex gap-2 flex-shrink-0">
             <button id="btnConfigCookies" class="btn-cookie-config">Configurar cookies</button>
             <button id="btnAceptarCookies" class="btn-cookie-aceptar">Aceptar cookies</button>
+        </div>
+    </div>
+</div>
+<div class="modal fade cookie-settings-modal" id="cookieSettingsModal" tabindex="-1" aria-labelledby="cookieSettingsTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title" id="cookieSettingsTitle">Configurar cookies</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <div class="cookie-info">
+                    <i class="bi bi-info-circle-fill" aria-hidden="true"></i>
+                    <div>
+                        <p>Las cookies nos ayudan a entender cómo usas nuestro sitio, mejorar su funcionamiento y ofrecerte una experiencia más relevante. Puedes elegir qué categorías permitir.</p>
+                        <a href="pages/terminos.html">Conoce más sobre privacidad y uso de datos.</a>
+                    </div>
+                </div>
+                <article class="cookie-category">
+                    <div class="cookie-category-essential">
+                        <h3>Cookies esenciales</h3>
+                        <p>Son necesarias para el funcionamiento del sitio, proteger tu cuenta y recordar tus preferencias. No se pueden desactivar.</p>
+                    </div>
+                </article>
+                <article class="cookie-category">
+                    <div>
+                        <h3>Cookies analíticas</h3>
+                        <p>Nos permiten analizar cómo se utiliza el sitio para entender qué funciona y mejorar la experiencia.</p>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" role="switch" id="cookieAnalytics">
+                    </div>
+                </article>
+                <article class="cookie-category">
+                    <div>
+                        <h3>Cookies de publicidad personalizada</h3>
+                        <p>Nos ayudan a conocer tus preferencias para mostrarte contenido y anuncios más relevantes.</p>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" role="switch" id="cookieAdvertising">
+                    </div>
+                </article>
+                <article class="cookie-category">
+                    <div>
+                        <h3>Cookies de rendimiento</h3>
+                        <p>Permiten optimizar funciones del sitio. Si las desactivas, algunas páginas podrían responder más lentamente.</p>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" role="switch" id="cookiePerformance">
+                    </div>
+                </article>
+                <article class="cookie-category">
+                    <div>
+                        <h3>Cookies funcionales</h3>
+                        <p>Ayudan a recordar tus elecciones y mantener el buen funcionamiento de tu navegación.</p>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" role="switch" id="cookieFunctional">
+                    </div>
+                </article>
+                <p class="cookie-note">Puedes cambiar tu configuración más adelante desde el enlace “Configurar cookies” en el pie de página.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-cookie-save" id="btnGuardarCookies">Guardar</button>
+            </div>
         </div>
     </div>
 </div>
@@ -500,6 +595,7 @@
                     <ul class="list-unstyled mt-3 text-start">
                         <li class="mb-2"><a href="#" class="text-white-50 text-decoration-none"><i class="bi bi-shield-check me-2 text-white"></i>Política de Privacidad</a></li>
                         <li class="mb-2"><a href="#" class="text-white-50 text-decoration-none"><i class="bi bi-file-earmark-text me-2 text-white"></i>Términos de Servicio</a></li>
+                        <li class="mb-2"><button type="button" class="btn btn-link p-0 text-white-50 text-decoration-none" data-cookie-settings>Configurar cookies</button></li>
                     </ul>
                 </div>
 

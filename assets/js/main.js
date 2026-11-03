@@ -107,7 +107,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 function setCookie(nombre, valor, dias) {
     const fecha = new Date();
     fecha.setTime(fecha.getTime() + dias * 24 * 60 * 60 * 1000);
-    document.cookie = `${nombre}=${valor};expires=${fecha.toUTCString()};path=/`;
+    const secure = window.location.protocol === 'https:' ? ';Secure' : '';
+    document.cookie = `${nombre}=${valor};expires=${fecha.toUTCString()};path=/;SameSite=Lax${secure}`;
 }
 
 function getCookie(nombre) {
@@ -115,23 +116,88 @@ function getCookie(nombre) {
     return match ? match[2] : null;
 }
 
+const defaultCookiePreferences = {
+    analytics: false,
+    advertising: false,
+    performance: false,
+    functional: false
+};
+
+function getCookiePreferences() {
+    const savedPreferences = getCookie('cookiePreferences');
+    if (savedPreferences) {
+        try {
+            const preferences = JSON.parse(decodeURIComponent(savedPreferences));
+            return { ...defaultCookiePreferences, ...preferences };
+        } catch (error) {
+            console.warn('No se pudieron leer las preferencias de cookies guardadas.', error);
+        }
+    }
+
+    if (getCookie('cookiesAceptadas') === 'true') {
+        return {
+            analytics: true,
+            advertising: true,
+            performance: true,
+            functional: true
+        };
+    }
+
+    return { ...defaultCookiePreferences };
+}
+
+function saveCookiePreferences(preferences) {
+    setCookie('cookiePreferences', encodeURIComponent(JSON.stringify(preferences)), 365);
+    setCookie('cookiesAceptadas', 'true', 365);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     const banner = document.getElementById('cookieBanner');
+    const settingsModalElement = document.getElementById('cookieSettingsModal');
 
-    if (!banner) return;
+    if (!banner || !settingsModalElement) return;
 
     if (!getCookie('cookiesAceptadas')) {
         banner.style.display = 'block';
     }
 
+    const updateCookieControls = () => {
+        const preferences = getCookiePreferences();
+        document.getElementById('cookieAnalytics').checked = preferences.analytics;
+        document.getElementById('cookieAdvertising').checked = preferences.advertising;
+        document.getElementById('cookiePerformance').checked = preferences.performance;
+        document.getElementById('cookieFunctional').checked = preferences.functional;
+    };
+
+    const openCookieSettings = () => {
+        updateCookieControls();
+        bootstrap.Modal.getOrCreateInstance(settingsModalElement).show();
+    };
+
     document.getElementById('btnAceptarCookies').addEventListener('click', () => {
-        setCookie('cookiesAceptadas', 'true', 365);
+        saveCookiePreferences({
+            analytics: true,
+            advertising: true,
+            performance: true,
+            functional: true
+        });
         banner.style.display = 'none';
     });
 
-    document.getElementById('btnConfigCookies').addEventListener('click', () => {
-        // Aquí después puedes abrir un modal con opciones (necesarias/analíticas/marketing)
-        alert('Aquí iría tu panel de configuración de cookies.');
+    document.getElementById('btnConfigCookies').addEventListener('click', openCookieSettings);
+    document.querySelectorAll('[data-cookie-settings]').forEach((button) => {
+        button.addEventListener('click', openCookieSettings);
+    });
+
+    document.getElementById('btnGuardarCookies').addEventListener('click', () => {
+        saveCookiePreferences({
+            analytics: document.getElementById('cookieAnalytics').checked,
+            advertising: document.getElementById('cookieAdvertising').checked,
+            performance: document.getElementById('cookiePerformance').checked,
+            functional: document.getElementById('cookieFunctional').checked
+        });
+        banner.style.display = 'none';
+        bootstrap.Modal.getOrCreateInstance(settingsModalElement).hide();
     });
 });
 
