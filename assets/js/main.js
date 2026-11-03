@@ -54,54 +54,126 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 document.addEventListener("DOMContentLoaded", async () => {
-    const contenedorPlanes = document.getElementById('contenedor-planes');
-    
-    // Si estamos en la página de inicio y el contenedor existe, cargamos los precios
-    if (contenedorPlanes) {
-        try {
-            // Petición al backend
-            const respuesta = await fetch(`${window.SIRID_API_URL}/api/planes`);
-            const planes = await respuesta.json();
-            
-            contenedorPlanes.innerHTML = ''; // Limpiamos el spinner
+    const catalogContainer = document.getElementById('catalogProducts');
+    const catalogSearch = document.getElementById('catalogSearch');
+    if (!catalogContainer) return;
+    let catalogProducts = [];
+    const money = (value) => `$${Number(value).toLocaleString('es-MX', { minimumFractionDigits: 2 })}`;
+    const getExperienceContent = (product) => {
+        const productName = product.name.toLocaleLowerCase();
+        const isHardware = productName.includes('hardware') || productName.includes('iot');
+        const isEnterprise = productName.includes('enterprise') || productName.includes('pro');
+        const audience = isHardware
+            ? 'Gimnasios que quieren conectar su espacio físico con la operación digital.'
+            : isEnterprise
+                ? 'Equipos que necesitan visibilidad, control y una operación lista para crecer.'
+                : 'Gimnasios que buscan ordenar su operación sin añadir complejidad.';
+        const outcome = isHardware
+            ? 'Convierte cada acceso y cada dispositivo en información útil para tu equipo.'
+            : isEnterprise
+                ? 'Toma decisiones con una operación más conectada y una experiencia consistente.'
+                : 'Empieza con una base clara para administrar mejor a tus clientes y tu equipo.';
+        const implementation = isHardware ? 'Integración guiada' : isEnterprise ? 'Despliegue acompañado' : 'Activación sencilla';
+        const scale = isEnterprise ? 'Operación avanzada' : isHardware ? 'Espacio conectado' : 'Base funcional';
 
-            if (planes.length === 0) {
-                contenedorPlanes.innerHTML = '<p class="text-center text-muted">Aún no hay planes configurados en la base de datos.</p>';
-                return;
-            }
-
-            // Generamos una tarjeta HTML por cada plan
-            planes.forEach(plan => {
-                const destacadoClass = plan.destacado ? 'destacado' : '';
-                const badgeHtml = plan.destacado ? `<span class="badge-popular">MÁS ELEGIDO</span>` : '';
-                
-                // Extraemos beneficios como reducción de morosidad y upselling[cite: 1]
-                const listaCaracteristicas = plan.caracteristicas.map(c => `<li>${c}</li>`).join('');
-
-                const tarjetaHtml = `
-                    <div class="col-lg-4 col-md-6">
-                        <div class="pricing-card ${destacadoClass}">
-                            ${badgeHtml}
-                            <h3 class="fw-semibold" style="color: #1d1d1f;">${plan.nombre}</h3>
-                            <p class="text-muted small">${plan.descripcion}</p>
-                            <div class="mt-4">
-                                <span class="price-text" style="color: #1d1d1f;">$${plan.precio}</span><span class="text-muted">${plan.tipoCobro}</span>
-                            </div>
-                            <ul class="feature-list">
-                                ${listaCaracteristicas}
-                            </ul>
-                            <a href="pages/demo.html" class="btn btn-buy">Agendar Demo</a>
-                        </div>
+        return { audience, outcome, implementation, scale };
+    };
+    const renderCatalog = () => {
+        const query = (catalogSearch?.value || '').trim().toLocaleLowerCase();
+        const filtered = catalogProducts.filter((product) =>
+            `${product.name} ${product.description} ${(product.features || []).join(' ')}`
+                .toLocaleLowerCase().includes(query)
+        );
+        catalogContainer.innerHTML = filtered.length ? filtered.map((product) => {
+            const experience = getExperienceContent(product);
+            return `
+            <div class="col-lg-4 col-md-6 fade-in-up">
+                <article class="pricing-card ${product.featured ? 'destacado' : ''}">
+                    ${product.featured ? '<span class="badge-popular">MÁS ELEGIDO</span>' : ''}
+                    <span class="eyebrow">SOLUCIÓN GYMGO</span>
+                    <h3 class="fw-semibold">${product.name}</h3>
+                    <p class="pricing-description text-muted small">${product.description}</p>
+                    <div class="pricing-price">
+                        <span class="price-text">${money(product.price)}</span>
+                        <span class="price-period">MXN ${product.billing || ''}</span>
                     </div>
-                `;
-                contenedorPlanes.innerHTML += tarjetaHtml;
-            });
-
-        } catch (error) {
-            console.error("Error conectando al backend:", error);
-            contenedorPlanes.innerHTML = '<p class="text-center text-danger">Error al cargar los planes desde el servidor.</p>';
-        }
+                    <ul class="feature-list flex-grow-1">${(product.features || []).slice(0, 5).map((feature) => `<li>${feature}</li>`).join('')}</ul>
+                    <p class="catalog-meta mb-2"><strong>${product.stock > 0 ? 'Disponible' : 'Agotado'}</strong> · ${product.guarantee}</p>
+                    <div class="pricing-actions mt-auto">
+                        <button type="button" class="btn btn-buy catalog-add-to-cart" data-product-id="${product.id}" ${product.stock < 1 ? 'disabled' : ''}>Añadir al carrito</button>
+                        <button type="button" class="catalog-detail-button catalog-open-details">Ver detalles</button>
+                    </div>
+                    <div class="catalog-details-panel" aria-hidden="true">
+                        <button type="button" class="catalog-details-close" aria-label="Cerrar detalles">&times;</button>
+                        <span class="detail-label">Vista de decisión</span>
+                        <h4 class="mt-2 mb-2">¿Es la solución correcta para tu gimnasio?</h4>
+                        <p class="details-intro">${experience.outcome}</p>
+                        <div class="details-metrics">
+                            <div class="details-metric">
+                                <span class="details-metric-value">${experience.implementation}</span>
+                                <span class="details-metric-label">puesta en marcha</span>
+                            </div>
+                            <div class="details-metric">
+                                <span class="details-metric-value">${experience.scale}</span>
+                                <span class="details-metric-label">enfoque</span>
+                            </div>
+                        </div>
+                        <span class="detail-label">Ideal para</span>
+                        <p class="details-audience">${experience.audience}</p>
+                        <div class="details-next-step">
+                            <i class="bi bi-arrow-up-right-circle"></i>
+                            <div>
+                                <strong>Tu siguiente paso</strong>
+                                <span>Elige esta solución y revisa el resumen antes de confirmar.</span>
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-buy catalog-add-to-cart" data-product-id="${product.id}" ${product.stock < 1 ? 'disabled' : ''}>Elegir esta solución</button>
+                    </div>
+                </article>
+            </div>`;
+        }).join('') : '<p class="text-center text-muted">No encontramos soluciones con esa búsqueda.</p>';
+        catalogContainer.querySelectorAll('.fade-in-up').forEach((element) => element.classList.add('is-visible'));
+    };
+    try {
+        const response = await fetch(`${window.SIRID_API_URL}/api/catalog`);
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.msg || 'No se pudo cargar el catálogo.');
+        catalogProducts = data.products || [];
+        renderCatalog();
+    } catch (error) {
+        console.error('Error conectando al catálogo:', error);
+        catalogContainer.innerHTML = '<p class="text-center text-danger">No se pudo cargar el catálogo. Inténtalo más tarde.</p>';
     }
+    catalogSearch?.addEventListener('input', renderCatalog);
+    catalogContainer.addEventListener('click', (event) => {
+        const detailButton = event.target.closest('.catalog-open-details');
+        if (detailButton) {
+            const card = detailButton.closest('.pricing-card');
+            card?.classList.add('details-open');
+            card?.querySelector('.catalog-details-panel')?.setAttribute('aria-hidden', 'false');
+            return;
+        }
+        const closeButton = event.target.closest('.catalog-details-close');
+        if (closeButton) {
+            const card = closeButton.closest('.pricing-card');
+            card?.classList.remove('details-open');
+            card?.querySelector('.catalog-details-panel')?.setAttribute('aria-hidden', 'true');
+            return;
+        }
+        const button = event.target.closest('.catalog-add-to-cart');
+        const product = catalogProducts.find((item) => item.id === button?.dataset.productId);
+        if (!product) return;
+        const user = JSON.parse(localStorage.getItem('userData') || 'null');
+        const cartKey = `gg_pay_${user?.id || user?.email || 'guest'}`;
+        const state = JSON.parse(localStorage.getItem(cartKey) || 'null') || { cart: [], orders: [] };
+        state.cart = state.cart.filter((item) => item.pid !== product.id || product.billing?.toLowerCase().includes('pago'));
+        const existing = state.cart.find((item) => item.pid === product.id);
+        if (existing) existing.qty += 1;
+        else state.cart.push({ id: product.id, pid: product.id, title: product.name, price: product.price, qty: 1, rec: !product.billing?.toLowerCase().includes('pago') });
+        localStorage.setItem(cartKey, JSON.stringify(state));
+        button.textContent = 'Añadido al carrito';
+        setTimeout(() => { button.textContent = 'Añadir al carrito'; }, 1800);
+    });
 });
 
 function setCookie(nombre, valor, dias) {
@@ -222,23 +294,11 @@ function enviarWhatsApp() {
 
     if (userNavContainer) {
         if (userName) {
-            // Usuario logueado: Mostrar ícono, nombre y menú desplegable
+            // Usuario logueado: mostrar sus acciones dentro del panel lateral.
             userNavContainer.innerHTML = `
-                <a href="#" class="nav-link text-white d-flex align-items-center dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" style="cursor: pointer;">
-                    <i class="bi bi-person-circle fs-5 me-2"></i>
-                    <span class="fw-medium small">${userName}</span>
-                </a>
-                
-                <ul class="dropdown-menu dropdown-menu-end border-0 shadow-sm mt-3 rounded-4 p-2">
-                    <li><h6 class="dropdown-header text-secondary">Mi Cuenta</h6></li>
-                    <li><a class="dropdown-item py-2 rounded" href="pages/perfil.html"><i class="bi bi-person me-2 text-muted"></i>Mi perfil</a></li>
-                    <li><hr class="dropdown-divider my-2"></li>
-                    <li>
-                        <a class="dropdown-item py-2 rounded text-danger fw-medium" href="#" id="logoutBtn">
-                            <i class="bi bi-door-open me-2"></i>Cerrar sesión
-                        </a>
-                    </li>
-                </ul>
+                <div class="small text-white-50 mb-2 px-2"><i class="bi bi-person-circle me-2"></i>${userName}</div>
+                <a class="action-link" href="pages/perfil.html"><i class="bi bi-person fs-5"></i><span>Mi perfil</span></a>
+                <a class="action-link mt-2" href="#" id="logoutBtn"><i class="bi bi-door-open fs-5"></i><span>Cerrar sesión</span></a>
             `;
 
             // Darle vida al botón de cerrar sesión dentro del menú
@@ -252,9 +312,9 @@ function enviarWhatsApp() {
         } else {
             // Usuario NO logueado: Devolver el ícono normal con el enlace al login
             userNavContainer.innerHTML = `
-                <a href="pages/login.html" class="nav-link text-white opacity-75">
+                <a href="pages/login.html" class="action-link">
                     <i class="bi bi-person fs-5"></i>
-                    <span class="ms-2">Iniciar Sesión</span>
+                    <span>Iniciar sesión</span>
                 </a>
             `;
         }

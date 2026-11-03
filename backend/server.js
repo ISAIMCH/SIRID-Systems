@@ -42,12 +42,18 @@ mongoose.connect(process.env.MONGO_URI, { serverSelectionTimeoutMS: 10000 })
 const authRoutes = require('./routes/auth'); 
 const planRoutes = require('./routes/plans');
 const paymentRoutes = require('./routes/payments');
+const catalogRoutes = require('./routes/catalog');
+const reviewRoutes = require('./routes/reviews');
+const adminRoutes = require('./routes/admin');
 const { getPlans } = require('./controllers/plan.controller');
 
 // Conectamos las rutas al motor principal
 app.use('/api/auth', authRoutes); 
 app.use('/api/plans', planRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/catalog', catalogRoutes);
+app.use('/api/reviews', reviewRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Ruta para obtener los planes SaaS desde MongoDB Atlas
 app.get('/api/planes', getPlans);

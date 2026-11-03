@@ -7,13 +7,13 @@
  */
 
 :root {
-  --payments-bg: #1d1d1f;
-  --payments-surface: #252527;
-  --payments-elevated: #303033;
+  --payments-bg: #111214;
+  --payments-surface: #1b1c20;
+  --payments-elevated: #25272b;
   --payments-border: rgba(255, 255, 255, .12);
   --payments-text: #f5f5f7;
-  --payments-muted: #d2d2d7;
-  --payments-accent: #ffffff;
+  --payments-muted: #a7a9ae;
+  --payments-accent: #e8e9eb;
   --payments-radius: 20px;
 }
 
@@ -103,7 +103,7 @@ body.payments-page {
   margin: 0 auto 16px;
   padding: 18px;
   color: var(--payments-text);
-  background: linear-gradient(135deg, #454548, #1d1d1f);
+  background: linear-gradient(135deg, #3a3c42, #111214);
   border-radius: 18px;
   box-shadow: 0 12px 30px rgba(0, 0, 0, .3);
   display: flex;
@@ -114,9 +114,9 @@ body.payments-page {
 .payments-page .vcard .num { font-family: monospace; font-size: 1.25rem; letter-spacing: 2px; }
 .payments-page .chip { padding: 4px 10px; margin: 2px; font-size: .72rem; background: var(--payments-elevated); color: var(--payments-text); border: 1px solid var(--payments-border); border-radius: 12px; cursor: pointer; }
 .payments-page .chip:hover { border-color: rgba(255, 255, 255, .5); }
-.payments-page .form-control { color: var(--payments-text); background: #0d100e; border-color: var(--payments-border); }
-.payments-page .form-control::placeholder { color: #778078; }
-.payments-page .form-control:focus { color: var(--payments-text); background: #1d1d1f; border-color: rgba(255, 255, 255, .6); box-shadow: 0 0 0 3px rgba(255, 255, 255, .12); }
+.payments-page .form-control { color: var(--payments-text); background: #111214; border-color: var(--payments-border); }
+.payments-page .form-control::placeholder { color: #777a81; }
+.payments-page .form-control:focus { color: var(--payments-text); background: #25272b; border-color: rgba(255, 255, 255, .6); box-shadow: 0 0 0 3px rgba(255, 255, 255, .12); }
 .payments-page .pp { padding: 12px; color: #1d1d1f; background: var(--payments-accent); border-radius: 14px; }
 .payments-page .kpi { padding: 12px; background: var(--payments-elevated); border: 1px solid var(--payments-border); border-radius: 16px; }
 .payments-page .ficha { padding: 12px; text-align: center; background: #fff; color: #1d1d1f; border: 2px dashed #ccc; border-radius: 12px; }
@@ -151,9 +151,77 @@ body.payments-page {
 .payments-page .cart-note { font-size: .72rem; }
 .payments-page .modal-content { border-radius: 24px; }
 .payments-page .modal-content .text-muted { color: #6c757d !important; }
+.payments-page .modal-content .text-success,
+.payments-page .modal-content .text-primary,
+.payments-page .badge.text-bg-success,
+.payments-page .alert-success {
+  color: #1d1d1f !important;
+  background: #f5f5f7 !important;
+  border-color: #d2d2d7 !important;
+}
+.payments-page .modal-content .bi-check-circle-fill { color: #1d1d1f !important; }
 .payments-page .payments-toast { z-index: 2000; margin-top: 56px; }
 
 @media (min-width: 992px) {
   .payments-page .bar-m { display: none; }
   body.payments-page { padding-bottom: 32px; }
+}
+
+/* Checkout alineado con la portada: superficie clara y navegación grafito. */
+body.payments-page {
+  color: #1d1d1f;
+  background: #f1f2f3;
+}
+
+.payments-page .nav-g {
+  background: rgba(29,29,31,.96);
+}
+
+.payments-page .page-title,
+.payments-page .panel,
+.payments-page .text-white-50,
+.payments-page .text-muted {
+  color: #1d1d1f !important;
+}
+
+.payments-page .panel {
+  background: #ffffff;
+  border-color: #d3d5d9;
+  box-shadow: 0 18px 42px rgba(29,29,31,.08);
+}
+
+.payments-page .prod {
+  background: #f1f2f3;
+  border-color: #d3d5d9;
+  color: #1d1d1f;
+}
+
+.payments-page .form-control {
+  color: #1d1d1f;
+  background: #f1f2f3;
+  border-color: #d3d5d9;
+}
+
+.payments-page .form-control:focus {
+  color: #1d1d1f;
+  background: #ffffff;
+  border-color: #3a3c42;
+}
+
+.payments-page .nav-pills .nav-link {
+  color: #62656b !important;
+}
+
+.payments-page .nav-pills .nav-link.active {
+  color: #ffffff !important;
+  background: #1d1d1f;
+}
+
+.payments-page .offcanvas {
+  color: #1d1d1f;
+  background: #ffffff;
+}
+
+.payments-page .offcanvas .btn-close {
+  filter: none;
 }
