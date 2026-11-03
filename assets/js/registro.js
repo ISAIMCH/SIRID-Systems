@@ -72,6 +72,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const birthMonth = document.getElementById('regMesNac');
     const birthYear = document.getElementById('regAnioNac');
     const birthDateStatus = document.getElementById('birthDateStatus');
+    const acceptTerms = document.getElementById('acceptTerms');
     const today = new Date();
     const currentDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
@@ -112,6 +113,10 @@ document.addEventListener('DOMContentLoaded', () => {
             password: password.value
         };
         const checks = updatePasswordMeter();
+        if (!acceptTerms.checked) {
+            alert('Debes aceptar los términos y condiciones para crear tu cuenta.');
+            return;
+        }
         if (!isValidEmail(userData.email) || !validateBirthDateFields() || userData.fechaNacimiento > currentDate) {
             alert('Revisa el formato del correo y la fecha de nacimiento.');
             return;
