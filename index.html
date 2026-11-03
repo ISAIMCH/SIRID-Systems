@@ -267,7 +267,7 @@
     background-color: #1d1d1f;
     color: #f5f5f7;
     padding: 18px 20px;
-    z-index: 2000;
+    z-index: 1040;
     display: none;
     box-shadow: 0 -4px 20px rgba(0,0,0,0.3);
 }
@@ -953,6 +953,71 @@
         <div class="d-flex gap-2 flex-shrink-0">
             <button id="btnConfigCookies" class="btn-cookie-config">Configurar cookies</button>
             <button id="btnAceptarCookies" class="btn-cookie-aceptar">Aceptar cookies</button>
+        </div>
+    </div>
+</div>
+<div class="modal fade cookie-settings-modal" id="cookieSettingsModal" tabindex="-1" aria-labelledby="cookieSettingsTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title" id="cookieSettingsTitle">Configurar cookies</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <div class="cookie-info">
+                    <i class="bi bi-info-circle-fill" aria-hidden="true"></i>
+                    <div>
+                        <p>Las cookies nos ayudan a entender cómo usas nuestro sitio, mejorar su funcionamiento y ofrecerte una experiencia más relevante. Puedes elegir qué categorías permitir.</p>
+                        <a href="pages/terminos.html">Conoce más sobre privacidad y uso de datos.</a>
+                    </div>
+                </div>
+                <article class="cookie-category">
+                    <div class="cookie-category-essential">
+                        <h3>Cookies esenciales</h3>
+                        <p>Son necesarias para el funcionamiento del sitio, proteger tu cuenta y recordar tus preferencias. No se pueden desactivar.</p>
+                    </div>
+                </article>
+                <article class="cookie-category">
+                    <div>
+                        <h3>Cookies analíticas</h3>
+                        <p>Nos permiten analizar cómo se utiliza el sitio para entender qué funciona y mejorar la experiencia.</p>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" role="switch" id="cookieAnalytics">
+                    </div>
+                </article>
+                <article class="cookie-category">
+                    <div>
+                        <h3>Cookies de publicidad personalizada</h3>
+                        <p>Nos ayudan a conocer tus preferencias para mostrarte contenido y anuncios más relevantes.</p>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" role="switch" id="cookieAdvertising">
+                    </div>
+                </article>
+                <article class="cookie-category">
+                    <div>
+                        <h3>Cookies de rendimiento</h3>
+                        <p>Permiten optimizar funciones del sitio. Si las desactivas, algunas páginas podrían responder más lentamente.</p>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" role="switch" id="cookiePerformance">
+                    </div>
+                </article>
+                <article class="cookie-category">
+                    <div>
+                        <h3>Cookies funcionales</h3>
+                        <p>Ayudan a recordar tus elecciones y mantener el buen funcionamiento de tu navegación.</p>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" role="switch" id="cookieFunctional">
+                    </div>
+                </article>
+                <p class="cookie-note">Puedes cambiar tu configuración más adelante desde el enlace “Configurar cookies” en el pie de página.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-cookie-save" id="btnGuardarCookies">Guardar</button>
+            </div>
         </div>
     </div>
 </div>
