@@ -14,6 +14,7 @@ import {
   ShoppingCart,
   Users,
   Wrench,
+  BookOpen,
 } from 'lucide-react'
 import { useEffect, useState, type ComponentType } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
@@ -49,7 +50,8 @@ const navigation: NavItem[] = [
   { label: 'Pagos', to: '/payments', icon: Receipt, section: 'Comercial' },
   { label: 'Ventas', to: '/sales', icon: ShoppingCart, section: 'Comercial' },
   { label: 'Suscripciones', to: '/subscriptions', icon: CreditCard, section: 'Comercial' },
-  { label: 'Organizaciones', to: '/platform', icon: Building2, section: 'SIRID', platformOnly: true },
+  { label: 'Organizaciones', to: '/platform', icon: Building2, end: true, section: 'SIRID', platformOnly: true },
+  { label: 'Catálogo global', to: '/platform/exercises', icon: BookOpen, section: 'SIRID', platformOnly: true },
 ]
 
 const APPLICATION_STATUS = { pending: 'está en revisión', rejected: 'fue rechazada', suspended: 'está suspendida', active: 'está activa' } as const

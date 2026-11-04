@@ -6,6 +6,7 @@ import type { Equipment, EquipmentStatus } from '../types'
 import GymSelect from '../components/GymSelect'
 import { useAuth } from '../store/useAuth'
 import { targetGymField } from '../utils/targetGym'
+import { EQUIPMENT_CATEGORIES, isEquipmentCategory } from '../utils/exerciseCatalog'
 
 type EquipmentResponse = Equipment[] | { data?: unknown; equipment?: unknown }
 
@@ -14,6 +15,7 @@ interface EquipmentFormState {
   zona: string
   marca: string
   tipo: string
+  categoria: string
   imageUrl: string
   cantidadTotal: string
   cantidadMantenimiento: string
@@ -22,18 +24,6 @@ interface EquipmentFormState {
 
 const zoneOptions = ['Zona de piernas', 'Peso libre', 'Cardio']
 const customZoneOption = 'other'
-const equipmentStatusMap: Record<string, EquipmentPayload['status']> = {
-  operativo: 'available',
-  operational: 'available',
-  available: 'available',
-  mantenimiento: 'maintenance',
-  maintenance: 'maintenance',
-  'en mantenimiento': 'maintenance',
-  averiado: 'unavailable',
-  broken: 'unavailable',
-  unavailable: 'unavailable',
-  'fuera de servicio': 'unavailable',
-}
 const equipmentTypeMap: Record<string, string> = {
   cardio: 'cardio',
   fuerza: 'strength',
@@ -45,10 +35,11 @@ const emptyEquipmentForm: EquipmentFormState = {
   zona: '',
   marca: '',
   tipo: 'Cardio',
+  categoria: '',
   imageUrl: '',
   cantidadTotal: '1',
   cantidadMantenimiento: '0',
-  estado: 'operational',
+  estado: 'available',
 }
 
 async function fetchEquipment() {
@@ -134,10 +125,11 @@ function EquipmentPage() {
       zona: isPresetZone ? zone : customZoneOption,
       marca: item.brand || '',
       tipo: item.type || 'Cardio',
+      categoria: isEquipmentCategory(item.equipmentCategory) ? item.equipmentCategory : '',
       imageUrl: item.imageUrl || '',
       cantidadTotal: String(item.totalQuantity ?? 1),
       cantidadMantenimiento: String(item.maintenanceQuantity ?? 0),
-      estado: item.status || 'operational',
+      estado: item.status === 'out_of_service' ? 'out_of_service' : 'available',
     })
     setCustomZone(isPresetZone ? '' : zone)
     setModalError(null)
@@ -164,10 +156,11 @@ function EquipmentPage() {
         zone: (form.zona === customZoneOption ? customZone : form.zona).trim(),
         brand: form.marca.trim(),
         type: equipmentTypeMap[form.tipo.trim().toLowerCase()] || form.tipo.trim().toLowerCase(),
+        equipmentCategory: form.categoria,
         imageUrl: form.imageUrl.trim(),
         totalQuantity: Number(form.cantidadTotal),
         maintenanceQuantity: Number(form.cantidadMantenimiento),
-        status: equipmentStatusMap[form.estado.trim().toLowerCase()],
+        status: form.estado,
       }
       if (!Number.isInteger(payload.totalQuantity) || payload.totalQuantity < 0) {
         throw new Error('La cantidad total debe ser un número entero no negativo.')
@@ -175,8 +168,16 @@ function EquipmentPage() {
       if (!Number.isInteger(payload.maintenanceQuantity) || payload.maintenanceQuantity < 0 || payload.maintenanceQuantity > payload.totalQuantity) {
         throw new Error('Las unidades en mantenimiento deben estar entre 0 y la cantidad total.')
       }
-      if (!payload.status) throw new Error('Selecciona un estado válido para el equipo.')
+      // The API sets the status from the quantities, so both must say the same.
+      const allInMaintenance = payload.maintenanceQuantity >= payload.totalQuantity
+      if (payload.status === 'out_of_service' && !allInMaintenance) {
+        throw new Error('Para marcarlo fuera de servicio, todas las unidades deben estar en mantenimiento.')
+      }
+      if (payload.status === 'available' && allInMaintenance) {
+        throw new Error('Si todas las unidades están en mantenimiento, el estado debe ser Fuera de servicio.')
+      }
       if (!payload.zone) throw new Error('Selecciona o escribe una zona.')
+      if (!isEquipmentCategory(payload.equipmentCategory)) throw new Error('Selecciona la categoría del equipo.')
       const equipmentId = editingEquipment?._id || editingEquipment?.id
 
       if (editingEquipment) {
@@ -219,15 +220,11 @@ function EquipmentPage() {
   }
 
   function statusLabel(status: EquipmentStatus) {
-    if (status === 'maintenance') return 'Mantenimiento'
-    if (status === 'broken') return 'Averiado'
-    return 'Operativo'
+    return status === 'out_of_service' ? 'Fuera de servicio' : 'Operativo'
   }
 
   function statusClass(status: EquipmentStatus) {
-    if (status === 'maintenance') return 'bg-amber-100 text-amber-800'
-    if (status === 'broken') return 'bg-red-100 text-red-800'
-    return 'bg-green-100 text-green-800'
+    return status === 'out_of_service' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
   }
 
   const filteredEquipment = equipment.filter((item) =>
@@ -315,6 +312,7 @@ function EquipmentPage() {
                         </td>
                         <td className="whitespace-nowrap px-6 py-4 font-medium text-slate-900">
                           {item.name || 'Sin nombre'}
+                          {item.equipmentCategory && <span className="mt-0.5 block text-xs font-normal text-slate-400">{item.equipmentCategory}</span>}
                         </td>
                         <td className="px-6 py-4 text-slate-500">{item.zone || 'Sin zona'}</td>
                         <td className="px-6 py-4 text-slate-500">{item.brand || 'Sin marca'}</td>
@@ -484,6 +482,23 @@ function EquipmentPage() {
               </div>
 
               <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="equipment-category">
+                  Categoría del catálogo
+                </label>
+                <select
+                  className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                  id="equipment-category"
+                  value={form.categoria}
+                  onChange={(event) => setForm({ ...form, categoria: event.target.value })}
+                  required
+                >
+                  <option value="">Selecciona una categoría</option>
+                  {EQUIPMENT_CATEGORIES.filter((category) => category !== 'Sin equipo').map((category) => <option key={category} value={category}>{category}</option>)}
+                </select>
+                <p className="mt-1.5 text-xs text-slate-500">Desbloquea los ejercicios del catálogo global que usan esta familia de equipo.</p>
+              </div>
+
+              <div>
                 <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="equipment-image-url">
                   Imagen (URL)
                 </label>
@@ -541,9 +556,8 @@ function EquipmentPage() {
                   value={form.estado}
                   onChange={(event) => setForm({ ...form, estado: event.target.value as EquipmentStatus })}
                 >
-                  <option value="operational">Operativo</option>
-                  <option value="maintenance">Mantenimiento</option>
-                  <option value="broken">Averiado</option>
+                  <option value="available">Operativo</option>
+                  <option value="out_of_service">Fuera de servicio</option>
                 </select>
               </div>
 

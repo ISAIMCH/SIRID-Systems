@@ -1,4 +1,4 @@
-import type { AssignableRole, Equipment, GymRole, User, UserRole } from '../types'
+import type { AssignableRole, Equipment, EquipmentStatus, GymRole, User, UserRole } from '../types'
 import { ALL_GYMS, getActiveGymId } from './activeGym'
 
 export const API_BASE_URL = import.meta.env.VITE_GYMGO_API_URL
@@ -582,7 +582,8 @@ export interface EquipmentPayload {
   imageUrl?: string
   totalQuantity: number
   maintenanceQuantity: number
-  status: 'available' | 'maintenance' | 'unavailable'
+  status: EquipmentStatus
+  equipmentCategory?: string
   gymId?: string
 }
 
@@ -1155,4 +1156,119 @@ export function getAccessLogs(filters: AccessLogFilters) {
     if (value !== undefined && value !== '') params.set(key, String(value))
   }
   return apiClient<{ page: number; pageSize: number; total: number; entries: AccessLogEntry[] }>(`/access/logs?${params}`)
+}
+
+// Global exercise catalog: read-only for gym staff (exercises their equipment unlocks), editable by SIRID.
+export interface CatalogExercise {
+  _id: string
+  name: string
+  muscleGroup: string
+  equipment: string | null
+  gifUrl: string | null
+  imageUrl: string | null
+  videoUrl: string | null
+  metricType: 'strength' | 'cardio'
+  source: 'global' | 'custom'
+  isCustom: boolean
+}
+
+export interface CatalogExerciseDetail extends CatalogExercise {
+  secondaryMuscles: string[]
+  steps: string[]
+  attribution: string | null
+}
+
+export interface ExerciseCatalogPage {
+  exercises: CatalogExercise[]
+  page: number
+  limit: number
+  total: number
+  hasMore: boolean
+  unlockedCategories: string[]
+  outOfServiceCategories: string[]
+}
+
+export interface ExerciseCatalogFilters {
+  q?: string
+  muscleGroup?: string
+  category?: string
+  availableOnly?: boolean
+  page?: number
+}
+
+function queryString(filters: object) {
+  const params = new URLSearchParams()
+  for (const [key, value] of Object.entries(filters)) {
+    if (value !== undefined && value !== '') params.set(key, String(value))
+  }
+  const query = params.toString()
+  return query ? `?${query}` : ''
+}
+
+export function getExerciseCatalog(filters: ExerciseCatalogFilters) {
+  return apiClient<ExerciseCatalogPage>(`/exercises/catalog${queryString(filters)}`)
+}
+
+export function getCatalogExercise(id: string) {
+  return apiClient<{ exercise: CatalogExerciseDetail }>(`/exercises/catalog/${id}`)
+}
+
+export interface PlatformExercise {
+  _id: string
+  sourceId: string
+  name: string
+  targetMuscle: string
+  secondaryMuscles: string[]
+  equipment: string
+  gifUrl: string
+  imageUrl: string | null
+  steps: string[]
+  metricType: 'strength' | 'cardio'
+  attribution: string | null
+  origin: 'dataset' | 'sirid'
+  isActive: boolean
+  lockedFields: string[]
+  updatedAt: string
+}
+
+export interface PlatformExercisePayload {
+  name: string
+  targetMuscle: string
+  secondaryMuscles: string[]
+  equipment: string
+  gifUrl: string
+  imageUrl: string
+  steps: string[]
+  metricType: 'strength' | 'cardio'
+}
+
+export interface PlatformExerciseFilters {
+  q?: string
+  muscleGroup?: string
+  category?: string
+  status?: 'active' | 'inactive' | 'all'
+  origin?: 'dataset' | 'sirid' | ''
+  page?: number
+}
+
+export function getPlatformExercises(filters: PlatformExerciseFilters) {
+  return apiClient<{ exercises: PlatformExercise[]; page: number; limit: number; total: number; hasMore: boolean }>(
+    `/platform/exercises${queryString(filters)}`,
+    {},
+    { withGym: false },
+  )
+}
+
+export function createPlatformExercise(data: PlatformExercisePayload) {
+  return apiClient<{ exercise: PlatformExercise }>('/platform/exercises', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, { withGym: false })
+}
+
+export function updatePlatformExercise(id: string, data: Partial<PlatformExercisePayload> & { isActive?: boolean; unlock?: string[] }) {
+  return apiClient<{ exercise: PlatformExercise }>(`/platform/exercises/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  }, { withGym: false })
 }
