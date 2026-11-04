@@ -3,6 +3,7 @@ import { Activity, Boxes, Dumbbell, Pencil, Plus, Search, Trash2 } from 'lucide-
 import { createExercise, deleteExercise, getEquipment, getExercises, updateExercise } from '../services/api'
 import type { Exercise, ExercisePayload } from '../services/api'
 import type { Equipment } from '../types'
+import GlobalExerciseCatalog from '../components/GlobalExerciseCatalog'
 import {
   fetchAndFilterExercises,
   filterExerciseSuggestions,
@@ -120,6 +121,7 @@ function Exercises() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [modalError, setModalError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
+  const [tab, setTab] = useState<'custom' | 'global'>('custom')
 
   async function loadExercises() {
     const response = await getExercises<ExercisesResponse>()
@@ -262,10 +264,18 @@ function Exercises() {
           <h1 className="text-4xl font-semibold tracking-tight text-slate-900">Ejercicios</h1>
           <p className="mt-3 text-slate-500">Administra el catálogo disponible para construir rutinas.</p>
         </div>
-        <button className="inline-flex items-center gap-2 rounded-lg bg-[#9BFF63] px-4 py-2 font-medium text-[#0F172A] transition hover:bg-[#abff7c]" type="button" onClick={openCreateModal}>
+        {tab === 'custom' && <button className="inline-flex items-center gap-2 rounded-lg bg-[#9BFF63] px-4 py-2 font-medium text-[#0F172A] transition hover:bg-[#abff7c]" type="button" onClick={openCreateModal}>
           <Plus size={18} aria-hidden="true" />Nuevo ejercicio
-        </button>
+        </button>}
       </div>
+
+      <div className="mt-6 inline-flex rounded-lg border border-slate-200 bg-white p-1" role="tablist" aria-label="Tipo de catálogo">
+        {([['custom', 'Mis ejercicios'], ['global', 'Catálogo global']] as const).map(([value, label]) => (
+          <button className={`rounded-md px-4 py-2 text-sm font-medium transition ${tab === value ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-50'}`} key={value} type="button" role="tab" aria-selected={tab === value} onClick={() => setTab(value)}>{label}</button>
+        ))}
+      </div>
+
+      {tab === 'global' ? <GlobalExerciseCatalog /> : <>
 
       <div className="mt-8 grid gap-4 sm:grid-cols-3">
         <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
@@ -349,6 +359,8 @@ function Exercises() {
           </div>
         )}
       </div>
+
+      </>}
 
       {isModalOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4 backdrop-blur-sm">
         <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">

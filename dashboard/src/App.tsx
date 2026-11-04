@@ -22,6 +22,7 @@ const Access = lazy(() => import('./pages/Access'))
 const Gyms = lazy(() => import('./pages/Gyms'))
 const Documents = lazy(() => import('./pages/Documents'))
 const Platform = lazy(() => import('./pages/Platform'))
+const PlatformExercises = lazy(() => import('./pages/PlatformExercises'))
 const Maintenance = lazy(() => import('./pages/Maintenance'))
 
 function ProtectedRoute() {
@@ -90,6 +91,7 @@ function App() {
               <Route index element={<HomeRoute />} />
               <Route element={<PlatformRoute />}>
                 <Route path="platform" element={<Platform />} />
+                <Route path="platform/exercises" element={<PlatformExercises />} />
               </Route>
               <Route element={<RoleRoute />}>
                 <Route path="gyms" element={<Gyms />} />

@@ -97,7 +97,8 @@ export interface Product {
   imageUrl?: string
 }
 
-export type EquipmentStatus = 'operational' | 'maintenance' | 'broken'
+// Same values as the API; it derives them from the quantities (out of service = no unit available).
+export type EquipmentStatus = 'available' | 'out_of_service'
 
 export interface Equipment {
   id?: string
@@ -106,6 +107,7 @@ export interface Equipment {
   zone: string
   brand: string
   type?: string
+  equipmentCategory?: string
   imageUrl?: string
   totalQuantity?: number
   maintenanceQuantity?: number
