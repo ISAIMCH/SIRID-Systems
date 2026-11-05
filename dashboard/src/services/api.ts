@@ -1266,6 +1266,14 @@ export function createPlatformExercise(data: PlatformExercisePayload) {
   }, { withGym: false })
 }
 
+// Uploads a GIF or thumbnail to the catalog's public R2 bucket; save the returned url in gifUrl/imageUrl.
+export function uploadPlatformExerciseMedia(file: File, kind: 'gif' | 'image') {
+  const formData = new FormData()
+  formData.append('kind', kind)
+  formData.append('file', file)
+  return apiClient<{ key: string; url: string }>('/platform/exercises/media', { method: 'POST', body: formData }, { withGym: false })
+}
+
 export function updatePlatformExercise(id: string, data: Partial<PlatformExercisePayload> & { isActive?: boolean; unlock?: string[] }) {
   return apiClient<{ exercise: PlatformExercise }>(`/platform/exercises/${id}`, {
     method: 'PATCH',

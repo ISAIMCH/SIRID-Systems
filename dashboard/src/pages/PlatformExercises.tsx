@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { Dumbbell, Eye, EyeOff, Lock, Pencil, Plus, Search, Unlock, X } from 'lucide-react'
-import { createPlatformExercise, getPlatformExercises, updatePlatformExercise } from '../services/api'
+import { Dumbbell, Eye, EyeOff, Loader2, Lock, Pencil, Plus, Search, Unlock, Upload, X } from 'lucide-react'
+import { createPlatformExercise, getPlatformExercises, updatePlatformExercise, uploadPlatformExerciseMedia } from '../services/api'
 import type { PlatformExercise, PlatformExerciseFilters, PlatformExercisePayload } from '../services/api'
 import { EQUIPMENT_CATEGORIES, MUSCLE_GROUPS } from '../utils/exerciseCatalog'
 
@@ -64,6 +64,65 @@ function changedFields(payload: PlatformExercisePayload, original: PlatformExerc
     JSON.stringify(value) !== JSON.stringify(before[key as keyof PlatformExercisePayload]))) as Partial<PlatformExercisePayload>
 }
 
+const MEDIA_ACCEPT = { gif: 'image/gif,image/webp', image: 'image/jpeg,image/png,image/webp' }
+const MAX_MEDIA_BYTES = 5 * 1024 * 1024
+
+// URL field with an "upload" shortcut: the file goes to the catalog's R2 bucket and its public URL fills the field.
+function MediaField({ id, label, kind, value, required, onChange, onError }: {
+  id: string
+  label: string
+  kind: 'gif' | 'image'
+  value: string
+  required?: boolean
+  onChange: (value: string) => void
+  onError: (message: string | null) => void
+}) {
+  const fileInput = useRef<HTMLInputElement>(null)
+  const [isUploading, setIsUploading] = useState(false)
+
+  async function handleFile(file: File | undefined) {
+    if (!file) return
+    if (file.size > MAX_MEDIA_BYTES) return onError('El archivo supera el tamaño máximo de 5 MB.')
+    onError(null)
+    setIsUploading(true)
+    try {
+      onChange((await uploadPlatformExerciseMedia(file, kind)).url)
+    } catch (uploadError) {
+      onError(uploadError instanceof Error ? uploadError.message : 'No se pudo subir el archivo.')
+    } finally {
+      setIsUploading(false)
+      if (fileInput.current) fileInput.current.value = ''
+    }
+  }
+
+  return (
+    <div>
+      <label className={labelClassName} htmlFor={id}>{label}</label>
+      <div className="flex gap-2">
+        <input className={inputClassName} id={id} type="url" value={value} onChange={(event) => onChange(event.target.value)} required={required} placeholder="https://..." />
+        <button
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+          type="button"
+          onClick={() => fileInput.current?.click()}
+          disabled={isUploading}
+          aria-label={`Subir ${kind === 'gif' ? 'GIF' : 'miniatura'}`}
+        >
+          {isUploading ? <Loader2 className="animate-spin" size={16} /> : <Upload size={16} />}
+          <span className="hidden sm:inline">{isUploading ? 'Subiendo' : 'Subir'}</span>
+        </button>
+        <input ref={fileInput} className="hidden" type="file" accept={MEDIA_ACCEPT[kind]} onChange={(event) => handleFile(event.target.files?.[0])} />
+      </div>
+      {value && (
+        <img
+          className={`mt-3 rounded-xl border border-slate-100 bg-slate-50 ${kind === 'gif' ? 'h-40 w-40 object-contain' : 'h-20 w-20 object-cover'}`}
+          src={value}
+          alt={kind === 'gif' ? 'Vista previa del GIF' : 'Vista previa de la miniatura'}
+        />
+      )}
+    </div>
+  )
+}
+
 function ExerciseEditor({ exercise, onClose, onSaved }: { exercise: PlatformExercise | null; onClose: () => void; onSaved: (exercise: PlatformExercise) => void }) {
   const [form, setForm] = useState<FormState>(exercise ? toForm(exercise) : emptyForm)
   const [error, setError] = useState<string | null>(null)
@@ -107,10 +166,9 @@ function ExerciseEditor({ exercise, onClose, onSaved }: { exercise: PlatformExer
           <div><label className={labelClassName} htmlFor="pe-equipment">Categoría de equipo</label><select className={inputClassName} id="pe-equipment" value={form.equipment} onChange={(event) => setForm({ ...form, equipment: event.target.value })}>{EQUIPMENT_CATEGORIES.map((item) => <option key={item} value={item}>{item}</option>)}</select></div>
           <div><label className={labelClassName} htmlFor="pe-secondary">Músculos secundarios</label><input className={inputClassName} id="pe-secondary" value={form.secondaryMuscles} onChange={(event) => setForm({ ...form, secondaryMuscles: event.target.value })} placeholder="Tríceps, Hombros" /></div>
           <div><label className={labelClassName} htmlFor="pe-metric">Métrica</label><select className={inputClassName} id="pe-metric" value={form.metricType} onChange={(event) => setForm({ ...form, metricType: event.target.value === 'cardio' ? 'cardio' : 'strength' })}><option value="strength">Fuerza</option><option value="cardio">Cardio</option></select></div>
-          <div><label className={labelClassName} htmlFor="pe-gif">URL del GIF</label><input className={inputClassName} id="pe-gif" type="url" value={form.gifUrl} onChange={(event) => setForm({ ...form, gifUrl: event.target.value })} required /></div>
-          <div><label className={labelClassName} htmlFor="pe-image">URL de la miniatura (opcional)</label><input className={inputClassName} id="pe-image" type="url" value={form.imageUrl} onChange={(event) => setForm({ ...form, imageUrl: event.target.value })} /></div>
+          <MediaField id="pe-gif" label="GIF de la técnica" kind="gif" value={form.gifUrl} required onChange={(gifUrl) => setForm((current) => ({ ...current, gifUrl }))} onError={setError} />
+          <MediaField id="pe-image" label="Miniatura (opcional)" kind="image" value={form.imageUrl} onChange={(imageUrl) => setForm((current) => ({ ...current, imageUrl }))} onError={setError} />
           <div className="sm:col-span-2"><label className={labelClassName} htmlFor="pe-steps">Pasos (uno por línea)</label><textarea className={`${inputClassName} min-h-32`} id="pe-steps" value={form.steps} onChange={(event) => setForm({ ...form, steps: event.target.value })} /></div>
-          {form.gifUrl && <img className="h-40 w-40 rounded-xl bg-slate-50 object-contain" src={form.gifUrl} alt="Vista previa del GIF" />}
           {error && <p className="border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700 sm:col-span-2" role="alert">{error}</p>}
           <div className="flex justify-end gap-3 pt-2 sm:col-span-2">
             <button className="rounded-lg px-4 py-2 font-medium text-slate-600 hover:bg-slate-100" type="button" onClick={onClose} disabled={isSubmitting}>Cancelar</button>
