@@ -442,6 +442,17 @@ function Routines() {
     }
   }, [])
 
+  // A client enrolled or assigned to this coach elsewhere becomes selectable without reloading the page.
+  useEffect(() => {
+    function refreshClients() {
+      getUsers<ArrayResponse<User>>()
+        .then((response) => setClients(extractArray<User>(response, ['data', 'users']).filter(isClient)))
+        .catch(() => undefined)
+    }
+    socket.on('directory-updated', refreshClients)
+    return () => { socket.off('directory-updated', refreshClients) }
+  }, [])
+
   function startCreate(mode: BuilderMode) {
     setBuilderMode(mode)
     setEditingTemplate(null)

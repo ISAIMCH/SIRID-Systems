@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react'
 import { RefreshCw } from 'lucide-react'
 import { getMaintenanceReports, updateMaintenanceReport } from '../services/api'
 import type { MaintenanceReport, MaintenanceStatus } from '../services/api'
+import { socket } from '../services/socket'
 import { useAuth } from '../store/useAuth'
+import { useStaffRoles } from '../utils/access'
 
 type Filter = MaintenanceStatus | 'all'
 
@@ -32,8 +34,10 @@ interface AttendFormState {
 }
 
 // Reports clients send from the app; managers follow them up and take units out of service while they are repaired.
+// Coaches only read them, to plan routines around equipment that is failing.
 function Maintenance() {
   const { isAllGyms, organizationGyms } = useAuth()
+  const canAttend = useStaffRoles().has('Admin')
   const [reports, setReports] = useState<MaintenanceReport[]>([])
   const [filter, setFilter] = useState<Filter>('pending')
   const [isLoading, setIsLoading] = useState(true)
@@ -64,6 +68,17 @@ function Maintenance() {
       })
       .finally(() => { if (isMounted) setIsLoading(false) })
     return () => { isMounted = false }
+  }, [])
+
+  // New reports from the app and changes made elsewhere arrive live; the list stays visible while it reloads.
+  useEffect(() => {
+    function refreshFromEvent() {
+      getMaintenanceReports()
+        .then(({ reports: loaded }) => { setReports(loaded); setError(null) })
+        .catch(() => undefined)
+    }
+    socket.on('maintenance-updated', refreshFromEvent)
+    return () => { socket.off('maintenance-updated', refreshFromEvent) }
   }, [])
 
   function openAttend(report: MaintenanceReport) {
@@ -107,7 +122,9 @@ function Maintenance() {
       <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-4xl font-semibold tracking-tight text-slate-900">Mantenimiento</h1>
-          <p className="mt-3 text-slate-500">Reportes de equipo dañado que envían los clientes desde la app.</p>
+          <p className="mt-3 text-slate-500">
+            {canAttend ? 'Reportes de equipo dañado que envían los clientes desde la app.' : 'Equipos con fallas reportadas; tenlos en cuenta al planear rutinas.'}
+          </p>
         </div>
         <button
           className="inline-flex items-center gap-2 self-start rounded-lg border border-slate-200 bg-white px-4 py-2 font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50 sm:self-auto"
@@ -178,7 +195,7 @@ function Maintenance() {
                     </div>
                   </td>
                   <td className="whitespace-nowrap px-6 py-4 text-right">
-                    {report.status !== 'resolved' && (
+                    {canAttend && report.status !== 'resolved' && (
                       <button
                         className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:border-green-400 hover:text-green-700"
                         type="button"

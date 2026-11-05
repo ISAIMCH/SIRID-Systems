@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ChartColumn, History, KeyRound, Pencil } from 'lucide-react'
 import { ApiError, createUser, getPlans, getUsers, regenerateActivationCode, updateUser } from '../services/api'
+import { socket } from '../services/socket'
 import type { UserPayload } from '../services/api'
 import type { AssignableRole, GymRole, MemberRole, Plan, User, UserReference } from '../types'
 import GymSelect from '../components/GymSelect'
@@ -191,6 +192,16 @@ function Users() {
       isMounted = false
     }
   }, [canSeePlans])
+
+  // Enrollments, activations, coach and membership changes made elsewhere (another session, the app) arrive live.
+  useEffect(() => {
+    function refreshFromEvent() {
+      fetchUsers().then(setUsers).catch(() => undefined)
+    }
+    const events = ['directory-updated', 'payment-updated']
+    events.forEach((eventName) => socket.on(eventName, refreshFromEvent))
+    return () => { events.forEach((eventName) => socket.off(eventName, refreshFromEvent)) }
+  }, [])
 
   useEffect(() => {
     if (!isAdmin) return
