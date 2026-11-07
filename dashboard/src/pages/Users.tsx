@@ -14,6 +14,7 @@ import { ROLE_LABELS, STAFF_ROLES } from '../utils/roles'
 import { useAuth } from '../store/useAuth'
 import { targetGymField } from '../utils/targetGym'
 import { canAccessPage, useStaffRoles } from '../utils/access'
+import { useQuickAction } from '../utils/quickAction'
 import { formatMembershipDate, membershipBadge } from '../utils/membership'
 
 type UsersResponse = User[] | { data?: unknown; users?: unknown }
@@ -144,6 +145,7 @@ function Users() {
   const canEnroll = isAdmin || roles.has('Recepcion')
   // null: closed; 'form': new client; an outcome: the code view.
   const [enrollment, setEnrollment] = useState<'form' | EnrollmentOutcome | null>(null)
+  useQuickAction('registrar', () => setEnrollment('form'), canEnroll)
   const [regeneratingId, setRegeneratingId] = useState('')
   const [historyClient, setHistoryClient] = useState<{ id: string; name: string } | null>(null)
   const [progressClient, setProgressClient] = useState<ProgressClient | null>(null)
@@ -544,7 +546,7 @@ function Users() {
   }
 
   return (
-    <section className="min-h-screen bg-[#F8FAFC] px-8 py-10">
+    <section className="min-h-screen bg-canvas px-8 py-10">
       <p className="text-sm font-medium uppercase tracking-[0.25em] text-slate-500">Comunidad</p>
       <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
@@ -556,7 +558,7 @@ function Users() {
             <button
               className={isAdmin
                 ? 'rounded-lg border border-slate-200 bg-white px-4 py-2 font-medium text-slate-700 transition hover:bg-slate-50'
-                : 'rounded-lg bg-[#9BFF63] px-4 py-2 font-medium text-[#0F172A] transition hover:bg-[#abff7c]'}
+                : 'rounded-lg bg-brand px-4 py-2 font-medium text-ink transition hover:bg-brand-hover'}
               type="button"
               onClick={() => setEnrollment('form')}
             >
@@ -572,7 +574,7 @@ function Users() {
                   Invitar cuenta existente
                 </button>
                 <button
-                  className="rounded-lg bg-[#9BFF63] px-4 py-2 font-medium text-[#0F172A] transition hover:bg-[#abff7c]"
+                  className="rounded-lg bg-brand px-4 py-2 font-medium text-ink transition hover:bg-brand-hover"
                   type="button"
                   onClick={openModal}
                 >
@@ -1067,7 +1069,7 @@ function Users() {
                   Cancelar
                 </button>
                 <button
-                  className="rounded-lg bg-[#9BFF63] px-4 py-2 font-medium text-[#0F172A] transition hover:bg-[#abff7c] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="rounded-lg bg-brand px-4 py-2 font-medium text-ink transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
                   type="submit"
                   disabled={isSubmitting}
                 >

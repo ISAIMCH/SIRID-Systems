@@ -3,6 +3,7 @@ import { Clock, FileCheck, MapPin, MoreVertical, Pencil, Trash2 } from 'lucide-r
 import { createPlan, deletePlan, getPlans, updatePlan } from '../services/api'
 import { useAuth } from '../store/useAuth'
 import { useStaffRoles } from '../utils/access'
+import { useQuickAction } from '../utils/quickAction'
 import type { GymAccessScope, Plan, PlanType } from '../types'
 
 type PlansResponse = Plan[] | {
@@ -186,6 +187,8 @@ function Subscriptions() {
     setIsModalOpen(true)
   }
 
+  useQuickAction('nuevo', openModal, canManage)
+
   function closeModal() {
     if (isSubmitting) return
     setModalError(null)
@@ -291,7 +294,7 @@ function Subscriptions() {
   }
 
   return (
-    <section className="min-h-screen bg-[#F8FAFC] px-8 py-10">
+    <section className="min-h-screen bg-canvas px-8 py-10">
       <p className="text-sm font-medium uppercase tracking-[0.25em] text-slate-500">Facturación</p>
       <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
@@ -300,7 +303,7 @@ function Subscriptions() {
         </div>
         {canManage && (
           <button
-            className="rounded-lg bg-[#9BFF63] px-4 py-2 font-medium text-[#0F172A] transition hover:bg-[#abff7c]"
+            className="rounded-lg bg-brand px-4 py-2 font-medium text-ink transition hover:bg-brand-hover"
             type="button"
             onClick={openModal}
           >
@@ -641,7 +644,7 @@ function Subscriptions() {
                   Cancelar
                 </button>
                 <button
-                  className="rounded-lg bg-[#9BFF63] px-4 py-2 font-medium text-[#0F172A] transition hover:bg-[#abff7c] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="rounded-lg bg-brand px-4 py-2 font-medium text-ink transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
                   type="submit"
                   disabled={isSubmitting}
                 >
