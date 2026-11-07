@@ -94,7 +94,7 @@ function StatusDialog({ action, onClose, onDone }: StatusDialogProps) {
         <div className="mt-6 flex justify-end gap-3">
           <button className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100" type="button" onClick={onClose}>Cancelar</button>
           <button
-            className={`rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-50 ${target === 'active' ? 'bg-[#0F172A] hover:bg-slate-800' : 'bg-red-600 hover:bg-red-700'}`}
+            className={`rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-50 ${target === 'active' ? 'bg-ink hover:bg-slate-800' : 'bg-red-600 hover:bg-red-700'}`}
             type="submit"
             disabled={isSubmitting || (needsReason && !reason.trim())}
           >
@@ -169,7 +169,7 @@ function OrganizationCard({ organization, onAction, onChange }: OrganizationCard
             return (
               <button
                 key={target}
-                className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition ${target === 'active' ? 'bg-[#0F172A] text-white hover:bg-slate-800' : 'border border-slate-200 bg-white text-slate-700 hover:border-red-300 hover:text-red-700'}`}
+                className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition ${target === 'active' ? 'bg-ink text-white hover:bg-slate-800' : 'border border-slate-200 bg-white text-slate-700 hover:border-red-300 hover:text-red-700'}`}
                 type="button"
                 onClick={() => onAction({ organization, target: target as StatusAction })}
               >
@@ -307,7 +307,7 @@ function Platform() {
   const totalCount = Object.values(statusCounts).reduce((sum, count) => sum + (count ?? 0), 0)
 
   return (
-    <section className="min-h-screen bg-[#F8FAFC] px-4 py-10 sm:px-8">
+    <section className="min-h-screen bg-canvas px-4 py-10 sm:px-8">
       <p className="text-sm font-medium uppercase tracking-[0.25em] text-slate-500">SIRID</p>
       <h1 className="mt-3 text-4xl font-semibold tracking-tight text-slate-900">Organizaciones</h1>
       <p className="mt-3 text-slate-500">Aprueba las solicitudes de nuevos gimnasios y administra su estado. Por privacidad solo ves conteos y el contacto del propietario.</p>
@@ -319,7 +319,7 @@ function Platform() {
             return (
               <button
                 key={tab.label}
-                className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium transition ${status === tab.value ? 'bg-[#0F172A] text-white' : 'bg-white text-slate-600 hover:bg-slate-100'}`}
+                className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium transition ${status === tab.value ? 'bg-ink text-white' : 'bg-white text-slate-600 hover:bg-slate-100'}`}
                 type="button"
                 role="tab"
                 aria-selected={status === tab.value}

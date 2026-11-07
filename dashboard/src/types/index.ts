@@ -33,6 +33,8 @@ export interface User {
   planId?: string | UserReference
   membership?: UserMembership
   observations?: string
+  // When the person joined the organization (GET /users); missing on older API versions.
+  joinedAt?: string | null
 }
 
 export interface UserReference {

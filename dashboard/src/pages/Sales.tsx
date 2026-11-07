@@ -247,7 +247,7 @@ function Sales() {
   const finalTotal = calculatedBaseTotal - calculatedDiscount
 
   return (
-    <section className="min-h-screen bg-[#F8FAFC] px-8 py-10">
+    <section className="min-h-screen bg-canvas px-8 py-10">
       <p className="text-sm font-medium uppercase tracking-[0.25em] text-slate-500">Comercial</p>
       <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div><h1 className="text-4xl font-semibold tracking-tight text-slate-900">Ventas</h1><p className="mt-3 text-slate-500">Aprueba pedidos y registra ventas directas.</p></div>
@@ -256,7 +256,7 @@ function Sales() {
             <input className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-100 sm:w-52" type="text" placeholder="Código PIN (Ej. 84X2)" aria-label="Código PIN" value={pin} onChange={(event) => setPin(event.target.value)} />
             <button className="shrink-0 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:border-green-400 hover:text-green-700 disabled:cursor-not-allowed disabled:opacity-50" type="submit" disabled={isRedeemingPin || !pin.trim()}>{isRedeemingPin ? 'Canjeando...' : 'Canjear PIN'}</button>
           </form>
-          <button className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#9BFF63] px-4 py-2 font-medium text-[#0F172A] transition hover:bg-[#abff7c]" type="button" onClick={openCreateModal}><Plus size={18} aria-hidden="true" />+ Venta Directa</button>
+          <button className="inline-flex items-center justify-center gap-2 rounded-lg bg-brand px-4 py-2 font-medium text-ink transition hover:bg-brand-hover" type="button" onClick={openCreateModal}><Plus size={18} aria-hidden="true" />+ Venta Directa</button>
         </div>
       </div>
 
@@ -308,7 +308,7 @@ function Sales() {
             </div>
           </div>
           <div><label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="sale-status">Estado</label><select className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900" id="sale-status" value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })}><option value="paid">Pagado</option><option value="pending">Pendiente</option><option value="cancelled">Cancelado</option></select></div>
-          {modalError && <p className="text-sm text-red-600" role="alert">{modalError}</p>}<div className="flex justify-end gap-3 pt-2"><button className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100" type="button" onClick={closeModal}>Cancelar</button><button className="rounded-lg bg-[#0F172A] px-4 py-2 text-sm font-medium text-white disabled:opacity-50" type="submit" disabled={isSubmitting}>{isSubmitting ? 'Guardando...' : 'Guardar venta'}</button></div>
+          {modalError && <p className="text-sm text-red-600" role="alert">{modalError}</p>}<div className="flex justify-end gap-3 pt-2"><button className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100" type="button" onClick={closeModal}>Cancelar</button><button className="rounded-lg bg-ink px-4 py-2 text-sm font-medium text-white disabled:opacity-50" type="submit" disabled={isSubmitting}>{isSubmitting ? 'Guardando...' : 'Guardar venta'}</button></div>
         </form></div></div>}
     </section>
   )

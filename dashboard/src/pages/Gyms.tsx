@@ -118,7 +118,7 @@ function GymCard({ gym, canManage, onRegenerate, onEdit, onError }: GymCardProps
         <p className="mt-2 text-sm text-slate-500">El cliente lo escanea o lo escribe en la app. Para entrar sigue necesitando una membresía activa.</p>
         <div className="mt-5 flex flex-wrap gap-3">
           <button
-            className="inline-flex items-center gap-2 rounded-lg bg-[#0F172A] px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800 disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-lg bg-ink px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800 disabled:opacity-50"
             type="button"
             onClick={handlePrint}
             disabled={!qrDataUrl}
@@ -238,7 +238,7 @@ function DevicesSection({ gyms, onError }: DevicesSectionProps) {
           <p className="mt-2 text-slate-500">Cada torniquete tiene su propia llave y registra los accesos de su sucursal.</p>
         </div>
         <button
-          className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#9BFF63] px-4 py-2 font-medium text-[#0F172A] transition hover:bg-[#abff7c]"
+          className="inline-flex items-center justify-center gap-2 rounded-lg bg-brand px-4 py-2 font-medium text-ink transition hover:bg-brand-hover"
           type="button"
           onClick={openModal}
         >
@@ -315,7 +315,7 @@ function DevicesSection({ gyms, onError }: DevicesSectionProps) {
                   <button className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50" type="button" onClick={() => void handleCopy()}>
                     <Copy size={16} aria-hidden="true" /> {copied ? 'Copiada' : 'Copiar llave'}
                   </button>
-                  <button className="rounded-lg bg-[#0F172A] px-4 py-2 text-sm font-medium text-white" type="button" onClick={closeModal}>Listo</button>
+                  <button className="rounded-lg bg-ink px-4 py-2 text-sm font-medium text-white" type="button" onClick={closeModal}>Listo</button>
                 </div>
               </div>
             ) : (
@@ -337,7 +337,7 @@ function DevicesSection({ gyms, onError }: DevicesSectionProps) {
                 {modalError && <p className="text-sm text-red-600" role="alert">{modalError}</p>}
                 <div className="flex justify-end gap-3 pt-2">
                   <button className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100" type="button" onClick={closeModal}>Cancelar</button>
-                  <button className="rounded-lg bg-[#0F172A] px-4 py-2 text-sm font-medium text-white disabled:opacity-50" type="submit" disabled={isSubmitting}>
+                  <button className="rounded-lg bg-ink px-4 py-2 text-sm font-medium text-white disabled:opacity-50" type="submit" disabled={isSubmitting}>
                     {isSubmitting ? 'Registrando...' : 'Registrar'}
                   </button>
                 </div>
@@ -456,7 +456,7 @@ function GymDialog({ gym, onClose, onSaved }: GymDialogProps) {
         {error && <p className="mt-3 text-sm text-red-600" role="alert">{error}</p>}
         <div className="mt-6 flex justify-end gap-3">
           <button className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100" type="button" onClick={onClose}>Cancelar</button>
-          <button className="rounded-lg bg-[#0F172A] px-4 py-2 text-sm font-medium text-white disabled:opacity-50" type="submit" disabled={isSubmitting}>
+          <button className="rounded-lg bg-ink px-4 py-2 text-sm font-medium text-white disabled:opacity-50" type="submit" disabled={isSubmitting}>
             {isSubmitting ? 'Guardando...' : gym ? 'Guardar cambios' : 'Abrir sucursal'}
           </button>
         </div>
@@ -513,7 +513,7 @@ function Gyms() {
   }
 
   return (
-    <section className="min-h-screen bg-[#F8FAFC] px-4 py-10 sm:px-8">
+    <section className="min-h-screen bg-canvas px-4 py-10 sm:px-8">
       <p className="text-sm font-medium uppercase tracking-[0.25em] text-slate-500">Operación</p>
       <h1 className="mt-3 text-4xl font-semibold tracking-tight text-slate-900">Gimnasios</h1>
       <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -522,7 +522,7 @@ function Gyms() {
           <div className="flex shrink-0 items-center gap-3">
             <span className="text-sm text-slate-500">{limits.activeGyms} de {limits.gymLimit} sucursales</span>
             <button
-              className="inline-flex items-center gap-2 rounded-lg bg-[#0F172A] px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-lg bg-ink px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
               type="button"
               onClick={() => setDialog('new')}
               disabled={isAtLimit}

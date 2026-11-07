@@ -9,7 +9,7 @@ import {
 } from '../services/api'
 import type { UserMembership } from '../types'
 import { formatMembershipDate, membershipBadge } from '../utils/membership'
-import BarChart, { type BarDatum } from './BarChart'
+import BarChart, { type BarDatum } from './charts/BarChart'
 
 export interface ProgressClient {
   id: string
@@ -118,7 +118,7 @@ function ClientProgressPanel({ client, onObservationsSaved, onClose }: ClientPro
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/50" role="dialog" aria-modal="true" aria-labelledby="progress-title">
-      <div className="flex h-full w-full max-w-3xl flex-col overflow-y-auto bg-[#F8FAFC] shadow-xl">
+      <div className="flex h-full w-full max-w-3xl flex-col overflow-y-auto bg-canvas shadow-xl">
         <header className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-slate-200 bg-white px-6 py-5">
           <div>
             <p className="text-xs font-medium uppercase tracking-[0.2em] text-slate-500">Seguimiento del cliente</p>
@@ -169,7 +169,7 @@ function ClientProgressPanel({ client, onObservationsSaved, onClose }: ClientPro
                 {notesMessage?.text}
               </p>
               <button
-                className="rounded-lg bg-[#9BFF63] px-4 py-2 text-sm font-medium text-[#0F172A] transition hover:bg-[#abff7c] disabled:cursor-not-allowed disabled:opacity-60"
+                className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-ink transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
                 type="submit"
                 disabled={isSaving || observations.trim() === savedObservations.trim()}
               >

@@ -205,6 +205,12 @@ export interface ClientEnrollmentPayload {
   email: string
   phone: string
   gymId?: string
+  // Optional training profile. Goal, level and days only fill new accounts; an existing account keeps its own.
+  goal?: string
+  experienceLevel?: string
+  availableTrainingDays?: number[]
+  assignedCoach?: string
+  observations?: string
 }
 
 // A new account brings an activation code; an existing GymGo account is linked (its holder gets a notice in the app),

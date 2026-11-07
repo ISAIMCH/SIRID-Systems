@@ -18,6 +18,7 @@ import GymSelect from '../components/GymSelect'
 import { useAuth } from '../store/useAuth'
 import { useStaffRoles } from '../utils/access'
 import { targetGymField } from '../utils/targetGym'
+import { useQuickAction } from '../utils/quickAction'
 
 interface PaymentFormState {
   userId: string
@@ -259,6 +260,8 @@ function Payments() {
     setIsModalOpen(true)
   }
 
+  useQuickAction('nuevo', openCreateModal)
+
   function closeModal() {
     if (isSubmitting) return
     if (searchParams.has('cliente')) setSearchParams({}, { replace: true })
@@ -393,7 +396,7 @@ function Payments() {
   }
 
   return (
-    <section className="min-h-screen bg-[#F8FAFC] px-8 py-10">
+    <section className="min-h-screen bg-canvas px-8 py-10">
       <p className="text-sm font-medium uppercase tracking-[0.25em] text-slate-500">Comercial</p>
       <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
@@ -419,7 +422,7 @@ function Payments() {
             </button>
           </form>
           <button
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#9BFF63] px-4 py-2 font-medium text-[#0F172A] transition hover:bg-[#abff7c]"
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-brand px-4 py-2 font-medium text-ink transition hover:bg-brand-hover"
             type="button"
             onClick={openCreateModal}
           >
@@ -728,7 +731,7 @@ function Payments() {
                   Cancelar
                 </button>
                 <button
-                  className="rounded-lg bg-[#9BFF63] px-4 py-2 font-medium text-[#0F172A] transition hover:bg-[#abff7c] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="rounded-lg bg-brand px-4 py-2 font-medium text-ink transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
                   type="submit"
                   disabled={isSubmitting || users.length === 0 || plans.length === 0}
                 >

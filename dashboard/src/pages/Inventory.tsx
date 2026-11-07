@@ -221,7 +221,7 @@ function Inventory() {
   }
 
   return (
-    <section className="flex min-h-screen flex-col gap-6 bg-[#F8FAFC] px-8 py-10">
+    <section className="flex min-h-screen flex-col gap-6 bg-canvas px-8 py-10">
       <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
         <div>
           <p className="text-sm font-medium uppercase tracking-[0.25em] text-slate-500">Operación</p>
@@ -238,7 +238,7 @@ function Inventory() {
             onChange={(event) => setSearchTerm(event.target.value)}
           />
           <button
-            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-[#9BFF63] px-4 py-2 font-medium text-[#0F172A] transition hover:bg-[#abff7c]"
+            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-brand px-4 py-2 font-medium text-ink transition hover:bg-brand-hover"
             type="button"
             onClick={openCreateModal}
           >
@@ -470,7 +470,7 @@ function Inventory() {
                   Cancelar
                 </button>
                 <button
-                  className="rounded-lg bg-[#9BFF63] px-4 py-2 font-medium text-[#0F172A] transition hover:bg-[#abff7c] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="rounded-lg bg-brand px-4 py-2 font-medium text-ink transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
                   type="submit"
                   disabled={isSubmitting}
                 >

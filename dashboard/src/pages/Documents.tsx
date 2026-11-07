@@ -162,7 +162,7 @@ function ReviewModal({ document, decision, onClose, onDone }: ReviewModalProps) 
           <div className="flex justify-end gap-3 pt-2">
             <button className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100" type="button" onClick={onClose}>Cancelar</button>
             <button
-              className={`rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-50 ${isVerify ? 'bg-[#0F172A]' : 'bg-red-600'}`}
+              className={`rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-50 ${isVerify ? 'bg-ink' : 'bg-red-600'}`}
               type="submit"
               disabled={isSubmitting}
             >
@@ -750,7 +750,7 @@ function Documents() {
   const [activeTab, setActiveTab] = useState<Tab>('clientes')
 
   return (
-    <section className="min-h-screen bg-[#F8FAFC] px-4 py-10 sm:px-8">
+    <section className="min-h-screen bg-canvas px-4 py-10 sm:px-8">
       <p className="text-sm font-medium uppercase tracking-[0.25em] text-slate-500">Operación</p>
       <h1 className="mt-3 text-4xl font-semibold tracking-tight text-slate-900">Documentos</h1>
 

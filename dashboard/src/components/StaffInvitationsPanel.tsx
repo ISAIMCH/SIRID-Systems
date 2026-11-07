@@ -243,7 +243,7 @@ function InviteModal({ isOwner, isAllGyms, prefill, onClose, onSent }: InviteMod
               Cancelar
             </button>
             <button
-              className="rounded-lg bg-[#9BFF63] px-4 py-2 font-medium text-[#0F172A] transition hover:bg-[#abff7c] disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-lg bg-brand px-4 py-2 font-medium text-ink transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
               type="submit"
               disabled={isSubmitting}
             >

@@ -14,6 +14,7 @@ import { ROLE_LABELS, STAFF_ROLES } from '../utils/roles'
 import { useAuth } from '../store/useAuth'
 import { targetGymField } from '../utils/targetGym'
 import { canAccessPage, useStaffRoles } from '../utils/access'
+import { useQuickAction } from '../utils/quickAction'
 import { formatMembershipDate, membershipBadge } from '../utils/membership'
 
 type UsersResponse = User[] | { data?: unknown; users?: unknown }
@@ -51,7 +52,8 @@ const emptyUserForm: UserFormState = {
   lastName: '',
   email: '',
   password: '',
-  roles: ['Cliente'],
+  // The form creates staff; clients are registered with ClientEnrollmentModal.
+  roles: [],
   phone: '',
   address: '',
   isActive: true,
@@ -144,6 +146,7 @@ function Users() {
   const canEnroll = isAdmin || roles.has('Recepcion')
   // null: closed; 'form': new client; an outcome: the code view.
   const [enrollment, setEnrollment] = useState<'form' | EnrollmentOutcome | null>(null)
+  useQuickAction('registrar', () => setEnrollment('form'), canEnroll)
   const [regeneratingId, setRegeneratingId] = useState('')
   const [historyClient, setHistoryClient] = useState<{ id: string; name: string } | null>(null)
   const [progressClient, setProgressClient] = useState<ProgressClient | null>(null)
@@ -160,7 +163,7 @@ function Users() {
   const [modalError, setModalError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [activeTab, setActiveTab] = useState<'clientes' | 'staff' | 'invitaciones'>('clientes')
-  // Opens the invite form; set from the header or when "Nuevo usuario" finds the email already has an account.
+  // Opens the invite form; set from the header or when "Agregar trabajador" finds the email already has an account.
   const [invitePrefill, setInvitePrefill] = useState<InvitePrefill | null>(null)
   const [existingAccount, setExistingAccount] = useState<InvitePrefill | null>(null)
 
@@ -544,7 +547,7 @@ function Users() {
   }
 
   return (
-    <section className="min-h-screen bg-[#F8FAFC] px-8 py-10">
+    <section className="min-h-screen bg-canvas px-8 py-10">
       <p className="text-sm font-medium uppercase tracking-[0.25em] text-slate-500">Comunidad</p>
       <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
@@ -553,15 +556,7 @@ function Users() {
         </div>
         {canEnroll && (
           <div className="flex flex-wrap gap-3">
-            <button
-              className={isAdmin
-                ? 'rounded-lg border border-slate-200 bg-white px-4 py-2 font-medium text-slate-700 transition hover:bg-slate-50'
-                : 'rounded-lg bg-[#9BFF63] px-4 py-2 font-medium text-[#0F172A] transition hover:bg-[#abff7c]'}
-              type="button"
-              onClick={() => setEnrollment('form')}
-            >
-              Registrar cliente
-            </button>
+            {/* Clients: «Registrar cliente». Staff: a new account, or an invitation for someone who already uses GymGo. */}
             {isAdmin && (
               <>
                 <button
@@ -569,17 +564,24 @@ function Users() {
                   type="button"
                   onClick={() => openInvite({ email: '', roles: [] })}
                 >
-                  Invitar cuenta existente
+                  Invitar trabajador existente
                 </button>
                 <button
-                  className="rounded-lg bg-[#9BFF63] px-4 py-2 font-medium text-[#0F172A] transition hover:bg-[#abff7c]"
+                  className="rounded-lg border border-slate-200 bg-white px-4 py-2 font-medium text-slate-700 transition hover:bg-slate-50"
                   type="button"
                   onClick={openModal}
                 >
-                  + Nuevo Usuario
+                  Agregar trabajador
                 </button>
               </>
             )}
+            <button
+              className="rounded-lg bg-brand px-4 py-2 font-medium text-ink transition hover:bg-brand-hover"
+              type="button"
+              onClick={() => setEnrollment('form')}
+            >
+              + Registrar cliente
+            </button>
           </div>
         )}
       </div>
@@ -654,6 +656,7 @@ function Users() {
       {enrollment && (
         <ClientEnrollmentModal
           initialOutcome={enrollment === 'form' ? null : enrollment}
+          coaches={coaches}
           onEnrolled={handleEnrolled}
           onClose={() => setEnrollment(null)}
         />
@@ -676,9 +679,9 @@ function Users() {
           <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-sm font-medium uppercase tracking-[0.2em] text-emerald-700">Comunidad</p>
+                <p className="text-sm font-medium uppercase tracking-[0.2em] text-emerald-700">{editingUser ? 'Comunidad' : 'Equipo'}</p>
                 <h2 className="mt-2 text-2xl font-semibold text-slate-900">
-                  {editingUser ? 'Editar Usuario' : 'Nuevo usuario'}
+                  {editingUser ? 'Editar usuario' : 'Agregar trabajador'}
                 </h2>
               </div>
               <button
@@ -768,7 +771,8 @@ function Users() {
                 ) : (
                   <>
                     <div className="flex flex-wrap gap-3">
-                      {(['Cliente', ...STAFF_ROLES] as AssignableRole[]).map((role) => {
+                      {/* New clients go through «Registrar cliente»; Cliente stays here to change an existing account. */}
+                      {((editingUser ? ['Cliente', ...STAFF_ROLES] : STAFF_ROLES) as AssignableRole[]).map((role) => {
                         const isChecked = form.roles.includes(role)
                         const isDisabled = !canEditRoles || (role === 'Gerente' && !isOwner)
                         return (
@@ -791,7 +795,7 @@ function Users() {
                       })}
                     </div>
                     <p className="mt-2 text-xs text-slate-500">
-                      Cliente es un rol único. Gerente, Coach y Recepción se combinan y aplican a la sucursal {isAllGyms ? 'seleccionada' : 'activa'}.
+                      {editingUser ? 'Cliente es un rol único. ' : ''}Gerente, Coach y Recepción se combinan y aplican a la sucursal {isAllGyms ? 'seleccionada' : 'activa'}.
                       {!isOwner && ' Solo el propietario asigna el rol Gerente.'}
                     </p>
                   </>
@@ -1067,7 +1071,7 @@ function Users() {
                   Cancelar
                 </button>
                 <button
-                  className="rounded-lg bg-[#9BFF63] px-4 py-2 font-medium text-[#0F172A] transition hover:bg-[#abff7c] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="rounded-lg bg-brand px-4 py-2 font-medium text-ink transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
                   type="submit"
                   disabled={isSubmitting}
                 >

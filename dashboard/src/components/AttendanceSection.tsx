@@ -1,19 +1,26 @@
 import { useEffect, useState } from 'react'
-import { Activity, Clock, DoorOpen, LogIn } from 'lucide-react'
+import { Activity, CalendarDays, Clock, DoorOpen, LogIn } from 'lucide-react'
 import { getOperationsDashboard, type OperationsDashboard } from '../services/api'
-import BarChart, { type BarDatum } from './BarChart'
+import BarChart, { type BarDatum } from './charts/BarChart'
+import Panel from './ui/Panel'
+import Segmented from './ui/Segmented'
 
 type Period = OperationsDashboard['period']
+
+export interface AttendanceSummary {
+  checkIns: number
+  occupancy: number
+}
 
 const hourName = (hour: number) => `${String(hour).padStart(2, '0')}:00`
 
 function hourlyBars(dashboard: OperationsDashboard): BarDatum[] {
   return dashboard.hourlyDemand.map(({ hour, checkIns }) => ({
-      key: String(hour),
-      label: hour % 3 === 0 ? String(hour) : '',
-      name: hourName(hour),
-      value: checkIns,
-    }))
+    key: String(hour),
+    label: hour % 3 === 0 ? String(hour) : '',
+    name: `${hourName(hour)} – ${hourName((hour + 1) % 24)}`,
+    value: checkIns,
+  }))
 }
 
 // The last seven days of the gym, with the days nobody came in at zero.
@@ -29,9 +36,14 @@ function dailyBars(dashboard: OperationsDashboard): BarDatum[] {
   })
 }
 
+interface AttendanceSectionProps {
+  // Today's figures for the KPI row, so Inicio does not ask the API twice.
+  onSummary?: (summary: AttendanceSummary) => void
+}
+
 // Check-ins at the turnstiles of the visible gyms (every gym of the organization in the all-gyms view),
 // counted in each gym's own time zone.
-function AttendanceSection() {
+function AttendanceSection({ onSummary }: AttendanceSectionProps) {
   const [period, setPeriod] = useState<Period>('day')
   const [dashboard, setDashboard] = useState<OperationsDashboard | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -43,74 +55,82 @@ function AttendanceSection() {
         if (!isMounted) return
         setDashboard(response)
         setError(null)
+        onSummary?.({ checkIns: response.today.checkIns, occupancy: response.currentOccupancy })
       })
       .catch((requestError: unknown) => {
         if (isMounted) setError(requestError instanceof Error ? requestError.message : 'No se pudo cargar la asistencia.')
       })
     return () => { isMounted = false }
-  }, [period])
+  }, [period, onSummary])
 
+  const weekTotal = dashboard?.dailyAttendance.reduce((total, day) => total + day.checkIns, 0) ?? 0
   const tiles = dashboard ? [
-    { label: 'Entradas hoy', value: dashboard.today.checkIns.toLocaleString('es-MX'), icon: LogIn },
-    { label: 'Salidas hoy', value: dashboard.today.checkOuts.toLocaleString('es-MX'), icon: DoorOpen },
-    { label: 'Dentro ahora', value: dashboard.currentOccupancy.toLocaleString('es-MX'), icon: Activity },
-    {
-      label: period === 'day' ? 'Hora pico de hoy' : 'Hora pico (7 días)',
-      value: dashboard.peakHour ? hourName(dashboard.peakHour.hour) : '—',
-      icon: Clock,
-    },
+    { label: 'Entradas hoy', value: dashboard.today.checkIns.toLocaleString('es-MX'), icon: LogIn, live: false },
+    { label: 'Salidas hoy', value: dashboard.today.checkOuts.toLocaleString('es-MX'), icon: DoorOpen, live: false },
+    { label: 'Dentro ahora', value: dashboard.currentOccupancy.toLocaleString('es-MX'), icon: Activity, live: true },
+    period === 'day'
+      ? { label: 'Hora pico de hoy', value: dashboard.peakHour ? hourName(dashboard.peakHour.hour) : '—', icon: Clock, live: false }
+      : { label: 'Promedio diario', value: Math.round(weekTotal / 7).toLocaleString('es-MX'), icon: CalendarDays, live: false },
   ] : []
 
   return (
-    <article className="mt-6 rounded-xl border border-slate-100 bg-white p-6 shadow-sm">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-slate-900">Asistencia</h2>
-          {dashboard && (
-            <p className="mt-1 text-xs text-slate-500">
-              {dashboard.timezone ? `Hora local de la sucursal (${dashboard.timezone}).` : 'Cada sucursal cuenta en su propia hora local.'}
-            </p>
-          )}
-        </div>
-        <div className="inline-flex rounded-lg border border-slate-200 p-0.5 text-sm" role="group" aria-label="Periodo de asistencia">
-          {([['day', 'Hoy'], ['week', 'Últimos 7 días']] as const).map(([value, label]) => (
-            <button
-              className={`rounded-md px-3 py-1 transition ${period === value ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
-              type="button"
-              aria-pressed={period === value}
-              key={value}
-              onClick={() => setPeriod(value)}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
-
+    <Panel
+      title="Asistencia"
+      icon={Activity}
+      description={dashboard
+        ? (dashboard.timezone ? `Hora local de la sucursal (${dashboard.timezone}).` : 'Cada sucursal cuenta en su propia hora local.')
+        : 'Entradas registradas en el control de acceso.'}
+      actions={(
+        <Segmented
+          label="Periodo de asistencia"
+          value={period}
+          options={[['day', 'Hoy por hora'], ['week', 'Últimos 7 días']]}
+          onChange={setPeriod}
+        />
+      )}
+    >
       {error ? (
-        <p className="mt-4 rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">{error}</p>
+        <p className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">{error}</p>
       ) : !dashboard ? (
-        <div className="mt-4 h-56 animate-pulse rounded-lg bg-slate-100" aria-label="Cargando asistencia" aria-busy="true" />
+        <div aria-label="Cargando asistencia" aria-busy="true">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {Array.from({ length: 4 }, (_, index) => <div className="skeleton h-[68px] rounded-xl" key={index} />)}
+          </div>
+          <div className="skeleton mt-6 h-56 rounded-xl" />
+        </div>
       ) : (
         <>
-          <dl className="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
-            {tiles.map(({ label, value, icon: Icon }) => (
-              <div className="rounded-lg bg-slate-50 px-4 py-3" key={label}>
-                <dt className="flex items-center gap-2 text-sm text-slate-500"><Icon size={16} aria-hidden="true" /> {label}</dt>
-                <dd className="mt-1 text-2xl font-semibold text-slate-900">{value}</dd>
+          <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {tiles.map(({ label, value, icon: Icon, live }) => (
+              <div className="rounded-xl bg-slate-50 px-4 py-3" key={label}>
+                <dt className="flex items-center gap-2 text-xs font-medium text-slate-500">
+                  <Icon size={14} aria-hidden="true" /> {label}
+                  {live && (
+                    <span className="relative ml-auto flex h-2 w-2" aria-hidden="true">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand opacity-75" />
+                      <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+                    </span>
+                  )}
+                </dt>
+                <dd className="mt-1 font-display text-2xl font-bold text-ink tabular">{value}</dd>
               </div>
             ))}
           </dl>
           <div className="mt-6">
             {period === 'day' ? (
-              <BarChart data={hourlyBars(dashboard)} caption="Entradas por hora de hoy" valueLabel="Entradas por hora" />
+              <BarChart
+                data={hourlyBars(dashboard)}
+                caption="Entradas por hora de hoy"
+                valueLabel="Entradas por hora"
+                highlightKey={dashboard.peakHour ? String(dashboard.peakHour.hour) : undefined}
+              />
             ) : (
               <BarChart data={dailyBars(dashboard)} caption="Entradas por día de los últimos 7 días" valueLabel="Entradas por día" />
             )}
           </div>
         </>
       )}
-    </article>
+    </Panel>
   )
 }
 

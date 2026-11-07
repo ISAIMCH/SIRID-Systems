@@ -25,6 +25,7 @@ import type {
 } from '../services/api'
 import { socket } from '../services/socket'
 import type { Equipment, User } from '../types'
+import { useQuickAction } from '../utils/quickAction'
 
 type ArrayResponse<T> = T[] | {
   data?: unknown
@@ -462,6 +463,11 @@ function Routines() {
     setIsBuilderOpen(true)
   }
 
+  useQuickAction('nuevo', () => {
+    setActiveTab('routine')
+    startCreate('routine')
+  })
+
   function startEditTemplate(template: RoutineTemplate) {
     setBuilderMode('template')
     setEditingTemplate(template)
@@ -802,7 +808,7 @@ function Routines() {
   }`
 
   return (
-    <section className="min-h-screen bg-[#F8FAFC] px-8 py-10">
+    <section className="min-h-screen bg-canvas px-8 py-10">
       <p className="text-sm font-medium uppercase tracking-[0.25em] text-slate-500">Entrenamiento</p>
       <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
@@ -810,7 +816,7 @@ function Routines() {
           <p className="mt-3 text-slate-500">Diseña plantillas y asígnalas a tus clientes.</p>
         </div>
         <button
-          className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#9BFF63] px-4 py-2 font-medium text-[#0F172A] transition hover:bg-[#abff7c]"
+          className="inline-flex items-center justify-center gap-2 rounded-lg bg-brand px-4 py-2 font-medium text-ink transition hover:bg-brand-hover"
           type="button"
           onClick={() => startCreate(activeTab)}
         >
@@ -856,7 +862,7 @@ function Routines() {
                         <td className="px-6 py-4 text-slate-500">{routineScheduleDays(template.blocks).join(', ') || '-'}</td>
                         <td className="whitespace-nowrap px-6 py-4 text-right">
                           <div className="inline-flex items-center justify-end gap-2">
-                            <button className="inline-flex items-center gap-1 rounded-lg bg-[#9BFF63] px-2.5 py-2 text-xs font-semibold text-slate-900 transition hover:bg-[#abff7c]" type="button" onClick={() => startAssign(template)} aria-label={`Asignar ${template.title} a un cliente`}>
+                            <button className="inline-flex items-center gap-1 rounded-lg bg-brand px-2.5 py-2 text-xs font-semibold text-slate-900 transition hover:bg-brand-hover" type="button" onClick={() => startAssign(template)} aria-label={`Asignar ${template.title} a un cliente`}>
                               <UserRoundPlus size={15} aria-hidden="true" />Asignar a Cliente
                             </button>
                             <button className="rounded p-2 text-slate-400 transition hover:bg-green-50 hover:text-green-700" type="button" aria-label={`Editar plantilla ${template.title}`} onClick={() => startEditTemplate(template)}>
@@ -1145,7 +1151,7 @@ function Routines() {
               {modalError && <p className="border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">{modalError}</p>}
               <div className="flex justify-end gap-3 border-t border-slate-100 pt-4">
                 <button className="rounded-lg px-4 py-2 font-medium text-slate-600 transition hover:bg-slate-100" type="button" onClick={closeBuilder} disabled={isSubmitting}>Cancelar</button>
-                <button className="rounded-lg bg-[#9BFF63] px-4 py-2 font-medium text-[#0F172A] transition hover:bg-[#abff7c] disabled:cursor-not-allowed disabled:opacity-60" type="submit" disabled={isSubmitting}>{isSubmitting ? 'Guardando...' : 'Guardar'}</button>
+                <button className="rounded-lg bg-brand px-4 py-2 font-medium text-ink transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60" type="submit" disabled={isSubmitting}>{isSubmitting ? 'Guardando...' : 'Guardar'}</button>
               </div>
             </form>
           </div>
@@ -1175,7 +1181,7 @@ function Routines() {
               {assignmentError && <p className="border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">{assignmentError}</p>}
               <div className="flex justify-end gap-3 pt-2">
                 <button className="rounded-lg px-4 py-2 font-medium text-slate-600 transition hover:bg-slate-100" type="button" onClick={closeAssign} disabled={isAssigning}>Cancelar</button>
-                <button className="rounded-lg bg-[#9BFF63] px-4 py-2 font-medium text-[#0F172A] transition hover:bg-[#abff7c] disabled:cursor-not-allowed disabled:opacity-60" type="submit" disabled={isAssigning || clients.length === 0}>{isAssigning ? 'Asignando...' : 'Asignar rutina'}</button>
+                <button className="rounded-lg bg-brand px-4 py-2 font-medium text-ink transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60" type="submit" disabled={isAssigning || clients.length === 0}>{isAssigning ? 'Asignando...' : 'Asignar rutina'}</button>
               </div>
             </form>
           </div>

@@ -117,7 +117,7 @@ function Maintenance() {
   const countFor = (value: Filter) => value === 'all' ? reports.length : reports.filter((report) => report.status === value).length
 
   return (
-    <section className="min-h-screen bg-[#F8FAFC] px-4 py-10 sm:px-8">
+    <section className="min-h-screen bg-canvas px-4 py-10 sm:px-8">
       <p className="text-sm font-medium uppercase tracking-[0.25em] text-slate-500">Operación</p>
       <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
@@ -278,7 +278,7 @@ function Maintenance() {
                 <button className="rounded-lg border border-slate-200 bg-white px-4 py-2 font-medium text-slate-700 transition hover:bg-slate-50" type="button" onClick={closeAttend} disabled={isSubmitting}>
                   Cancelar
                 </button>
-                <button className="rounded-lg bg-[#9BFF63] px-4 py-2 font-medium text-[#0F172A] transition hover:bg-[#abff7c] disabled:opacity-50" type="submit" disabled={isSubmitting}>
+                <button className="rounded-lg bg-brand px-4 py-2 font-medium text-ink transition hover:bg-brand-hover disabled:opacity-50" type="submit" disabled={isSubmitting}>
                   {isSubmitting ? 'Guardando...' : 'Guardar'}
                 </button>
               </div>

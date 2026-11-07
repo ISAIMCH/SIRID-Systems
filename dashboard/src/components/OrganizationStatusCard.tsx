@@ -49,7 +49,7 @@ function OrganizationStatusCard({ notice, onBack }: OrganizationStatusCardProps)
       )}
       <div className="mt-8 flex flex-col gap-3">
         {notice.status === 'rejected' && (
-          <Link className="w-full bg-[#9BFF63] px-4 py-3 text-center font-semibold text-[#0F172A] transition hover:bg-[#abff7c]" to="/signup">
+          <Link className="w-full bg-brand px-4 py-3 text-center font-semibold text-ink transition hover:bg-brand-hover" to="/signup">
             Enviar solicitud de nuevo
           </Link>
         )}
