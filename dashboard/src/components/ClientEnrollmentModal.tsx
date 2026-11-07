@@ -19,11 +19,39 @@ export interface EnrollmentOutcome {
 interface ClientEnrollmentModalProps {
   // Opens on the code view (new code for a client); otherwise on the form.
   initialOutcome?: EnrollmentOutcome | null
+  // Coaches of the gym; only managers can list them, so reception registers without one.
+  coaches?: User[]
   onEnrolled: (user: User) => void
   onClose: () => void
 }
 
-const inputClassName = 'w-full rounded-lg border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100'
+const inputClassName = 'w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100'
+
+const TRAINING_DAYS = [
+  { label: 'L', name: 'Lunes', value: 1 },
+  { label: 'M', name: 'Martes', value: 2 },
+  { label: 'X', name: 'Miércoles', value: 3 },
+  { label: 'J', name: 'Jueves', value: 4 },
+  { label: 'V', name: 'Viernes', value: 5 },
+  { label: 'S', name: 'Sábado', value: 6 },
+  { label: 'D', name: 'Domingo', value: 0 },
+]
+
+const emptyForm = {
+  name: '',
+  lastName: '',
+  email: '',
+  phone: '',
+  goal: '',
+  experienceLevel: '',
+  availableTrainingDays: [] as number[],
+  assignedCoach: '',
+  observations: '',
+}
+
+function coachName(coach: User) {
+  return [coach.name || coach.firstName, coach.lastName].filter(Boolean).join(' ') || coach.email
+}
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat('es-MX', { dateStyle: 'long' }).format(new Date(value))
@@ -55,9 +83,9 @@ function printActivationSheet(outcome: EnrollmentOutcome, activation: Activation
   sheet.print()
 }
 
-function ClientEnrollmentModal({ initialOutcome = null, onEnrolled, onClose }: ClientEnrollmentModalProps) {
+function ClientEnrollmentModal({ initialOutcome = null, coaches = [], onEnrolled, onClose }: ClientEnrollmentModalProps) {
   const { isAllGyms } = useAuth()
-  const [form, setForm] = useState({ name: '', lastName: '', email: '', phone: '' })
+  const [form, setForm] = useState(emptyForm)
   const [gymId, setGymId] = useState('')
   const [outcome, setOutcome] = useState<EnrollmentOutcome | null>(initialOutcome)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -73,6 +101,11 @@ function ClientEnrollmentModal({ initialOutcome = null, onEnrolled, onClose }: C
         lastName: form.lastName.trim() || undefined,
         email: form.email.trim(),
         phone: form.phone.trim(),
+        goal: form.goal.trim() || undefined,
+        experienceLevel: form.experienceLevel || undefined,
+        availableTrainingDays: form.availableTrainingDays.length ? form.availableTrainingDays : undefined,
+        assignedCoach: form.assignedCoach || undefined,
+        observations: form.observations.trim() || undefined,
         ...targetGymField(isAllGyms, gymId),
       })
       onEnrolled(result.user)
@@ -161,10 +194,10 @@ function ClientEnrollmentModal({ initialOutcome = null, onEnrolled, onClose }: C
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4 backdrop-blur-sm">
-      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
+      <div className="max-h-[90vh] w-full max-w-2xl animate-pop-in overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-sm font-medium uppercase tracking-[0.2em] text-emerald-700">Recepción</p>
+            <p className="text-sm font-medium uppercase tracking-[0.2em] text-emerald-700">Clientes</p>
             <h2 className="mt-2 text-2xl font-semibold text-slate-900">
               {outcome ? 'Código de activación' : 'Registrar cliente'}
             </h2>
@@ -182,7 +215,7 @@ function ClientEnrollmentModal({ initialOutcome = null, onEnrolled, onClose }: C
         {outcome ? renderOutcome(outcome) : (
           <form className="mt-6 space-y-5" onSubmit={handleSubmit}>
             <p className="text-sm text-slate-500">
-              Para clientes que aún no tienen la app. Puedes cobrar la membresía enseguida; la cuenta se activa después en la app con el código.
+              Da de alta al cliente con su perfil. Puedes cobrar la membresía enseguida; la cuenta se activa después en la app con el código.
             </p>
             <div className="grid gap-5 sm:grid-cols-2">
               <div>
@@ -237,6 +270,100 @@ function ClientEnrollmentModal({ initialOutcome = null, onEnrolled, onClose }: C
               />
             </div>
             <GymSelect id="enroll-gym" label="Sucursal del cliente" value={gymId} onChange={setGymId} />
+
+            <section className="space-y-5 rounded-xl border border-slate-200 bg-slate-50 p-5">
+              <div>
+                <h3 className="text-base font-semibold text-slate-900">Perfil de entrenamiento</h3>
+                <p className="mt-1 text-sm text-slate-500">Opcional. Si la persona ya tenía cuenta GymGo, su objetivo, nivel y días se conservan.</p>
+              </div>
+              <div className="grid gap-5 sm:grid-cols-2">
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="enroll-goal">Objetivo deportivo</label>
+                  <input
+                    className={inputClassName}
+                    id="enroll-goal"
+                    type="text"
+                    placeholder="Ej. Ganar masa, bajar de peso..."
+                    value={form.goal}
+                    onChange={(event) => setForm({ ...form, goal: event.target.value })}
+                    maxLength={120}
+                  />
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="enroll-level">Nivel de experiencia</label>
+                  <select
+                    className={inputClassName}
+                    id="enroll-level"
+                    value={form.experienceLevel}
+                    onChange={(event) => setForm({ ...form, experienceLevel: event.target.value })}
+                  >
+                    <option value="">Sin especificar</option>
+                    <option value="principiante">Principiante</option>
+                    <option value="intermedio">Intermedio</option>
+                    <option value="avanzado">Avanzado</option>
+                  </select>
+                </div>
+              </div>
+              <fieldset>
+                <legend className="mb-2 block text-sm font-medium text-slate-700">Días disponibles</legend>
+                <div className="flex flex-wrap gap-2">
+                  {TRAINING_DAYS.map(({ label, name, value }) => {
+                    const isChecked = form.availableTrainingDays.includes(value)
+                    return (
+                      <label
+                        className={`inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg border text-sm font-medium transition has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand-text ${
+                          isChecked ? 'border-ink bg-ink text-white' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+                        }`}
+                        key={value}
+                        title={name}
+                      >
+                        <input
+                          className="sr-only"
+                          type="checkbox"
+                          aria-label={name}
+                          checked={isChecked}
+                          onChange={(event) => setForm((current) => ({
+                            ...current,
+                            availableTrainingDays: event.target.checked
+                              ? [...current.availableTrainingDays, value]
+                              : current.availableTrainingDays.filter((day) => day !== value),
+                          }))}
+                        />
+                        {label}
+                      </label>
+                    )
+                  })}
+                </div>
+              </fieldset>
+              {coaches.length > 0 && (
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="enroll-coach">Coach asignado</label>
+                  <select
+                    className={inputClassName}
+                    id="enroll-coach"
+                    value={form.assignedCoach}
+                    onChange={(event) => setForm({ ...form, assignedCoach: event.target.value })}
+                  >
+                    <option value="">Sin coach</option>
+                    {coaches.map((coach) => {
+                      const coachId = coach.id || coach._id || ''
+                      return <option key={coachId} value={coachId}>{coachName(coach)}</option>
+                    })}
+                  </select>
+                </div>
+              )}
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="enroll-notes">Observaciones</label>
+                <textarea
+                  className={`${inputClassName} min-h-[88px] resize-y`}
+                  id="enroll-notes"
+                  placeholder="Lesiones, restricciones, preferencias..."
+                  value={form.observations}
+                  onChange={(event) => setForm({ ...form, observations: event.target.value })}
+                  maxLength={4000}
+                />
+              </div>
+            </section>
 
             {error && <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">{error}</p>}
 
