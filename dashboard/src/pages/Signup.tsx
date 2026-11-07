@@ -70,9 +70,9 @@ function Signup() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#F8FAFC] px-4 py-12 sm:px-6">
+    <main className="flex min-h-screen items-center justify-center bg-canvas px-4 py-12 sm:px-6">
       <section className="w-full max-w-2xl border border-slate-100 bg-white p-6 shadow-xl shadow-slate-200/60 sm:p-10">
-        <p className="text-xl font-semibold tracking-tight text-[#0F172A]">GymGo</p>
+        <p className="text-xl font-semibold tracking-tight text-ink">GymGo</p>
         <p className="mt-1 text-xs font-medium uppercase tracking-[0.25em] text-emerald-700">Registro de gimnasios</p>
 
         {result ? (
@@ -88,7 +88,7 @@ function Signup() {
                 Usamos tu cuenta de GymGo existente: entra con el mismo correo y contraseña.
               </p>
             )}
-            <Link className="mt-8 inline-block bg-[#9BFF63] px-6 py-3 font-semibold text-[#0F172A] transition hover:bg-[#abff7c]" to="/login">
+            <Link className="mt-8 inline-block bg-brand px-6 py-3 font-semibold text-ink transition hover:bg-brand-hover" to="/login">
               Ir a iniciar sesión
             </Link>
           </div>
@@ -153,7 +153,7 @@ function Signup() {
               <div className="flex flex-col-reverse gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <Link className="text-center text-sm font-medium text-slate-500 hover:text-slate-800" to="/login">Ya tengo acceso</Link>
                 <button
-                  className="bg-[#9BFF63] px-6 py-3 font-semibold text-[#0F172A] transition hover:bg-[#abff7c] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="bg-brand px-6 py-3 font-semibold text-ink transition hover:bg-brand-hover active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
                   type="submit"
                   disabled={isSubmitting}
                 >

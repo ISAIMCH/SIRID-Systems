@@ -264,7 +264,7 @@ function Exercises() {
           <h1 className="text-4xl font-semibold tracking-tight text-slate-900">Ejercicios</h1>
           <p className="mt-3 text-slate-500">Administra el catálogo disponible para construir rutinas.</p>
         </div>
-        {tab === 'custom' && <button className="inline-flex items-center gap-2 rounded-lg bg-[#9BFF63] px-4 py-2 font-medium text-[#0F172A] transition hover:bg-[#abff7c]" type="button" onClick={openCreateModal}>
+        {tab === 'custom' && <button className="inline-flex items-center gap-2 rounded-lg bg-brand px-4 py-2 font-medium text-ink transition hover:bg-brand-hover" type="button" onClick={openCreateModal}>
           <Plus size={18} aria-hidden="true" />Nuevo ejercicio
         </button>}
       </div>
@@ -372,7 +372,7 @@ function Exercises() {
             <div><label className={labelClassName} htmlFor="exercise-equipment">Equipo</label><select className={inputClassName} id="exercise-equipment" value={form.equipment} onChange={(event) => setForm({ ...form, equipment: event.target.value })}><option value="">Peso corporal / Ninguno</option>{form.equipment && !equipment.some((item) => item.name === form.equipment) && <option value={form.equipment}>{form.equipment}</option>}{equipment.map((item, index) => <option key={item._id || item.id || `equipment-${index}`} value={item.name}>{item.name}</option>)}</select></div>
             <div><label className={labelClassName} htmlFor="exercise-video">URL del video</label><input className={inputClassName} id="exercise-video" type="url" value={form.videoUrl} onChange={(event) => setForm({ ...form, videoUrl: event.target.value })} placeholder="https://..." /></div>
             {modalError && <p className="border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">{modalError}</p>}
-            <div className="flex justify-end gap-3 pt-2"><button className="rounded-lg px-4 py-2 font-medium text-slate-600 hover:bg-slate-100" type="button" onClick={closeModal} disabled={isSubmitting}>Cancelar</button><button className="rounded-lg bg-[#9BFF63] px-4 py-2 font-medium text-[#0F172A] disabled:opacity-60" type="submit" disabled={isSubmitting}>{isSubmitting ? 'Guardando...' : 'Guardar'}</button></div>
+            <div className="flex justify-end gap-3 pt-2"><button className="rounded-lg px-4 py-2 font-medium text-slate-600 hover:bg-slate-100" type="button" onClick={closeModal} disabled={isSubmitting}>Cancelar</button><button className="rounded-lg bg-brand px-4 py-2 font-medium text-ink disabled:opacity-60" type="submit" disabled={isSubmitting}>{isSubmitting ? 'Guardando...' : 'Guardar'}</button></div>
           </form>
         </div>
       </div>}

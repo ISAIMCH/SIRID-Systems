@@ -66,7 +66,7 @@ function StaffInvitationsNotice() {
               Rechazar
             </button>
             <button
-              className="rounded-lg bg-[#9BFF63] px-3 py-1.5 font-medium text-[#0F172A] transition hover:bg-[#abff7c] disabled:opacity-50"
+              className="rounded-lg bg-brand px-3 py-1.5 font-medium text-ink transition hover:bg-brand-hover disabled:opacity-50"
               type="button"
               disabled={busyId !== null}
               onClick={() => void respond(invitation, 'accept')}

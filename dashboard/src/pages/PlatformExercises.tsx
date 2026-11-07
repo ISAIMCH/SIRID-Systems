@@ -172,7 +172,7 @@ function ExerciseEditor({ exercise, onClose, onSaved }: { exercise: PlatformExer
           {error && <p className="border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700 sm:col-span-2" role="alert">{error}</p>}
           <div className="flex justify-end gap-3 pt-2 sm:col-span-2">
             <button className="rounded-lg px-4 py-2 font-medium text-slate-600 hover:bg-slate-100" type="button" onClick={onClose} disabled={isSubmitting}>Cancelar</button>
-            <button className="rounded-lg bg-[#9BFF63] px-4 py-2 font-medium text-[#0F172A] disabled:opacity-60" type="submit" disabled={isSubmitting}>{isSubmitting ? 'Guardando...' : 'Guardar'}</button>
+            <button className="rounded-lg bg-brand px-4 py-2 font-medium text-ink disabled:opacity-60" type="submit" disabled={isSubmitting}>{isSubmitting ? 'Guardando...' : 'Guardar'}</button>
           </div>
         </form>
       </div>
@@ -245,7 +245,7 @@ export default function PlatformExercises() {
           <h1 className="text-4xl font-semibold tracking-tight text-slate-900">Catálogo global de ejercicios</h1>
           <p className="mt-3 text-slate-500">Lo que ven todos los gimnasios al crear rutinas, según el equipo que tengan registrado.</p>
         </div>
-        <button className="inline-flex items-center gap-2 rounded-lg bg-[#9BFF63] px-4 py-2 font-medium text-[#0F172A] hover:bg-[#abff7c]" type="button" onClick={() => setEditing('new')}>
+        <button className="inline-flex items-center gap-2 rounded-lg bg-brand px-4 py-2 font-medium text-ink hover:bg-brand-hover" type="button" onClick={() => setEditing('new')}>
           <Plus size={18} aria-hidden="true" />Nuevo ejercicio
         </button>
       </div>

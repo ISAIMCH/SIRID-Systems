@@ -141,7 +141,7 @@ function ClientEnrollmentModal({ initialOutcome = null, onEnrolled, onClose }: C
           )}
           {current.client.id && (
             <Link
-              className="rounded-lg bg-[#9BFF63] px-4 py-2 font-medium text-[#0F172A] transition hover:bg-[#abff7c]"
+              className="rounded-lg bg-brand px-4 py-2 font-medium text-ink transition hover:bg-brand-hover"
               to={`/payments?cliente=${encodeURIComponent(current.client.id)}`}
             >
               Cobrar membresía
@@ -250,7 +250,7 @@ function ClientEnrollmentModal({ initialOutcome = null, onEnrolled, onClose }: C
                 Cancelar
               </button>
               <button
-                className="rounded-lg bg-[#9BFF63] px-4 py-2 font-medium text-[#0F172A] transition hover:bg-[#abff7c] disabled:opacity-50"
+                className="rounded-lg bg-brand px-4 py-2 font-medium text-ink transition hover:bg-brand-hover disabled:opacity-50"
                 type="submit"
                 disabled={isSubmitting}
               >

@@ -169,7 +169,7 @@ function Access() {
   }
 
   return (
-    <section className="min-h-screen bg-[#F8FAFC] px-4 py-10 sm:px-8">
+    <section className="min-h-screen bg-canvas px-4 py-10 sm:px-8">
       <p className="text-sm font-medium uppercase tracking-[0.25em] text-slate-500">Operación</p>
       <h1 className="mt-3 text-4xl font-semibold tracking-tight text-slate-900">Control de acceso</h1>
       <p className="mt-3 text-slate-500">Registra entradas y salidas, vigila el aforo de cada sucursal y consulta la bitácora.</p>
@@ -200,12 +200,12 @@ function Access() {
             </div>
           )}
 
-          <div className="overflow-hidden rounded-xl border border-slate-100 bg-[#0F172A] shadow-sm">
+          <div className="overflow-hidden rounded-xl border border-slate-100 bg-ink shadow-sm">
             <div className="relative aspect-[4/3] w-full">
               <video className={`h-full w-full object-cover ${isCameraOn ? '' : 'hidden'}`} ref={videoRef} muted playsInline />
               {isCameraOn ? (
                 <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                  <div className="h-3/5 w-auto aspect-square rounded-2xl border-4 border-[#9BFF63]/80" />
+                  <div className="h-3/5 w-auto aspect-square rounded-2xl border-4 border-brand/80" />
                 </div>
               ) : (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-6 text-center text-slate-400">
@@ -213,7 +213,7 @@ function Access() {
                   <p className="text-sm">{needsGym ? 'Elige la sucursal para empezar.' : 'La cámara está apagada.'}</p>
                 </div>
               )}
-              {isSubmitting && <div className="absolute inset-x-0 bottom-0 bg-[#0F172A]/80 py-2 text-center text-sm text-white">Validando...</div>}
+              {isSubmitting && <div className="absolute inset-x-0 bottom-0 bg-ink/80 py-2 text-center text-sm text-white">Validando...</div>}
             </div>
             <div className="flex justify-center p-4">
               {isCameraOn ? (
@@ -221,7 +221,7 @@ function Access() {
                   <CameraOff size={16} aria-hidden="true" /> Apagar cámara
                 </button>
               ) : (
-                <button className="inline-flex items-center gap-2 rounded-lg bg-[#9BFF63] px-4 py-2 font-medium text-[#0F172A] transition hover:bg-[#abff7c] disabled:opacity-50" type="button" onClick={() => void startCamera()} disabled={needsGym}>
+                <button className="inline-flex items-center gap-2 rounded-lg bg-brand px-4 py-2 font-medium text-ink transition hover:bg-brand-hover disabled:opacity-50" type="button" onClick={() => void startCamera()} disabled={needsGym}>
                   <Camera size={18} aria-hidden="true" /> Encender cámara
                 </button>
               )}

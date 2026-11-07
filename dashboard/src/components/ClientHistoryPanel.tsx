@@ -118,7 +118,7 @@ function ClientHistoryPanel({ client, canSeeLogs, onClose }: ClientHistoryPanelP
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/50" role="dialog" aria-modal="true" aria-labelledby="history-title">
-      <div className="flex h-full w-full max-w-3xl flex-col overflow-y-auto bg-[#F8FAFC] shadow-xl">
+      <div className="flex h-full w-full max-w-3xl flex-col overflow-y-auto bg-canvas shadow-xl">
         <header className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-slate-200 bg-white px-6 py-5">
           <div>
             <p className="text-xs font-medium uppercase tracking-[0.2em] text-slate-500">Historial compartido</p>
@@ -154,7 +154,7 @@ function ClientHistoryPanel({ client, canSeeLogs, onClose }: ClientHistoryPanelP
                       <span className={`rounded-full border px-3 py-0.5 text-xs font-medium ${STATUS_COPY[share.status].tone}`}>{STATUS_COPY[share.status].label}</span>
                       {share.status === 'approved' && (
                         <button
-                          className="inline-flex items-center gap-2 rounded-lg bg-[#0F172A] px-3 py-1.5 text-sm font-medium text-white transition hover:bg-slate-800 disabled:opacity-50"
+                          className="inline-flex items-center gap-2 rounded-lg bg-ink px-3 py-1.5 text-sm font-medium text-white transition hover:bg-slate-800 disabled:opacity-50"
                           type="button"
                           onClick={() => void openHistory(share)}
                           disabled={isOpening}

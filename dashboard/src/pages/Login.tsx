@@ -48,14 +48,14 @@ function Login() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#F8FAFC] px-6 py-12">
+    <main className="flex min-h-screen items-center justify-center bg-canvas px-6 py-12">
       <section className="w-full max-w-md border border-slate-100 bg-white p-8 shadow-xl shadow-slate-200/60 sm:p-10">
         {notice ? (
           <OrganizationStatusCard notice={notice} onBack={() => { clearOrganizationNotice(); setNotice(null); setPassword('') }} />
         ) : (
         <>
         <div className="mb-8">
-          <p className="text-xl font-semibold tracking-tight text-[#0F172A]">GymGo</p>
+          <p className="text-xl font-semibold tracking-tight text-ink">GymGo</p>
           <p className="mt-1 text-xs font-medium uppercase tracking-[0.25em] text-emerald-700">
             Panel administrativo
           </p>
@@ -103,7 +103,7 @@ function Login() {
           )}
 
           <button
-            className="w-full bg-[#9BFF63] px-4 py-3 font-semibold text-[#0F172A] transition hover:bg-[#abff7c] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full bg-brand px-4 py-3 font-semibold text-ink transition hover:bg-brand-hover active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
             type="submit"
             disabled={isSubmitting}
           >
