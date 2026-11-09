@@ -911,6 +911,36 @@ export interface PlatformOrganization {
   owner: { name: string; lastName: string; email: string; phone: string | null } | null
   counts: { gyms: number; staff: number; clients: number; activeMemberships: number }
   gyms?: { id: string; name: string; address: string; timezone: string; isActive: boolean; createdAt: string }[]
+  // The GymGo plan without payment details. No planCode: created before billing, keeps every feature.
+  subscription: {
+    planCode: string | null
+    status: SubscriptionStatus
+    phase: 'ok' | 'grace' | 'expired'
+    method: SubscriptionMethod | null
+    renews: boolean
+    trialEndsAt: string | null
+    currentPeriodEnd: string | null
+    graceEndsAt: string | null
+  }
+}
+
+// What SIRID sets by hand: a longer trial, a period paid outside the web, or a plan sold by its team (no expiry).
+export type OrganizationSubscriptionUpdate =
+  | { status: 'trialing'; trialEndsAt: string }
+  | { status: 'active'; planCode: string; currentPeriodEnd: string; gymLimit?: number }
+  | { status: 'manual'; planCode: string; gymLimit?: number }
+
+export function updateOrganizationSubscription(id: string, payload: OrganizationSubscriptionUpdate) {
+  return apiClient<{ organization: PlatformOrganization }>(
+    `/platform/organizations/${id}/subscription`,
+    { method: 'PATCH', body: JSON.stringify(payload) },
+    { withGym: false },
+  )
+}
+
+// Public catalog of GymGo plans (the same one the web sells).
+export function getSaasPlans() {
+  return apiClient<{ plans: SaasPlan[]; trialDays: number; graceDays: number }>('/saas-plans', {}, { withGym: false })
 }
 
 export function getPlatformOrganizations(params: { status?: OrganizationStatus; search?: string } = {}) {

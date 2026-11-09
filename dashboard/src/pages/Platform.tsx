@@ -1,13 +1,17 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { Building2, Check, ChevronDown, Pause, Phone, Play, Search, X } from 'lucide-react'
+import { Building2, Check, ChevronDown, Gem, Pause, Phone, Play, Search, X } from 'lucide-react'
 import {
   getPlatformOrganization,
   getPlatformOrganizations,
+  getSaasPlans,
   updateOrganizationGymLimit,
   updateOrganizationStatus,
   type OrganizationStatus,
   type PlatformOrganization,
+  type SaasPlan,
 } from '../services/api'
+import OrganizationPlanDialog from '../components/OrganizationPlanDialog'
+import { METHOD_LABELS, STATUS_LABELS } from '../utils/planFeatures'
 
 const STATUS_TABS: { value: OrganizationStatus | ''; label: string }[] = [
   { value: 'pending', label: 'Pendientes' },
@@ -42,6 +46,36 @@ function formatDate(value: string | null) {
 interface PendingAction {
   organization: PlatformOrganization
   target: StatusAction
+}
+
+// One line about the organization's GymGo plan: which one, until when, and whether it lapsed.
+function PlanSummary({ subscription, plans }: { subscription: PlatformOrganization['subscription']; plans: SaasPlan[] }) {
+  if (!subscription.planCode) {
+    return <p className="text-sm text-slate-500">Sin plan: creada antes de la facturación, tiene todos los módulos y no vence.</p>
+  }
+  const planName = plans.find((plan) => plan.code === subscription.planCode)?.name ?? subscription.planCode
+  const date = subscription.status === 'trialing'
+    ? `prueba hasta el ${formatDate(subscription.trialEndsAt)}`
+    : subscription.status === 'manual'
+      ? 'sin vencimiento'
+      : subscription.currentPeriodEnd
+        ? `${subscription.renews ? 'se renueva el' : 'pagado hasta el'} ${formatDate(subscription.currentPeriodEnd)}`
+        : ''
+  const tone = subscription.phase !== 'ok'
+    ? 'bg-red-50 text-red-800 border-red-200'
+    : subscription.status === 'trialing'
+      ? 'bg-amber-50 text-amber-800 border-amber-200'
+      : 'bg-brand-soft text-brand-text border-brand/40'
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
+      <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-0.5 text-xs font-semibold ${tone}`}>
+        <Gem size={12} aria-hidden /> {planName} · {subscription.phase === 'ok' ? STATUS_LABELS[subscription.status] : 'Vencido'}
+      </span>
+      <span>{date}{subscription.method ? ` · ${METHOD_LABELS[subscription.method]}` : ''}</span>
+      {subscription.phase === 'grace' && <span className="font-medium text-red-700">· en gracia hasta el {formatDate(subscription.graceEndsAt)}</span>}
+      {subscription.phase === 'expired' && <span className="font-medium text-red-700">· pausada para su equipo</span>}
+    </div>
+  )
 }
 
 interface StatusDialogProps {
@@ -108,11 +142,15 @@ function StatusDialog({ action, onClose, onDone }: StatusDialogProps) {
 
 interface OrganizationCardProps {
   organization: PlatformOrganization
+  plans: SaasPlan[]
   onAction: (action: PendingAction) => void
   onChange: (organization: PlatformOrganization) => void
+  onEditPlan: (organization: PlatformOrganization) => void
 }
 
-function OrganizationCard({ organization, onAction, onChange }: OrganizationCardProps) {
+function OrganizationCard({ organization, plans, onAction, onChange, onEditPlan }: OrganizationCardProps) {
+  // A card that renews by itself is cancelled in Stripe before SIRID changes the plan (the API refuses it).
+  const renewsWithCard = organization.subscription.method === 'card' && organization.subscription.renews && organization.subscription.status === 'active'
   const badge = STATUS_BADGE[organization.status]
   const [gyms, setGyms] = useState<NonNullable<PlatformOrganization['gyms']> | null>(null)
   const [isOpen, setIsOpen] = useState(false)
@@ -183,6 +221,22 @@ function OrganizationCard({ organization, onAction, onChange }: OrganizationCard
       {organization.statusReason && (
         <p className="mt-4 rounded-lg bg-slate-50 px-4 py-3 text-sm text-slate-700"><span className="font-medium">Motivo:</span> {organization.statusReason}</p>
       )}
+
+      <div className="mt-5 flex flex-col gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <p className="mb-1.5 text-xs font-medium uppercase tracking-[0.2em] text-slate-500">Plan GymGo</p>
+          <PlanSummary subscription={organization.subscription} plans={plans} />
+        </div>
+        <button
+          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          type="button"
+          onClick={() => onEditPlan(organization)}
+          disabled={renewsWithCard || plans.length === 0}
+          title={renewsWithCard ? 'Paga con tarjeta y se renueva sola: cancélala en Stripe antes de cambiar el plan.' : undefined}
+        >
+          <Gem size={16} aria-hidden="true" /> Cambiar plan
+        </button>
+      </div>
 
       <div className="mt-5 grid gap-4 border-t border-slate-100 pt-5 md:grid-cols-[1fr_auto]">
         <div>
@@ -267,6 +321,12 @@ function Platform() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null)
+  const [plans, setPlans] = useState<SaasPlan[]>([])
+  const [planTarget, setPlanTarget] = useState<PlatformOrganization | null>(null)
+
+  useEffect(() => {
+    getSaasPlans().then((response) => setPlans(response.plans)).catch(() => {})
+  }, [])
 
   // Bumped after approving, rejecting or suspending, since the organization may leave the current tab.
   const [reloadKey, setReloadKey] = useState(0)
@@ -350,7 +410,7 @@ function Platform() {
           ? Array.from({ length: 2 }).map((_, index) => <div className="h-48 animate-pulse rounded-xl bg-slate-200" key={index} />)
           : organizations.length
             ? organizations.map((organization) => (
-              <OrganizationCard key={organization.id} organization={organization} onAction={setPendingAction} onChange={replace} />
+              <OrganizationCard key={organization.id} organization={organization} plans={plans} onAction={setPendingAction} onChange={replace} onEditPlan={setPlanTarget} />
             ))
             : (
               <div className="flex flex-col items-center rounded-xl border border-dashed border-slate-200 bg-white px-6 py-12 text-center">
@@ -365,6 +425,15 @@ function Platform() {
           action={pendingAction}
           onClose={() => setPendingAction(null)}
           onDone={() => { setPendingAction(null); setReloadKey((key) => key + 1) }}
+        />
+      )}
+
+      {planTarget && (
+        <OrganizationPlanDialog
+          organization={planTarget}
+          plans={plans}
+          onClose={() => setPlanTarget(null)}
+          onDone={(organization) => { setPlanTarget(null); replace(organization) }}
         />
       )}
     </section>
