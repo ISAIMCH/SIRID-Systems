@@ -16,15 +16,19 @@ import {
   Users,
   Wrench,
   BookOpen,
+  Gem,
   X,
 } from 'lucide-react'
 import { useEffect, useState, type ComponentType } from 'react'
-import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../store/useAuth'
 import { ALL_GYMS } from '../services/activeGym'
-import { connectSocket, disconnectSocket } from '../services/socket'
+import { SUBSCRIPTION_REQUIRED_EVENT } from '../services/api'
+import { connectSocket, disconnectSocket, socket } from '../services/socket'
 import { canAccessPage, useStaffRoles } from '../utils/access'
 import StaffInvitationsNotice from '../components/StaffInvitationsNotice'
+import PlanUpgradeModal from '../components/PlanUpgradeModal'
+import { formatLongDate } from '../utils/planFeatures'
 
 interface NavItem {
   label: string
@@ -35,6 +39,8 @@ interface NavItem {
   disabled?: boolean
   // Only for SIRID staff (User.isPlatformAdmin).
   platformOnly?: boolean
+  // Only for the organization's owner (the session carries their GymGo plan).
+  ownerOnly?: boolean
 }
 
 const navigation: NavItem[] = [
@@ -52,6 +58,7 @@ const navigation: NavItem[] = [
   { label: 'Pagos', to: '/payments', icon: Receipt, section: 'Comercial' },
   { label: 'Ventas', to: '/sales', icon: ShoppingCart, section: 'Comercial' },
   { label: 'Suscripciones', to: '/subscriptions', icon: CreditCard, section: 'Comercial' },
+  { label: 'Mi plan GymGo', to: '/billing', icon: Gem, section: 'Cuenta', ownerOnly: true },
   { label: 'Organizaciones', to: '/platform', icon: Building2, end: true, section: 'SIRID', platformOnly: true },
   { label: 'Catálogo global', to: '/platform/exercises', icon: BookOpen, section: 'SIRID', platformOnly: true },
 ]
@@ -68,18 +75,37 @@ function Wordmark() {
 }
 
 function AdminLayout() {
-  const { signOut, session, activeGymId, setActiveGymId, canSeeAllGyms, isPlatformMode } = useAuth()
+  const { signOut, session, activeGymId, setActiveGymId, canSeeAllGyms, isPlatformMode, refreshSession } = useAuth()
   const location = useLocation()
+  const navigate = useNavigate()
   const gyms = session?.gyms ?? []
   const organizations = [...new Map(gyms.map((gym) => [gym.organization.id, gym.organization])).values()]
 
   const roles = useStaffRoles()
   const isPlatformAdmin = Boolean(session?.user.isPlatformAdmin)
-  // In the SIRID panel the gym modules are hidden until a gym is picked in the selector.
+  const subscription = session?.subscription ?? null
+  const billingOnly = Boolean(subscription?.billingOnly)
+  // In the SIRID panel the gym modules are hidden until a gym is picked in the selector; with a lapsed plan
+  // the owner only sees billing.
   const visibleNavigation = navigation.filter((item) => {
     if (item.platformOnly) return isPlatformAdmin
-    return !isPlatformMode && canAccessPage(roles, item.to)
+    if (item.ownerOnly) return Boolean(subscription) && !isPlatformMode
+    return !isPlatformMode && !billingOnly && canAccessPage(roles, item.to)
   })
+  const showPlanBanner = Boolean(subscription) && !isPlatformMode && location.pathname !== '/billing'
+    && (subscription?.phase !== 'ok' || subscription?.status === 'trialing')
+
+  // The plan changed (a payment landed, it lapsed): reload the session so menus and banners follow.
+  useEffect(() => {
+    const onPlanChange = () => { refreshSession() }
+    const onRequired = () => { refreshSession().finally(() => navigate('/billing', { replace: true })) }
+    socket.on('subscription:updated', onPlanChange)
+    window.addEventListener(SUBSCRIPTION_REQUIRED_EVENT, onRequired)
+    return () => {
+      socket.off('subscription:updated', onPlanChange)
+      window.removeEventListener(SUBSCRIPTION_REQUIRED_EVENT, onRequired)
+    }
+  }, [refreshSession, navigate])
   // Staff of another gym who also applied to open their own see how the request is going.
   const applications = session?.organizationApplications ?? []
   // On phones and tablets the sidebar slides in over the page, so reception can use the access scanner there.
@@ -228,12 +254,28 @@ function AdminLayout() {
             {application.reason ? `: ${application.reason}` : '.'}
           </div>
         ))}
+        {showPlanBanner && subscription && (
+          <div
+            className={`flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2.5 text-sm sm:px-8 ${subscription.phase === 'ok' ? 'border-slate-200 bg-white text-slate-700' : 'border-red-200 bg-red-50 text-red-900'}`}
+            role="status"
+          >
+            <p>
+              {subscription.phase === 'ok'
+                ? <>Prueba de <strong>GymGo {subscription.planName}</strong>: te quedan <strong className="tabular">{subscription.daysLeft} {subscription.daysLeft === 1 ? 'día' : 'días'}</strong>, hasta el {formatLongDate(subscription.trialEndsAt)}.</>
+                : <>Tu plan de GymGo venció. {subscription.phase === 'grace' ? `Tu equipo puede seguir hasta el ${formatLongDate(subscription.graceEndsAt)}.` : 'Tu gimnasio está pausado.'}</>}
+            </p>
+            <Link className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold transition ${subscription.phase === 'ok' ? 'bg-brand text-brand-ink hover:bg-brand-hover' : 'bg-red-600 text-white hover:bg-red-700'}`} to="/billing">
+              <Gem size={14} aria-hidden /> {subscription.phase === 'ok' ? 'Ver mi plan' : 'Pagar ahora'}
+            </Link>
+          </div>
+        )}
         <StaffInvitationsNotice />
         {/* Pages remount when the gym changes, so they reload their data for it; each route fades in. */}
         <div className="animate-page-in" key={`${activeGymId ?? 'sin-sucursal'}:${location.pathname}`}>
           <Outlet />
         </div>
       </main>
+      <PlanUpgradeModal />
     </div>
   )
 }

@@ -24,6 +24,7 @@ const Documents = lazy(() => import('./pages/Documents'))
 const Platform = lazy(() => import('./pages/Platform'))
 const PlatformExercises = lazy(() => import('./pages/PlatformExercises'))
 const Maintenance = lazy(() => import('./pages/Maintenance'))
+const Billing = lazy(() => import('./pages/Billing'))
 
 function ProtectedRoute() {
   const { isAuthenticated } = useAuth()
@@ -45,6 +46,8 @@ function RoleRoute() {
   // Sessions saved before gyms existed load as null until /auth/me answers; wait instead of redirecting.
   if (!session) return null
   if (isPlatformMode) return <Navigate to="/platform" replace />
+  // The owner's plan lapsed: the API only answers billing until it is paid.
+  if (session.subscription?.billingOnly) return <Navigate to="/billing" replace />
 
   if (!canAccessPage(roles, location.pathname)) {
     return <Navigate to="/" replace />
@@ -59,10 +62,25 @@ function RoleRoute() {
 
 // Inicio is the gym overview; SIRID staff without a gym land on their panel instead.
 function HomeRoute() {
-  const { isPlatformMode } = useAuth()
+  const { isPlatformMode, session } = useAuth()
 
   if (isPlatformMode) return <Navigate to="/platform" replace />
+  if (session?.subscription?.billingOnly) return <Navigate to="/billing" replace />
   return <Overview />
+}
+
+// The GymGo plan is the owner's: the API answers /subscription only to them (session.subscription).
+function OwnerRoute() {
+  const { session } = useAuth()
+
+  if (!session) return null
+  if (!session.subscription) return <Navigate to="/" replace />
+
+  return (
+    <Suspense fallback={null}>
+      <Outlet />
+    </Suspense>
+  )
 }
 
 // SIRID's panel is for platform staff only, whatever their roles in the active gym.
@@ -92,6 +110,9 @@ function App() {
               <Route element={<PlatformRoute />}>
                 <Route path="platform" element={<Platform />} />
                 <Route path="platform/exercises" element={<PlatformExercises />} />
+              </Route>
+              <Route element={<OwnerRoute />}>
+                <Route path="billing" element={<Billing />} />
               </Route>
               <Route element={<RoleRoute />}>
                 <Route path="gyms" element={<Gyms />} />

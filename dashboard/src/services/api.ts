@@ -47,6 +47,8 @@ export interface SessionResponse {
   defaultGymId: string | null
   // Organizations the user owns that SIRID has not approved, or rejected or suspended.
   organizationApplications?: OrganizationNotice[]
+  // The GymGo plan; only the organization's owner gets it. billingOnly: the plan lapsed, only billing opens.
+  subscription?: (OrganizationSubscription & { billingOnly: boolean }) | null
 }
 
 export interface LoginResponse extends SessionResponse {
@@ -112,6 +114,7 @@ export async function apiClient<T>(
 
   if (!response.ok) {
     if (response.status === 401 && sessionOn401 === 'clear') clearStoredSession()
+    announcePlanError(response.status, data)
     throw new ApiError(data.error || data.msg || data.message || 'No se pudo completar la solicitud.', data, response.status)
   }
 
@@ -908,6 +911,36 @@ export interface PlatformOrganization {
   owner: { name: string; lastName: string; email: string; phone: string | null } | null
   counts: { gyms: number; staff: number; clients: number; activeMemberships: number }
   gyms?: { id: string; name: string; address: string; timezone: string; isActive: boolean; createdAt: string }[]
+  // The GymGo plan without payment details. No planCode: created before billing, keeps every feature.
+  subscription: {
+    planCode: string | null
+    status: SubscriptionStatus
+    phase: 'ok' | 'grace' | 'expired'
+    method: SubscriptionMethod | null
+    renews: boolean
+    trialEndsAt: string | null
+    currentPeriodEnd: string | null
+    graceEndsAt: string | null
+  }
+}
+
+// What SIRID sets by hand: a longer trial, a period paid outside the web, or a plan sold by its team (no expiry).
+export type OrganizationSubscriptionUpdate =
+  | { status: 'trialing'; trialEndsAt: string }
+  | { status: 'active'; planCode: string; currentPeriodEnd: string; gymLimit?: number }
+  | { status: 'manual'; planCode: string; gymLimit?: number }
+
+export function updateOrganizationSubscription(id: string, payload: OrganizationSubscriptionUpdate) {
+  return apiClient<{ organization: PlatformOrganization }>(
+    `/platform/organizations/${id}/subscription`,
+    { method: 'PATCH', body: JSON.stringify(payload) },
+    { withGym: false },
+  )
+}
+
+// Public catalog of GymGo plans (the same one the web sells).
+export function getSaasPlans() {
+  return apiClient<{ plans: SaasPlan[]; trialDays: number; graceDays: number }>('/saas-plans', {}, { withGym: false })
 }
 
 export function getPlatformOrganizations(params: { status?: OrganizationStatus; search?: string } = {}) {
@@ -1285,4 +1318,103 @@ export function updatePlatformExercise(id: string, data: Partial<PlatformExercis
     method: 'PATCH',
     body: JSON.stringify(data),
   }, { withGym: false })
+}
+
+/* ===== GymGo plan (what the owner pays SIRID) ===== */
+
+export type PlanFeature = 'iot' | 'occupancy' | 'documents' | 'historyShare'
+export type SubscriptionStatus = 'trialing' | 'active' | 'past_due' | 'canceled' | 'incomplete' | 'manual'
+export type SubscriptionMethod = 'card' | 'oxxo' | 'paypal' | 'manual'
+
+export interface OrganizationSubscription {
+  planCode: string | null
+  planName: string | null
+  status: SubscriptionStatus
+  // ok: everyone works. grace: only billing for the owner, the team keeps working. expired: the gym is paused.
+  phase: 'ok' | 'grace' | 'expired'
+  interval: 'month' | 'year' | null
+  method: SubscriptionMethod | null
+  renews: boolean
+  trialEndsAt: string | null
+  currentPeriodEnd: string | null
+  lapsedAt: string | null
+  graceEndsAt: string | null
+  daysLeft: number | null
+  gymLimit: number | null
+  features: PlanFeature[] | null
+  pendingPayment: { method: 'oxxo'; planCode: string; interval: string; voucherUrl: string | null; expiresAt: string | null } | null
+  hasStripeCustomer: boolean
+}
+
+export interface PlanPrice {
+  subtotal: number
+  tax: number
+  total: number
+}
+
+export interface SaasPlan {
+  code: string
+  name: string
+  description: string
+  monthly: PlanPrice | null
+  yearly: PlanPrice | null
+  gymLimit: number | null
+  features: PlanFeature[]
+  highlights: string[]
+  selfService: boolean
+  featured: boolean
+}
+
+export interface MySubscriptionResponse {
+  organization: { id: string; name: string }
+  subscription: OrganizationSubscription
+  plans: SaasPlan[]
+  payments: { card: boolean; oxxo: boolean; paypal: boolean; testMode: boolean }
+}
+
+export interface SubscriptionPaymentEntry {
+  id: string
+  provider: 'stripe' | 'paypal'
+  method: SubscriptionMethod
+  reference: string
+  planCode: string
+  interval: 'month' | 'year'
+  amount: number
+  currency: string
+  periodStart: string
+  periodEnd: string
+  paidAt: string
+}
+
+export function getMySubscription() {
+  return apiClient<MySubscriptionResponse>('/subscription', {}, { withGym: false })
+}
+
+export function getSubscriptionPayments() {
+  return apiClient<{ payments: SubscriptionPaymentEntry[] }>('/subscription/payments', {}, { withGym: false })
+}
+
+// Stripe's own page to change the card, switch plan or cancel; it sends the owner back to returnUrl.
+export function openBillingPortal(returnUrl: string) {
+  return apiClient<{ url: string }>('/subscription/portal', { method: 'POST', body: JSON.stringify({ returnUrl }) }, { withGym: false })
+}
+
+// The API refuses what the plan doesn't include (403 feature_not_in_plan) and, once the plan lapsed, everything
+// but billing for the owner (402 subscription_required). The layout listens and opens the upgrade modal or billing.
+export const PLAN_FEATURE_EVENT = 'gymgo:plan-feature-blocked'
+export const SUBSCRIPTION_REQUIRED_EVENT = 'gymgo:subscription-required'
+
+export interface PlanFeatureBlocked {
+  feature: PlanFeature | null
+  planCode: string | null
+  message: string
+}
+
+function announcePlanError(status: number, data: { code?: string; feature?: PlanFeature; planCode?: string | null; error?: string }) {
+  if (status === 403 && data.code === 'feature_not_in_plan') {
+    const detail: PlanFeatureBlocked = { feature: data.feature ?? null, planCode: data.planCode ?? null, message: data.error ?? '' }
+    window.dispatchEvent(new CustomEvent(PLAN_FEATURE_EVENT, { detail }))
+  } else if (status === 402 && data.code === 'subscription_required') {
+    window.dispatchEvent(new CustomEvent(SUBSCRIPTION_REQUIRED_EVENT))
+  }
 }
