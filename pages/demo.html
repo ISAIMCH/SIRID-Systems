@@ -1,1 +1,97 @@
-<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Agendar demo | SIRID</title><link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"><link rel="stylesheet" href="../assets/css/estilos.css"></head><body><main class="container py-5"><a href="../index.html" class="navbar-brand fw-bold">SIRID<span>Systems</span></a><div class="row justify-content-center"><div class="col-lg-7 py-5"><p class="eyebrow">HABLEMOS DE TU OPERACION</p><h1 class="mb-4">Agenda una demo de 30 minutos.</h1><form data-validate class="row g-3"><div class="col-md-6"><label class="form-label">Nombre</label><input class="form-control" required></div><div class="col-md-6"><label class="form-label">Correo corporativo</label><input type="email" class="form-control" required></div><div class="col-12"><label class="form-label">Numero de sedes</label><select class="form-select" required><option value="">Selecciona...</option><option>1 - 3</option><option>4 - 10</option><option>11 o mas</option></select></div><div class="col-12"><label class="form-label">Que quieres mejorar?</label><textarea class="form-control" rows="4"></textarea></div><div class="col-12"><button class="btn btn-primary btn-lg">Solicitar demo</button></div></form></div></div></main><script src="../assets/js/main.js"></script></body></html>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#09090b">
+    <title>Agendar demo | GymGo</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <link rel="stylesheet" href="../assets/css/estilos.css">
+</head>
+<body>
+    <nav class="site-nav" aria-label="Navegación">
+        <div class="container">
+            <a class="brand" href="../index.html"><span class="brand-mark" aria-hidden="true">G</span><span>GYMGO</span></a>
+            <div class="site-nav-actions">
+                <a class="nav-text-link" href="../index.html"><i class="bi bi-arrow-left"></i><span>Volver al inicio</span></a>
+            </div>
+        </div>
+    </nav>
+
+    <header class="page-hero">
+        <div class="container">
+            <span class="kicker on-dark">Hablemos de tu operación</span>
+            <h1>Agenda una demo de 30 minutos.</h1>
+            <p>Te mostramos el panel administrativo, la app de clientes y coaches y el acceso con QR, aplicados a la operación de tu gimnasio.</p>
+        </div>
+    </header>
+
+    <main class="section section-light pt-5">
+        <div class="container">
+            <div class="row g-4">
+                <div class="col-lg-7">
+                    <div class="gg-card p-4 p-md-5">
+                        <form id="demoForm" data-validate class="row g-3" action="mailto:project.gymgo@gmail.com?subject=Solicitud%20de%20demostraci%C3%B3n%20GymGo" method="post" enctype="text/plain" novalidate>
+                            <div class="col-md-6">
+                                <label class="form-label" for="demoName">Nombre</label>
+                                <input class="form-control gg-input" id="demoName" name="nombre" autocomplete="name" required>
+                                <div class="invalid-feedback">Escribe tu nombre.</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label" for="demoEmail">Correo corporativo</label>
+                                <input type="email" class="form-control gg-input" id="demoEmail" name="correo" autocomplete="email" required>
+                                <div class="invalid-feedback">Escribe un correo válido.</div>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label" for="demoSedes">Número de sedes</label>
+                                <select class="form-select gg-input" id="demoSedes" name="sedes" required>
+                                    <option value="">Selecciona...</option>
+                                    <option>1 - 3</option>
+                                    <option>4 - 10</option>
+                                    <option>11 o más</option>
+                                </select>
+                                <div class="invalid-feedback">Selecciona el número de sedes.</div>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label" for="demoGoal">¿Qué quieres mejorar?</label>
+                                <textarea class="form-control gg-input" id="demoGoal" name="mejorar" rows="4" placeholder="Accesos, cobros, retención de clientes, rutinas..."></textarea>
+                            </div>
+                            <div class="col-12 d-flex flex-wrap gap-2">
+                                <button class="btn-gg btn-gg-dark btn-gg-lg" type="submit"><i class="bi bi-envelope"></i>Solicitar demo por correo</button>
+                                <button class="btn-gg btn-gg-outline btn-gg-lg" type="button" id="demoWhatsApp"><i class="bi bi-whatsapp"></i>Enviar por WhatsApp</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+                <div class="col-lg-5">
+                    <div class="gg-card-dark p-4 p-md-5 h-100 text-white">
+                        <span class="kicker on-dark">Qué verás</span>
+                        <ul class="role-list list-unstyled d-grid gap-3 mt-2 mb-0">
+                            <li class="d-flex gap-3"><span class="icon-tile"><i class="bi bi-window-sidebar"></i></span><div><strong>Panel administrativo</strong><div class="muted">Clientes, membresías, cobros e inventario.</div></div></li>
+                            <li class="d-flex gap-3"><span class="icon-tile"><i class="bi bi-phone"></i></span><div><strong>App para clientes y coaches</strong><div class="muted">Rutinas, progreso, rachas y tienda.</div></div></li>
+                            <li class="d-flex gap-3"><span class="icon-tile"><i class="bi bi-qr-code-scan"></i></span><div><strong>Acceso con QR</strong><div class="muted">Validación en recepción y con torniquete IoT.</div></div></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="../assets/js/main.js"></script>
+    <script>
+        // Alternativa por WhatsApp con los mismos datos del formulario.
+        document.getElementById('demoWhatsApp').addEventListener('click', () => {
+            const form = document.getElementById('demoForm');
+            if (!form.checkValidity()) { form.classList.add('was-validated'); return; }
+            const value = (id) => document.getElementById(id).value.trim();
+            const texto = `Hola equipo GymGo, soy ${value('demoName')} (${value('demoEmail')}). Me interesa una demostración. Sedes: ${value('demoSedes')}. ${value('demoGoal')}`;
+            window.open(`https://wa.me/527721050282?text=${encodeURIComponent(texto)}`, '_blank', 'noopener');
+        });
+    </script>
+</body>
+</html>

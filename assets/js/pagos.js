@@ -51,7 +51,9 @@ const confirmPayment=(method, message, onConfirm)=>{
    <button id="confirmPayment" class="btn btn-d w-100 mb-2">Sí, continuar</button>
    <button class="btn btn-light w-100" data-bs-dismiss="modal">Cancelar</button>
  </div>`);
- $('#confirmPayment').onclick=()=>{gm.hide();setTimeout(onConfirm,250)};
+ // Espera a que el modal termine de cerrarse antes de abrir el siguiente paso
+ // (antes se usaba un retraso fijo que podía dejar el fondo del modal en un estado inconsistente).
+ $('#confirmPayment').onclick=()=>{$('#gm').addEventListener('hidden.bs.modal',()=>onConfirm(),{once:true});gm.hide()};
 };
 
 function shareURL(){const b=location.origin+location.pathname;
@@ -74,15 +76,21 @@ function chg(id,d){const i=S.cart.find(x=>x.id==id);if(!i)return;const n=i.qty+d
 
 /* ===== Render ===== */
 function render(){
- $('#prods').innerHTML=PRODUCTS.map(p=>`<div class="col-12 col-md-4"><div class="prod d-flex justify-content-between align-items-center gap-2">
-  <div><div class="fw-semibold">${p.title}</div><div class="small text-white-50">${p.desc}</div><div class="fw-bold mt-1">${money(p.price)}${p.cobro}</div></div>
-  <button class="btn btn-w btn-sm" onclick="add('${p.id}')"><i class="bi bi-plus-lg"></i></button></div></div>`).join('');
+ $('#prods').innerHTML=PRODUCTS.map(p=>{const inCart=S.cart.some(i=>i.pid==p.id);return `<div class="col-12 col-md-4"><div class="prod ${inCart?'in-cart':''}">
+  <div><div class="prod-title">${p.title}</div><div class="prod-desc">${p.desc||''}</div></div>
+  <div class="prod-price">${money(p.price).replace(' MXN','')} <small>MXN ${p.cobro}</small></div>
+  <button class="prod-add" onclick="add('${p.id}')" aria-label="${inCart?'Agregar otra vez':'Agregar'} ${p.title} al carrito"><i class="bi bi-${inCart?'check2':'plus-lg'}"></i>${inCart?'En tu carrito':'Agregar'}</button></div></div>`}).join('');
  $('#cnt').textContent=$('#cnt2').textContent=qtyN();
  $('#totTop').textContent=$('#totBar').textContent=money(tot());
- $('#items').innerHTML=S.cart.length?S.cart.map(i=>`<div class="d-flex justify-content-between align-items-center border-bottom py-2">
-  <div><div class="fw-semibold">${i.title}</div><div class="small text-muted">${money(i.price)}${cobroOf(i.pid)}</div></div>
-  <div class="d-flex align-items-center gap-2"><button class="btn btn-sm btn-outline-dark" onclick="chg('${i.id}',-1)">−</button><b>${i.qty}</b><button class="btn btn-sm btn-outline-dark" onclick="chg('${i.id}',1)">+</button></div></div>`).join(''):'<p class="text-muted text-center mt-4">Tu carrito está vacío</p>';
- const s=sub();$('#sum').innerHTML=`<div class="d-flex justify-content-between"><span>Subtotal</span><span>${money(s)}</span></div><div class="d-flex justify-content-between"><span>IVA 16%</span><span>${money(s*.16)}</span></div><div class="d-flex justify-content-between fw-bold fs-6 mt-1"><span>Total hoy</span><span>${money(tot())}</span></div>${S.cart.some(i=>isRec(i.pid))?'<div class="text-muted mt-1">Suscripción mensual: se renueva cada mes.</div>':''}`;
+ $('#items').innerHTML=S.cart.length?S.cart.map(i=>`<div class="cart-item">
+  <div><div class="name">${i.title}</div><div class="price">${money(i.price)}${cobroOf(i.pid)}</div></div>
+  <div class="qty"><button onclick="chg('${i.id}',-1)" aria-label="${i.qty>1?'Quitar uno':'Eliminar'} ${i.title}"><i class="bi bi-${i.qty>1?'dash':'trash3'}"></i></button><b aria-label="Cantidad">${i.qty}</b><button onclick="chg('${i.id}',1)" aria-label="Agregar uno ${i.title}"><i class="bi bi-plus"></i></button></div></div>`).join(''):'<div class="empty-state"><i class="bi bi-bag"></i>Tu carrito está vacío<br><a class="btn-gg btn-gg-outline btn-gg-sm mt-3" href="../index.html#catalogo">Ver catálogo</a></div>';
+ const s=sub(),renews=S.cart.some(i=>isRec(i.pid));
+ const totalsHtml=`<div class="d-flex justify-content-between row-line"><span>Subtotal</span><span>${money(s)}</span></div><div class="d-flex justify-content-between row-line"><span>IVA 16%</span><span>${money(s*.16)}</span></div><div class="d-flex justify-content-between fw-bold fs-6 mt-1 row-line grand"><span>Total hoy</span><span>${money(tot())}</span></div>${renews?'<div class="text-muted mt-1 renew">Suscripción mensual: se renueva cada mes.</div>':''}`;
+ $('#sum').innerHTML=totalsHtml;
+ const summaryItems=$('#summaryItems'),summaryTotals=$('#summaryTotals');
+ if(summaryItems){summaryItems.innerHTML=S.cart.length?S.cart.map(i=>`<div class="summary-line"><span class="name">${i.title}<small>${i.qty} × ${money(i.price)}${cobroOf(i.pid)}</small></span><span class="val">${money(i.price*i.qty)}</span></div>`).join(''):'<p class="summary-empty mb-0">Agrega una solución para ver el resumen.</p>'}
+ if(summaryTotals)summaryTotals.innerHTML=totalsHtml;
  $('#medNote').textContent=isAuthenticated
   ? `Carrito asociado a ${user.nombre||user.email} y guardado en este navegador.`
   : 'Carrito temporal de invitado. Se asociará a tu cuenta después de iniciar sesión.';
@@ -98,34 +106,54 @@ function dash(){
  const k=(t,v)=>`<div class="col-4"><div class="kpi"><div class="small text-muted">${t}</div><b>${v}</b></div></div>`;
  $('#kpis').innerHTML=k('Recibido',money(paid.reduce((a,o)=>a+o.total,0)))+k('Pendiente',money(pend.reduce((a,o)=>a+o.total,0)))+k('Operaciones',S.orders.length);
  const ic={stripe:'bi-credit-card',paynet:'bi-upc-scan',paypal:'bi-paypal'};
- $('#txs').innerHTML=S.orders.length?S.orders.map(o=>`<div class="d-flex justify-content-between align-items-center border-bottom py-2">
-  <div><i class="bi ${ic[o.method]} me-2"></i><b>${o.id}</b><div class="small text-muted">${new Date(o.date).toLocaleString('es-MX')} · ${o.method}${o.last4?' ····'+o.last4:''}</div></div>
-  <div class="text-end"><div class="fw-semibold">${money(o.total)}</div>
-  <div class="d-flex flex-column align-items-end gap-1">
-  ${o.status=='pagado'?'<span class="badge text-bg-success">Pagado</span>':`<button class="btn btn-sm btn-outline-dark" onclick="ficha('${o.id}')">Ver ficha</button>`}
-  <button class="btn btn-sm btn-outline-light" data-receipt-order="${o.id}"><i class="bi bi-file-earmark-pdf me-1"></i>Recibo PDF</button>
-  </div></div></div>`).join(''):'<p class="text-muted text-center">Aún no hay transacciones.</p>'}
+ const names={stripe:'Tarjeta (Stripe)',paynet:'Efectivo (Paynet)',paypal:'PayPal'};
+ $('#txs').innerHTML=S.orders.length?S.orders.map(o=>`<div class="tx">
+  <span class="tx-icon"><i class="bi ${ic[o.method]||'bi-receipt'}"></i></span>
+  <div><div class="tx-id">${o.id}</div><div class="tx-meta">${new Date(o.date).toLocaleString('es-MX')} · ${names[o.method]||o.method}${o.last4?' ····'+o.last4:''}</div></div>
+  <div class="tx-side"><div class="d-flex align-items-center gap-2"><span class="status-pill ${o.status=='pagado'?'paid':'pending'}">${o.status=='pagado'?'Pagado':'Pendiente'}</span><span class="amount">${money(o.total)}</span></div>
+  <div class="tx-actions">
+  ${o.status=='pagado'?'':`<button class="mini-btn" onclick="ficha('${o.id}')"><i class="bi bi-upc"></i>Ver ficha</button>`}
+  <button class="mini-btn" data-receipt-order="${o.id}"><i class="bi bi-file-earmark-pdf"></i>Recibo PDF</button>
+  </div></div></div>`).join(''):'<div class="empty-state"><i class="bi bi-receipt"></i>Aún no hay transacciones.</div>'}
 
 /* ===== Órdenes ===== */
 async function order(method,status,ex={}){const o={id:'GG-'+Date.now().toString(36).toUpperCase(),method,status,total:tot(),items:qtyN(),date:new Date().toISOString(),...ex};
  const subtotal=+sub().toFixed(2), tax=+(subtotal*.16).toFixed(2);
  const data=await paymentRequest('',{method:'POST',body:JSON.stringify({id:o.id,method,status,subtotal,tax,total:o.total,last4:o.last4,ref:o.ref,exp:o.exp,items:S.cart.map(item=>({productId:item.pid,title:item.title,unitPrice:item.price,quantity:item.qty}))})});
  S.orders.unshift(data.payment||o);S.cart=[];save();return data.payment||o}
-const ok=(t,o)=>modal(`<div class="text-center"><i class="bi bi-check-circle-fill text-success" style="font-size:3rem"></i><h5 class="fw-bold mt-2">${t}</h5><p class="mb-1">Orden <b>${o.id}</b></p><p class="text-muted">${money(o.total)}</p><button class="btn btn-d w-100 mb-2" data-receipt-order="${o.id}"><i class="bi bi-file-earmark-pdf me-1"></i> Descargar ticket PDF</button><button class="btn btn-outline-dark w-100 mb-2" data-review-order="${o.id}" data-review-product="${o.items?.[0]?.productId || ''}">Dejar una reseña</button><button class="btn btn-light w-100" data-bs-dismiss="modal">Cerrar</button></div>`);
+const ok=(t,o)=>modal(`<div class="text-center"><span class="modal-icon ok"><i class="bi bi-check-lg"></i></span><h5 class="fw-bold mt-1">${t}</h5><p class="mb-1">Orden <b>${o.id}</b></p><p class="text-muted">${money(o.total)}</p><button class="btn btn-d w-100 mb-2" data-receipt-order="${o.id}"><i class="bi bi-file-earmark-pdf me-1"></i> Descargar ticket PDF</button><button class="btn btn-outline-dark w-100 mb-2" data-review-order="${o.id}" data-review-product="${o.items?.[0]?.productId || ''}"><i class="bi bi-star me-1"></i>Dejar una reseña</button><button class="btn btn-light w-100" data-bs-dismiss="modal">Cerrar</button></div>`);
 
-document.addEventListener('click', async (event) => {
+/* ===== Reseñas: formulario con estrellas (misma petición POST /api/reviews) ===== */
+const reviewModalEl=$('#reviewModal'), reviewForm=$('#reviewForm');
+const reviewModal=reviewModalEl?new bootstrap.Modal(reviewModalEl):null;
+let reviewButton=null;
+document.addEventListener('click', (event) => {
  const button=event.target.closest('[data-review-order]');
- if(!button)return;
- const rating=Number(window.prompt('Calificación de 1 a 5:', '5'));
- const comment=window.prompt('Cuéntanos brevemente tu experiencia:');
- if(!Number.isInteger(rating)||rating<1||rating>5||!comment?.trim())return;
+ if(!button||!reviewModal)return;
+ reviewButton=button;
+ reviewForm.reset();$('#reviewError').textContent='';$('#reviewCount').textContent='0';
+ if($('#gm').classList.contains('show')){$('#gm').addEventListener('hidden.bs.modal',()=>reviewModal.show(),{once:true});gm.hide()}
+ else reviewModal.show();
+});
+reviewModalEl?.addEventListener('shown.bs.modal',()=>$('#reviewComment').focus());
+$('#reviewComment')?.addEventListener('input',e=>{$('#reviewCount').textContent=e.target.value.length});
+reviewForm?.addEventListener('submit', async (event) => {
+ event.preventDefault();
+ const rating=Number(reviewForm.querySelector('input[name="rating"]:checked')?.value);
+ const comment=$('#reviewComment').value.trim();
+ const err=$('#reviewError'), submit=$('#reviewSubmit');
+ if(!Number.isInteger(rating)||rating<1||rating>5){err.textContent='Elige una calificación de 1 a 5.';return}
+ if(!comment){err.textContent='Escribe un comentario breve.';$('#reviewComment').focus();return}
+ err.textContent='';submit.disabled=true;submit.innerHTML='<span class="spinner-border spinner-border-sm"></span> Publicando…';
  try {
-  const response=await fetch(`${window.SIRID_API_URL}/api/reviews`,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({orderId:button.dataset.reviewOrder,productId:button.dataset.reviewProduct,rating,comment:comment.trim()})});
+  const response=await fetch(`${window.SIRID_API_URL}/api/reviews`,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({orderId:reviewButton?.dataset.reviewOrder,productId:reviewButton?.dataset.reviewProduct,rating,comment})});
   const data=await response.json();
   if(!response.ok)throw new Error(data.msg||'No se pudo publicar la reseña.');
+  reviewModal.hide();
   toast('Gracias por compartir tu experiencia.');
-  button.remove();
- } catch(error) { toast(error.message); }
+  reviewButton?.remove();
+ } catch(error) { err.textContent=error.message; }
+ finally { submit.disabled=false;submit.textContent='Publicar reseña'; }
 });
 
 async function downloadReceipt(orderId, button) {

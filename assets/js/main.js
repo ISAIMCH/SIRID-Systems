@@ -84,27 +84,29 @@ document.addEventListener("DOMContentLoaded", async () => {
             `${product.name} ${product.description} ${(product.features || []).join(' ')}`
                 .toLocaleLowerCase().includes(query)
         );
+        catalogContainer.setAttribute('aria-busy', 'false');
         catalogContainer.innerHTML = filtered.length ? filtered.map((product) => {
             const experience = getExperienceContent(product);
+            const available = product.stock > 0;
             return `
             <div class="col-lg-4 col-md-6 fade-in-up">
                 <article class="pricing-card ${product.featured ? 'destacado' : ''}">
-                    ${product.featured ? '<span class="badge-popular">MÁS ELEGIDO</span>' : ''}
-                    <span class="eyebrow">SOLUCIÓN GYMGO</span>
-                    <h3 class="fw-semibold">${product.name}</h3>
-                    <p class="pricing-description text-muted small">${product.description}</p>
+                    ${product.featured ? '<span class="badge-popular"><i class="bi bi-star-fill"></i>MÁS ELEGIDO</span>' : ''}
+                    <span class="plan-tag">Solución GymGo</span>
+                    <h3>${product.name}</h3>
+                    <p class="pricing-description">${product.description}</p>
                     <div class="pricing-price">
                         <span class="price-text">${money(product.price)}</span>
                         <span class="price-period">MXN ${product.billing || ''}</span>
                     </div>
-                    <ul class="feature-list flex-grow-1">${(product.features || []).slice(0, 5).map((feature) => `<li>${feature}</li>`).join('')}</ul>
-                    <p class="catalog-meta mb-2"><strong>${product.stock > 0 ? 'Disponible' : 'Agotado'}</strong> · ${product.guarantee}</p>
-                    <div class="pricing-actions mt-auto">
-                        <button type="button" class="btn btn-buy catalog-add-to-cart" data-product-id="${product.id}" ${product.stock < 1 ? 'disabled' : ''}>Añadir al carrito</button>
-                        <button type="button" class="catalog-detail-button catalog-open-details">Ver detalles</button>
+                    <ul class="feature-list">${(product.features || []).slice(0, 5).map((feature) => `<li>${feature}</li>`).join('')}</ul>
+                    <p class="catalog-meta"><span><span class="dot ${available ? '' : 'out'}"></span><strong>${available ? 'Disponible' : 'Agotado'}</strong></span>${product.guarantee ? `<span><i class="bi bi-shield-check"></i>${product.guarantee}</span>` : ''}</p>
+                    <div class="pricing-actions">
+                        <button type="button" class="btn-buy catalog-add-to-cart" data-product-id="${product.id}" ${available ? '' : 'disabled'}><i class="bi bi-bag-plus"></i><span>Añadir al carrito</span></button>
+                        <button type="button" class="catalog-detail-button catalog-open-details" aria-expanded="false">Ver detalles</button>
                     </div>
                     <div class="catalog-details-panel" aria-hidden="true">
-                        <button type="button" class="catalog-details-close" aria-label="Cerrar detalles">&times;</button>
+                        <button type="button" class="catalog-details-close" aria-label="Cerrar detalles"><i class="bi bi-x-lg"></i></button>
                         <span class="detail-label">Vista de decisión</span>
                         <h4 class="mt-2 mb-2">¿Es la solución correcta para tu gimnasio?</h4>
                         <p class="details-intro">${experience.outcome}</p>
@@ -127,11 +129,11 @@ document.addEventListener("DOMContentLoaded", async () => {
                                 <span>Elige esta solución y revisa el resumen antes de confirmar.</span>
                             </div>
                         </div>
-                        <button type="button" class="btn btn-buy catalog-add-to-cart" data-product-id="${product.id}" ${product.stock < 1 ? 'disabled' : ''}>Elegir esta solución</button>
+                        <button type="button" class="btn-buy catalog-add-to-cart" data-product-id="${product.id}" ${available ? '' : 'disabled'}><span>Elegir esta solución</span></button>
                     </div>
                 </article>
             </div>`;
-        }).join('') : '<p class="text-center text-muted">No encontramos soluciones con esa búsqueda.</p>';
+        }).join('') : `<div class="catalog-state"><i class="bi bi-search"></i>No encontramos soluciones con esa búsqueda.<br><button type="button" class="btn-gg btn-gg-outline btn-gg-sm mt-3" data-clear-catalog>Limpiar búsqueda</button></div>`;
         catalogContainer.querySelectorAll('.fade-in-up').forEach((element) => element.classList.add('is-visible'));
     };
     try {
@@ -142,15 +144,24 @@ document.addEventListener("DOMContentLoaded", async () => {
         renderCatalog();
     } catch (error) {
         console.error('Error conectando al catálogo:', error);
-        catalogContainer.innerHTML = '<p class="text-center text-danger">No se pudo cargar el catálogo. Inténtalo más tarde.</p>';
+        catalogContainer.setAttribute('aria-busy', 'false');
+        catalogContainer.innerHTML = `<div class="catalog-state"><i class="bi bi-wifi-off"></i>No se pudo cargar el catálogo. Inténtalo más tarde.<br><button type="button" class="btn-gg btn-gg-outline btn-gg-sm mt-3" onclick="location.reload()">Reintentar</button></div>`;
     }
     catalogSearch?.addEventListener('input', renderCatalog);
     catalogContainer.addEventListener('click', (event) => {
+        if (event.target.closest('[data-clear-catalog]')) {
+            catalogSearch.value = '';
+            renderCatalog();
+            catalogSearch.focus();
+            return;
+        }
         const detailButton = event.target.closest('.catalog-open-details');
         if (detailButton) {
             const card = detailButton.closest('.pricing-card');
             card?.classList.add('details-open');
+            detailButton.setAttribute('aria-expanded', 'true');
             card?.querySelector('.catalog-details-panel')?.setAttribute('aria-hidden', 'false');
+            card?.querySelector('.catalog-details-close')?.focus();
             return;
         }
         const closeButton = event.target.closest('.catalog-details-close');
@@ -158,6 +169,9 @@ document.addEventListener("DOMContentLoaded", async () => {
             const card = closeButton.closest('.pricing-card');
             card?.classList.remove('details-open');
             card?.querySelector('.catalog-details-panel')?.setAttribute('aria-hidden', 'true');
+            const opener = card?.querySelector('.catalog-open-details');
+            opener?.setAttribute('aria-expanded', 'false');
+            opener?.focus();
             return;
         }
         const button = event.target.closest('.catalog-add-to-cart');
@@ -171,9 +185,113 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (existing) existing.qty += 1;
         else state.cart.push({ id: product.id, pid: product.id, title: product.name, price: product.price, qty: 1, rec: !product.billing?.toLowerCase().includes('pago') });
         localStorage.setItem(cartKey, JSON.stringify(state));
-        button.textContent = 'Añadido al carrito';
-        setTimeout(() => { button.textContent = 'Añadir al carrito'; }, 1800);
+        const label = button.querySelector('span') || button;
+        const originalLabel = label.textContent;
+        label.textContent = 'Añadido al carrito';
+        button.classList.add('is-added');
+        setTimeout(() => { label.textContent = originalLabel; button.classList.remove('is-added'); }, 1800);
+        window.siridUpdateCartCount?.();
+        const toastText = document.getElementById('cartToastText');
+        if (toastText && window.bootstrap) {
+            toastText.textContent = `${product.name} se añadió al carrito`;
+            bootstrap.Toast.getOrCreateInstance('#cartToast').show();
+        }
     });
+});
+
+// ==========================================
+// Contador del carrito en el menú
+// ==========================================
+window.siridUpdateCartCount = function () {
+    const badge = document.getElementById('navCartCount');
+    if (!badge) return;
+    try {
+        const user = JSON.parse(localStorage.getItem('userData') || 'null');
+        const keys = [`gg_pay_${user?.id || user?.email || 'guest'}`];
+        if (keys[0] !== 'gg_pay_guest') keys.push('gg_pay_guest');
+        const count = keys.reduce((total, key) => {
+            const state = JSON.parse(localStorage.getItem(key) || 'null');
+            return total + (state?.cart || []).reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
+        }, 0);
+        badge.textContent = count > 0 ? String(count) : '';
+        badge.dataset.count = String(count);
+        badge.closest('a')?.setAttribute('aria-label', count > 0 ? `Carrito de compras, ${count} artículo(s)` : 'Carrito de compras');
+    } catch (error) {
+        badge.textContent = '';
+    }
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+    window.siridUpdateCartCount();
+    window.addEventListener('storage', window.siridUpdateCartCount);
+
+    // Menú: fondo más sólido al hacer scroll y enlace activo según la sección visible.
+    const nav = document.getElementById('siteNav');
+    if (nav) {
+        const onScroll = () => nav.classList.toggle('is-scrolled', window.scrollY > 24);
+        onScroll();
+        window.addEventListener('scroll', onScroll, { passive: true });
+
+        const links = [...nav.querySelectorAll('.site-nav-links a[href^="#"]')];
+        const sections = links.map((link) => document.querySelector(link.getAttribute('href'))).filter(Boolean);
+        if ('IntersectionObserver' in window && sections.length) {
+            const spy = new IntersectionObserver((entries) => {
+                entries.forEach((entry) => {
+                    if (!entry.isIntersecting) return;
+                    links.forEach((link) => {
+                        const active = link.getAttribute('href') === `#${entry.target.id}`;
+                        link.classList.toggle('active', active);
+                        if (active) link.setAttribute('aria-current', 'true'); else link.removeAttribute('aria-current');
+                    });
+                });
+            }, { rootMargin: '-45% 0px -50% 0px' });
+            sections.forEach((section) => spy.observe(section));
+        }
+    }
+
+    // Menú móvil: al elegir una sección, cierra el panel y luego desplaza hasta ella.
+    const actionsPanel = document.getElementById('actionsPanel');
+    if (actionsPanel && window.bootstrap) {
+        actionsPanel.querySelectorAll('.panel-nav a[href^="#"]').forEach((link) => {
+            link.addEventListener('click', (event) => {
+                event.preventDefault();
+                const target = document.querySelector(link.getAttribute('href'));
+                actionsPanel.addEventListener('hidden.bs.offcanvas', () => {
+                    target?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+                    history.replaceState(null, '', link.getAttribute('href'));
+                }, { once: true });
+                bootstrap.Offcanvas.getOrCreateInstance(actionsPanel).hide();
+            });
+        });
+    }
+
+    // Slider principal: pausa accesible, contador y respeto a "reducir movimiento".
+    const hero = document.getElementById('heroCarousel');
+    if (hero && window.bootstrap) {
+        const carousel = bootstrap.Carousel.getOrCreateInstance(hero);
+        const pauseButton = document.getElementById('heroPause');
+        const counter = document.getElementById('heroCurrent');
+        hero.style.setProperty('--hero-interval', `${Number(hero.dataset.bsInterval || 10000) / 1000}s`);
+        const setPaused = (paused) => {
+            hero.classList.toggle('is-paused', paused);
+            if (paused) carousel.pause(); else carousel.cycle();
+            if (pauseButton) {
+                pauseButton.setAttribute('aria-pressed', String(paused));
+                pauseButton.setAttribute('aria-label', paused ? 'Reanudar presentación' : 'Pausar presentación');
+                pauseButton.innerHTML = `<i class="bi bi-${paused ? 'play-fill' : 'pause-fill'}"></i>`;
+            }
+        };
+        pauseButton?.addEventListener('click', () => setPaused(!hero.classList.contains('is-paused')));
+        hero.addEventListener('slid.bs.carousel', (event) => {
+            if (counter) counter.textContent = String(event.to + 1).padStart(2, '0');
+            if (hero.classList.contains('is-paused')) carousel.pause();
+        });
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) setPaused(true);
+    }
+    const stories = document.getElementById('storiesCarousel');
+    if (stories && window.bootstrap && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        bootstrap.Carousel.getOrCreateInstance(stories).pause();
+    }
 });
 
 function setCookie(nombre, valor, dias) {
@@ -298,6 +416,12 @@ function enviarWhatsApp() {
     const userNavContainer = document.getElementById('userNavContainer');
 
     if (userNavContainer) {
+        const navLoginLink = document.getElementById('navLoginLink');
+        if (userName && navLoginLink) {
+            navLoginLink.href = 'pages/perfil.html';
+            navLoginLink.innerHTML = '<i class="bi bi-person-circle"></i><span></span>';
+            navLoginLink.querySelector('span').textContent = userName;
+        }
         if (userName) {
             // Usuario logueado: mostrar sus acciones dentro del panel lateral.
             userNavContainer.innerHTML = `

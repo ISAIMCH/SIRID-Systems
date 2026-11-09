@@ -3,107 +3,208 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Pagos de prueba | GYMGO</title>
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+<meta name="theme-color" content="#09090b">
+<title>Carrito y pago | GymGo</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700;800&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+<link rel="stylesheet" href="../assets/css/estilos.css">
 <link rel="stylesheet" href="../assets/css/pagos.css">
 </head>
 <body class="payments-page">
-<nav class="nav-g fixed-top py-2"><div class="container d-flex justify-content-between align-items-center">
-  <a class="brand-link text-decoration-none" href="../index.html"><i class="bi bi-chevron-left"></i> GYMGO</a>
-  <span class="badge text-bg-warning">MODO PRUEBA</span>
-  <span id="sessionUser" class="small text-white-50"></span>
-  <button class="btn btn-w btn-sm position-relative" data-bs-toggle="offcanvas" data-bs-target="#mini"><i class="bi bi-bag"></i>
-    <span id="cnt" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">0</span></button>
-</div></nav>
-
-<main class="container">
-  <div class="page-intro"><h1 class="page-title h3 fw-bold mt-3">Simulador de pagos</h1>
-  <p class="text-white-50 small">Ninguna tarjeta ni cobro es real. Puedes armar tu carrito sin cuenta; inicia sesión únicamente al confirmar el pago.</p></div>
-
-  <div class="row g-3 mb-4" id="prods"></div>
-
-  <div class="panel">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-      <strong>Pagar</strong><span class="fw-bold fs-5" id="totTop">$0.00</span>
+<nav class="site-nav nav-g" aria-label="Navegación del checkout">
+  <div class="container">
+    <a class="brand brand-link" href="../index.html#catalogo" aria-label="Volver al catálogo de GymGo"><span class="brand-mark" aria-hidden="true">G</span><span>GYMGO</span></a>
+    <span class="nav-badge"><i class="bi bi-cone-striped"></i>Modo prueba</span>
+    <div class="site-nav-actions">
+      <span id="sessionUser" class="session-user d-none d-sm-inline"></span>
+      <button class="icon-btn" data-bs-toggle="offcanvas" data-bs-target="#mini" aria-controls="mini" aria-label="Abrir carrito"><i class="bi bi-bag"></i>
+        <span id="cnt" class="count-badge">0</span></button>
     </div>
-    <ul class="nav nav-pills nav-fill gap-1 mb-3">
-      <li class="nav-item"><button class="nav-link active" data-bs-toggle="pill" data-bs-target="#t-stripe"><i class="bi bi-credit-card"></i> Stripe</button></li>
-      <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#t-paynet"><i class="bi bi-upc-scan"></i> Paynet</button></li>
-      <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#t-paypal"><i class="bi bi-paypal"></i> PayPal</button></li>
-      <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#t-dash"><i class="bi bi-speedometer2"></i> Panel</button></li>
-    </ul>
-    <div class="tab-content">
+  </div>
+</nav>
 
-      <!-- STRIPE -->
-      <div class="tab-pane fade show active" id="t-stripe">
-        <div class="vcard">
-          <div class="d-flex justify-content-between"><i class="bi bi-wifi fs-4"></i><b id="brand">CARD</b></div>
-          <div class="num" id="pvNum">•••• •••• •••• ••••</div>
-          <div class="d-flex justify-content-between small"><span id="pvName">NOMBRE APELLIDO</span><span id="pvExp">MM/AA</span></div>
+<main class="container checkout-shell">
+  <a class="back-link" href="../index.html#catalogo"><i class="bi bi-arrow-left"></i>Seguir explorando el catálogo</a>
+  <div class="page-intro">
+    <span class="kicker">Checkout seguro de prueba</span>
+    <h1 class="page-title">Carrito y pago</h1>
+    <p class="intro-text">Ninguna tarjeta ni cobro es real. Puedes armar tu carrito sin cuenta; inicia sesión únicamente al confirmar el pago.</p>
+  </div>
+
+  <ol class="checkout-steps" aria-label="Pasos de compra">
+    <li class="done"><span>1</span>Elige tu solución</li>
+    <li class="current"><span>2</span>Revisa y paga</li>
+    <li><span>3</span>Ticket y reseña</li>
+  </ol>
+
+  <div class="row g-4 align-items-start">
+    <div class="col-lg-8">
+      <section class="panel" aria-labelledby="prodsTitle">
+        <div class="panel-head">
+          <div><span class="panel-step">Paso 1</span><h2 id="prodsTitle">Soluciones disponibles</h2></div>
+          <span class="panel-hint">Los planes mensuales se reemplazan entre sí; los pagos únicos se suman.</span>
         </div>
-        <div class="mb-2 small text-muted">Tarjetas de prueba:
-          <button class="chip" data-card="4242424242424242">✔ Éxito</button>
-          <button class="chip" data-card="4000002500003155">🔐 3D Secure</button>
-          <button class="chip" data-card="4000000000000002">✖ Rechazada</button>
-          <button class="chip" data-card="4000000000009995">✖ Sin fondos</button></div>
-        <input id="cNum" class="form-control mb-2" inputmode="numeric" placeholder="Número de tarjeta" maxlength="19" autocomplete="off">
-        <input id="cName" class="form-control mb-2" placeholder="Nombre en la tarjeta">
-        <div class="row g-2 mb-2"><div class="col-6"><input id="cExp" class="form-control" inputmode="numeric" placeholder="MM/AA" maxlength="5"></div>
-        <div class="col-6"><input id="cCvc" class="form-control" inputmode="numeric" placeholder="CVC" maxlength="4"></div></div>
-        <div id="cErr" class="text-danger small mb-2"></div>
-        <button id="payStripe" class="btn btn-d w-100">Pagar con tarjeta</button>
-      </div>
+        <div class="row g-3" id="prods"></div>
+      </section>
 
-      <!-- PAYNET -->
-      <div class="tab-pane fade" id="t-paynet">
-        <p class="small text-muted">Genera una ficha con referencia y código de barras para pagar en tienda (vigencia 72 h). Después simula el pago en el mostrador.</p>
-        <button id="payPaynet" class="btn btn-d w-100"><i class="bi bi-upc"></i> Generar ficha de pago</button>
-      </div>
+      <section class="panel mt-4" aria-labelledby="payTitle">
+        <div class="panel-head">
+          <div><span class="panel-step">Paso 2</span><h2 id="payTitle">Método de pago</h2></div>
+          <div class="pay-total"><span>Total a pagar</span><strong id="totTop">$0.00</strong></div>
+        </div>
+        <ul class="nav pay-tabs" role="tablist">
+          <li class="nav-item" role="presentation"><button class="nav-link active" data-bs-toggle="pill" data-bs-target="#t-stripe" type="button" role="tab" aria-controls="t-stripe" aria-selected="true"><i class="bi bi-credit-card"></i><span>Tarjeta<small>Stripe</small></span></button></li>
+          <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#t-paynet" type="button" role="tab" aria-controls="t-paynet" aria-selected="false"><i class="bi bi-upc-scan"></i><span>Efectivo<small>Paynet</small></span></button></li>
+          <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#t-paypal" type="button" role="tab" aria-controls="t-paypal" aria-selected="false"><i class="bi bi-paypal"></i><span>PayPal<small>Cuenta</small></span></button></li>
+          <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#t-dash" type="button" role="tab" aria-controls="t-dash" aria-selected="false"><i class="bi bi-receipt"></i><span>Mis pagos<small>Panel</small></span></button></li>
+        </ul>
+        <div class="tab-content">
 
-      <!-- PAYPAL -->
-      <div class="tab-pane fade" id="t-paypal">
-        <p class="small text-muted">Se abre una ventana de acceso de prueba. El pago aparece en el panel.</p>
-        <button id="payPP" class="pp w-100"><i class="bi bi-paypal"></i> Pagar con PayPal</button>
-      </div>
+          <!-- STRIPE -->
+          <div class="tab-pane fade show active" id="t-stripe" role="tabpanel">
+            <div class="stripe-grid">
+              <div>
+                <div class="vcard" aria-hidden="true">
+                  <div class="d-flex justify-content-between align-items-center"><span class="vcard-chip"></span><b id="brand">CARD</b></div>
+                  <div class="num" id="pvNum">•••• •••• •••• ••••</div>
+                  <div class="d-flex justify-content-between small"><span id="pvName">NOMBRE APELLIDO</span><span id="pvExp">MM/AA</span></div>
+                </div>
+                <div class="test-cards">
+                  <p>Tarjetas de prueba</p>
+                  <div class="d-flex flex-wrap gap-2">
+                    <button type="button" class="chip" data-card="4242424242424242"><i class="bi bi-check-circle"></i>Éxito</button>
+                    <button type="button" class="chip" data-card="4000002500003155"><i class="bi bi-shield-lock"></i>3D Secure</button>
+                    <button type="button" class="chip" data-card="4000000000000002"><i class="bi bi-x-circle"></i>Rechazada</button>
+                    <button type="button" class="chip" data-card="4000000000009995"><i class="bi bi-wallet2"></i>Sin fondos</button>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <label class="form-label" for="cNum">Número de tarjeta</label>
+                <div class="input-icon mb-3"><i class="bi bi-credit-card"></i><input id="cNum" class="form-control gg-input" inputmode="numeric" placeholder="1234 5678 9012 3456" maxlength="19" autocomplete="off"></div>
+                <label class="form-label" for="cName">Nombre en la tarjeta</label>
+                <input id="cName" class="form-control gg-input mb-3" placeholder="Como aparece en la tarjeta" autocomplete="off">
+                <div class="row g-2 mb-3">
+                  <div class="col-6"><label class="form-label" for="cExp">Vencimiento</label><input id="cExp" class="form-control gg-input" inputmode="numeric" placeholder="MM/AA" maxlength="5"></div>
+                  <div class="col-6"><label class="form-label" for="cCvc">CVC</label><input id="cCvc" class="form-control gg-input" inputmode="numeric" placeholder="123" maxlength="4"></div>
+                </div>
+                <div id="cErr" class="field-error" role="alert" aria-live="assertive"></div>
+                <button id="payStripe" class="btn btn-d w-100">Pagar con tarjeta</button>
+              </div>
+            </div>
+          </div>
 
-      <!-- DASHBOARD -->
-      <div class="tab-pane fade" id="t-dash">
-        <div class="row g-2 mb-3" id="kpis"></div>
-        <div id="txs"></div>
-        <button id="reset" class="btn btn-outline-danger btn-sm mt-3 w-100">Reiniciar demo</button>
-      </div>
+          <!-- PAYNET -->
+          <div class="tab-pane fade" id="t-paynet" role="tabpanel">
+            <div class="method-box">
+              <span class="method-icon"><i class="bi bi-shop"></i></span>
+              <div>
+                <h3>Paga en efectivo en tienda</h3>
+                <p class="small text-muted">Genera una ficha con referencia y código de barras para pagar en tienda (vigencia 72 h). Después simula el pago en el mostrador.</p>
+                <ul class="method-steps"><li>Genera tu ficha</li><li>Presenta la referencia en tienda</li><li>Tu pago se confirma en el panel</li></ul>
+              </div>
+            </div>
+            <button id="payPaynet" class="btn btn-d w-100"><i class="bi bi-upc"></i> Generar ficha de pago</button>
+          </div>
+
+          <!-- PAYPAL -->
+          <div class="tab-pane fade" id="t-paypal" role="tabpanel">
+            <div class="method-box">
+              <span class="method-icon"><i class="bi bi-paypal"></i></span>
+              <div>
+                <h3>Paga con tu cuenta PayPal</h3>
+                <p class="small text-muted">Se abre una ventana de acceso de prueba. El pago aparece en el panel.</p>
+              </div>
+            </div>
+            <button id="payPP" class="pp w-100"><i class="bi bi-paypal"></i> Pagar con PayPal</button>
+          </div>
+
+          <!-- PANEL DE PAGOS -->
+          <div class="tab-pane fade" id="t-dash" role="tabpanel">
+            <div class="row g-2 mb-3" id="kpis"></div>
+            <div id="txs"></div>
+            <button id="reset" class="btn-gg btn-gg-danger btn-gg-sm mt-3 w-100"><i class="bi bi-arrow-counterclockwise"></i>Reiniciar demo</button>
+          </div>
+        </div>
+      </section>
     </div>
+
+    <!-- RESUMEN DE COMPRA (puntos obligatorios del checkout) -->
+    <aside class="col-lg-4 d-none d-lg-block">
+      <section class="panel summary-card" aria-labelledby="summaryTitle">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h2 id="summaryTitle">Resumen de compra</h2>
+          <button class="btn-link-sm" data-bs-toggle="offcanvas" data-bs-target="#mini">Editar</button>
+        </div>
+        <div id="summaryItems" class="summary-items"></div>
+        <div id="summaryTotals" class="summary-totals"></div>
+        <ul class="summary-facts">
+          <li><i class="bi bi-receipt"></i><span>Precios en pesos mexicanos (MXN). El IVA del 16% se desglosa antes de pagar.</span></li>
+          <li><i class="bi bi-file-earmark-pdf"></i><span>Puedes descargar un ticket PDF con el detalle de tu orden.</span></li>
+          <li><i class="bi bi-cone-striped"></i><span>Modo prueba: ninguna tarjeta ni cobro es real.</span></li>
+          <li><i class="bi bi-building"></i><span>Vendedor: Project-GymGo · SIRID Systems<br><a href="mailto:project.gymgo@gmail.com">project.gymgo@gmail.com</a></span></li>
+        </ul>
+        <p class="summary-legal">Consulta los <a href="terminos.html" target="_blank" rel="noopener">términos y condiciones</a> y el <a href="politica-privacidad.html" target="_blank" rel="noopener">aviso de privacidad</a> antes de pagar.</p>
+      </section>
+    </aside>
   </div>
 </main>
 
 <!-- barra móvil -->
 <div class="bar-m d-lg-none d-flex justify-content-between align-items-center">
-  <div><div class="small text-white-50"><span id="cnt2">0</span> artículo(s)</div><b id="totBar">$0.00</b></div>
+  <div><div class="bar-label"><span id="cnt2">0</span> artículo(s) · total</div><b id="totBar">$0.00</b></div>
   <button class="btn btn-w px-4" data-bs-toggle="offcanvas" data-bs-target="#mini">Ver carrito</button>
 </div>
 
 <!-- mini carrito -->
-<div class="offcanvas offcanvas-end" id="mini" tabindex="-1">
-  <div class="offcanvas-header"><h5 class="offcanvas-title fw-bold">Tu carrito</h5><button class="btn-close" data-bs-dismiss="offcanvas"></button></div>
+<div class="offcanvas offcanvas-end" id="mini" tabindex="-1" aria-labelledby="miniTitle">
+  <div class="offcanvas-header"><h5 class="offcanvas-title" id="miniTitle">Tu carrito</h5><button class="btn-close" data-bs-dismiss="offcanvas" aria-label="Cerrar carrito"></button></div>
   <div class="offcanvas-body d-flex flex-column">
     <div id="items" class="flex-grow-1"></div>
-    <div class="border-top pt-3 small" id="sum"></div>
+    <div class="pt-3 cart-sum" id="sum"></div>
     <div id="cartSessionNote" class="alert alert-light small mt-3 mb-0">
       <i class="bi bi-shield-check me-1"></i>
       Tu carrito se guarda en este navegador mientras compras como invitado.
     </div>
     <button id="share" class="btn btn-outline-dark btn-sm mt-3"><i class="bi bi-phone"></i> Continuar en otro dispositivo</button>
     <div id="medNote" class="text-muted mt-2 cart-note"></div>
+    <p class="summary-legal mt-3 mb-0">Precios en MXN con IVA desglosado. Consulta los <a href="terminos.html" target="_blank" rel="noopener">términos</a> y el <a href="politica-privacidad.html" target="_blank" rel="noopener">aviso de privacidad</a>. Vendedor: Project-GymGo · SIRID Systems.</p>
   </div>
 </div>
 
 <!-- modal genérico -->
-<div class="modal fade" id="gm" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content text-dark"><div class="modal-body p-4" id="gmb"></div></div></div></div>
-<div class="toast-container position-fixed top-0 end-0 p-3 payments-toast"><div id="toast" class="toast text-bg-dark"><div class="toast-body" id="toastB"></div></div></div>
+<div class="modal fade" id="gm" tabindex="-1" aria-label="Detalle del pago"><div class="modal-dialog modal-dialog-centered"><div class="modal-content text-dark"><div class="modal-body p-4" id="gmb"></div></div></div></div>
+
+<!-- modal de reseña -->
+<div class="modal fade" id="reviewModal" tabindex="-1" aria-labelledby="reviewTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+    <form id="reviewForm" class="modal-body p-4" novalidate>
+      <div class="d-flex justify-content-between align-items-start mb-2">
+        <div><span class="kicker mb-1">Tu opinión</span><h2 class="h4 mb-0" id="reviewTitle">¿Cómo fue tu experiencia?</h2></div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <fieldset class="mt-3">
+        <legend class="form-label">Calificación</legend>
+        <div class="star-input" role="radiogroup" aria-label="Calificación de 1 a 5">
+          <input type="radio" name="rating" id="r5" value="5" checked><label for="r5" title="5 estrellas"><i class="bi bi-star-fill"></i><span class="visually-hidden">5 estrellas</span></label>
+          <input type="radio" name="rating" id="r4" value="4"><label for="r4" title="4 estrellas"><i class="bi bi-star-fill"></i><span class="visually-hidden">4 estrellas</span></label>
+          <input type="radio" name="rating" id="r3" value="3"><label for="r3" title="3 estrellas"><i class="bi bi-star-fill"></i><span class="visually-hidden">3 estrellas</span></label>
+          <input type="radio" name="rating" id="r2" value="2"><label for="r2" title="2 estrellas"><i class="bi bi-star-fill"></i><span class="visually-hidden">2 estrellas</span></label>
+          <input type="radio" name="rating" id="r1" value="1"><label for="r1" title="1 estrella"><i class="bi bi-star-fill"></i><span class="visually-hidden">1 estrella</span></label>
+        </div>
+      </fieldset>
+      <label class="form-label mt-3" for="reviewComment">Cuéntanos brevemente tu experiencia</label>
+      <textarea id="reviewComment" class="form-control gg-input" rows="4" maxlength="500" required placeholder="¿Qué te gustó? ¿Qué podríamos mejorar?"></textarea>
+      <div class="d-flex justify-content-between gap-2 mt-1"><div id="reviewError" class="field-error mb-0" role="alert"></div><small class="text-muted text-nowrap"><span id="reviewCount">0</span>/500</small></div>
+      <button type="submit" class="btn-gg btn-gg-dark btn-gg-block mt-3" id="reviewSubmit">Publicar reseña</button>
+    </form>
+  </div></div>
+</div>
+
+<div class="toast-container position-fixed bottom-0 start-50 translate-middle-x p-3 payments-toast"><div id="toast" class="toast gg-toast" role="status" aria-live="polite"><div class="toast-body"><i class="bi bi-info-circle"></i><span id="toastB"></span></div></div></div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script src="../assets/js/config.js"></script>
