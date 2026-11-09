@@ -1,12 +1,12 @@
 /**
- * Checkout del plan GymGo. Tarjeta y OXXO van a Stripe Checkout; PayPal usa sus botones y la API de GymGo
- * captura y verifica la orden. El plan se activa en la API (webhook de Stripe o captura de PayPal), nunca aquí.
+ * Checkout del plan GymGo. Tarjeta y OXXO van a Stripe Checkout y el plan se activa con el webhook de Stripe,
+ * nunca aquí. PayPal es una simulación para la evaluación escolar: da una prueba de 5 días desde la API.
  */
 (function () {
     const $ = (selector) => document.querySelector(selector);
     const params = new URLSearchParams(location.search);
     const METHOD_LABELS = { card: 'Tarjeta', oxxo: 'OXXO', paypal: 'PayPal', manual: 'Pago con SIRID' };
-    const state = { data: null, plan: null, interval: 'month', method: 'card', busy: false, paypalLoaded: false };
+    const state = { data: null, plan: null, interval: 'month', method: 'card', busy: false };
 
     const show = (element, visible) => element.classList.toggle('d-none', !visible);
     const payStatus = (type, message) => window.siridStatus($('#payStatus'), type, message);
@@ -93,7 +93,7 @@
                 ? `Primer cobro el ${date(firstCharge)}: respetamos el periodo que ya pagaste. Después se renueva ${GymGo.intervalLabel(state.interval)} hasta que canceles.`
                 : `Se renueva ${GymGo.intervalLabel(state.interval)} con la misma tarjeta hasta que canceles.`,
             oxxo: `Pago único por ${period}. No se renueva solo.`,
-            paypal: `Pago único por ${period}. No se renueva solo.`,
+            paypal: 'Simulación de PayPal: activa una prueba de 5 días de este plan. No se cobra nada.',
         }[state.method];
         $('#summaryOrg').textContent = state.data.organization?.name || '';
         $('#summaryItems').innerHTML = `<div class="summary-line"><span class="name">GymGo ${escape(plan.name)}<small>${state.interval === 'year' ? 'Anual · pagas 10 meses' : 'Mensual'} · ${METHOD_LABELS[state.method]}</small></span><span class="val">${money(price.subtotal)}</span></div>`;
@@ -109,6 +109,7 @@
         $('#payCard span').textContent = `Pagar ${money(price.total)} con tarjeta`;
         $('#payOxxo span').textContent = `Generar ficha OXXO por ${money(price.total)}`;
         show($('#paypalButtons'), !locked);
+        if ($('#payPaypal') && !state.busy) $('#payPaypal').disabled = locked;
     }
 
     function renderMethods() {
@@ -197,44 +198,76 @@
         }
     }
 
-    function loadPaypal() {
-        const { paypal: enabled, paypalClientId } = state.data.payments;
-        if (!enabled || !paypalClientId || state.paypalLoaded) return;
-        state.paypalLoaded = true;
-        const script = document.createElement('script');
-        script.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(paypalClientId)}&currency=MXN&intent=capture&components=buttons&disable-funding=card,credit&locale=es_MX`;
-        script.onerror = () => { $('#paypalButtons').innerHTML = '<p class="small text-muted">No se pudo cargar PayPal. Recarga la página o usa otro método.</p>'; };
-        script.onload = () => {
-            window.paypal.Buttons({
-                style: { layout: 'vertical', shape: 'pill', label: 'pay' },
-                onClick: (data, actions) => (state.busy || cardLocked() ? actions.reject() : actions.resolve()),
-                createOrder: async () => {
-                    payStatus();
-                    try {
-                        const { orderId } = await GymGo.api('/subscription/paypal/orders', { method: 'POST', body: { planCode: state.plan, interval: state.interval } });
-                        return orderId;
-                    } catch (error) {
-                        handlePayError(error);
-                        throw error;
-                    }
-                },
-                onApprove: async ({ orderID }) => {
-                    state.busy = true;
-                    payStatus('info', 'Confirmando tu pago con PayPal…');
-                    try {
-                        await GymGo.api(`/subscription/paypal/orders/${encodeURIComponent(orderID)}/capture`, { method: 'POST', body: {} });
-                        location.href = 'pago-exitoso.html?provider=paypal';
-                    } catch (error) {
-                        state.busy = false;
-                        handlePayError(error);
-                    }
-                },
-                onCancel: () => payStatus('info', 'Cancelaste el pago en PayPal. No se hizo ningún cargo.'),
-                onError: () => { if (!$('#payStatus').textContent) payStatus('error', 'PayPal no pudo completar el pago. Inténtalo de nuevo o usa otro método.'); },
-            }).render('#paypalButtons');
-        };
-        document.head.appendChild(script);
+    // PayPal simulado (evaluación escolar): no carga el SDK ni habla con PayPal. La API da una prueba de
+    // 5 días del plan elegido, una sola vez. PayPal se quitará del proyecto después de la evaluación.
+    function renderPaypalDemo() {
+        if (!state.data.payments.paypal) return;
+        const slot = $('#paypalButtons');
+        slot.innerHTML = '<button type="button" class="paypal-demo-btn w-100" id="payPaypal"><i class="bi bi-paypal" aria-hidden="true"></i><span>Pagar con PayPal</span></button>';
+        $('#payPaypal').disabled = cardLocked() || state.data.subscription?.status === 'manual';
+        $('#payPaypal').addEventListener('click', paypalDemo);
     }
+
+    async function paypalDemo() {
+        if (state.busy || cardLocked()) return;
+        const button = $('#payPaypal');
+        state.busy = true;
+        payStatus();
+        window.siridLoading(button, true, 'Conectando con PayPal…');
+        try {
+            const { trialDays, subscription } = await GymGo.api('/subscription/paypal/demo', { method: 'POST', body: { planCode: state.plan } });
+            window.alert(`¡Pago con PayPal aprobado! (simulación)
+
+Tu plan ${subscription.planName} queda activo con una prueba de ${trialDays} días.`);
+            state.busy = false;
+            await load();
+            payStatus('success', `Pago simulado con PayPal: ${subscription.planName} activo por ${trialDays} días. Ya puedes entrar a tu panel.`);
+        } catch (error) {
+            state.busy = false;
+            window.siridLoading(button, false);
+            handlePayError(error);
+        }
+    }
+
+    // PayPal real (desactivado): botones del SDK con captura y verificación en la API.
+    // function loadPaypal() {
+    //     const { paypal: enabled, paypalClientId } = state.data.payments;
+    //     if (!enabled || !paypalClientId || state.paypalLoaded) return;
+    //     state.paypalLoaded = true;
+    //     const script = document.createElement('script');
+    //     script.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(paypalClientId)}&currency=MXN&intent=capture&components=buttons&disable-funding=card,credit&locale=es_MX`;
+    //     script.onerror = () => { $('#paypalButtons').innerHTML = '<p class="small text-muted">No se pudo cargar PayPal. Recarga la página o usa otro método.</p>'; };
+    //     script.onload = () => {
+    //         window.paypal.Buttons({
+    //             style: { layout: 'vertical', shape: 'pill', label: 'pay' },
+    //             onClick: (data, actions) => (state.busy || cardLocked() ? actions.reject() : actions.resolve()),
+    //             createOrder: async () => {
+    //                 payStatus();
+    //                 try {
+    //                     const { orderId } = await GymGo.api('/subscription/paypal/orders', { method: 'POST', body: { planCode: state.plan, interval: state.interval } });
+    //                     return orderId;
+    //                 } catch (error) {
+    //                     handlePayError(error);
+    //                     throw error;
+    //                 }
+    //             },
+    //             onApprove: async ({ orderID }) => {
+    //                 state.busy = true;
+    //                 payStatus('info', 'Confirmando tu pago con PayPal…');
+    //                 try {
+    //                     await GymGo.api(`/subscription/paypal/orders/${encodeURIComponent(orderID)}/capture`, { method: 'POST', body: {} });
+    //                     location.href = 'pago-exitoso.html?provider=paypal';
+    //                 } catch (error) {
+    //                     state.busy = false;
+    //                     handlePayError(error);
+    //                 }
+    //             },
+    //             onCancel: () => payStatus('info', 'Cancelaste el pago en PayPal. No se hizo ningún cargo.'),
+    //             onError: () => { if (!$('#payStatus').textContent) payStatus('error', 'PayPal no pudo completar el pago. Inténtalo de nuevo o usa otro método.'); },
+    //         }).render('#paypalButtons');
+    //     };
+    //     document.head.appendChild(script);
+    // }
 
     /* ===== Session ===== */
 
@@ -284,7 +317,7 @@
         renderMethods();
         renderAll();
         renderHistory();
-        loadPaypal();
+        renderPaypalDemo();
     }
 
     document.addEventListener('DOMContentLoaded', () => {
