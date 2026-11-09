@@ -81,6 +81,11 @@ body.payments-page { min-height: 100vh; padding-bottom: 3rem; background: var(--
 .method-steps li::before { content: counter(s) ". "; font-weight: 700; color: var(--gg-green-ink); }
 .test-hint { margin: .75rem 0 0; padding: .55rem .75rem; border-radius: var(--gg-r-sm); background: var(--gg-warning-soft); color: var(--gg-warning); font-size: .86rem; }
 .paypal-slot { min-height: 52px; }
+/* Botón de PayPal simulado (evaluación escolar) */
+.paypal-demo-btn { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; min-height: 52px; border: 0; border-radius: 999px; background: #ffc439; color: #111; font-weight: 700; font-size: 1rem; transition: filter .2s var(--gg-ease); }
+.paypal-demo-btn:hover { filter: brightness(.95); }
+.paypal-demo-btn:disabled { background: var(--gg-200); color: var(--gg-500); }
+.paypal-demo-btn .bi-paypal { color: #003087; font-size: 1.2rem; }
 
 .payments-page .btn-d { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; min-height: 52px; border: 0; border-radius: 999px; background: var(--gg-950); color: var(--gg-white); font-weight: 600; font-size: 1rem; transition: background-color .2s var(--gg-ease); }
 .payments-page .btn-d:hover { background: var(--gg-800); color: var(--gg-white); }
