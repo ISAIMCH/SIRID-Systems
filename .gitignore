@@ -5,3 +5,4 @@ graphify-out/
 backend/.env
 *.log
 .DS_Store
+_site/
