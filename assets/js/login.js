@@ -8,6 +8,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
+            const status = document.getElementById('loginStatus');
+            const submit = document.getElementById('loginSubmit');
+            const notify = (type, message) => window.siridStatus ? window.siridStatus(status, type, message) : alert(message);
+
+            if (!loginForm.checkValidity()) {
+                notify('error', 'Escribe un correo válido y tu contraseña.');
+                loginForm.reportValidity();
+                return;
+            }
+            notify();
+            window.siridLoading?.(submit, true, 'Entrando…');
 
             try {
                 // Petición al backend local (cambiar a URL de Railway al subir a producción)
@@ -27,17 +38,21 @@ document.addEventListener('DOMContentLoaded', () => {
                     localStorage.setItem('userName', data.user.nombre); 
                     localStorage.setItem('userData', JSON.stringify(data.user));
                     
-                    alert('Inicio de sesión exitoso');
+                    notify('success', `Inicio de sesión exitoso. Hola, ${data.user.nombre}; te estamos redirigiendo…`);
                     const returnTo = new URLSearchParams(window.location.search).get('returnTo');
-                    window.location.href = returnTo && /^(?:\.\.\/|[a-zA-Z0-9_-]+\.html(?:\?.*)?)$/.test(returnTo)
-                        ? returnTo
-                        : '../index.html';
+                    setTimeout(() => {
+                        window.location.href = returnTo && /^(?:\.\.\/|[a-zA-Z0-9_-]+\.html(?:\?.*)?)$/.test(returnTo)
+                            ? returnTo
+                            : '../index.html';
+                    }, 700);
                 } else {
-                    alert('Error: ' + data.msg);
+                    notify('error', data.msg || 'No se pudo iniciar sesión.');
+                    window.siridLoading?.(submit, false);
                 }
             } catch (error) {
                 console.error('Error de conexión:', error);
-                alert('No se pudo conectar con el servidor.');
+                notify('error', 'No se pudo conectar con el servidor. Inténtalo de nuevo en un momento.');
+                window.siridLoading?.(submit, false);
             }
         });
     }
@@ -89,6 +104,8 @@ async function handleGoogleCredential(response) {
             : '../index.html';
     } catch (error) {
         console.error('Error de autenticación con Google:', error);
-        alert(error.message || 'No se pudo iniciar sesión con Google.');
+        const status = document.getElementById('loginStatus');
+        if (window.siridStatus && status) window.siridStatus(status, 'error', error.message || 'No se pudo iniciar sesión con Google.');
+        else alert(error.message || 'No se pudo iniciar sesión con Google.');
     }
 }

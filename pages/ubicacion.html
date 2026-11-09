@@ -6,53 +6,73 @@
     <title>Ubicación | Project-GymGo</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
     <style>
-        :root { --ink: #111214; --lime: #e8e9eb; --blue: #3a3c42; --paper: #f1f2f3; }
+        :root { --ink: #09090b; --lime: #10ff85; --blue: #067a3d; --paper: #fafafa; --line: #e4e4e7; --muted: #71717a; }
         * { box-sizing: border-box; }
-        body { margin: 0; color: var(--ink); background: var(--paper); font-family: Inter, system-ui, sans-serif; }
-        .location-app { display: grid; grid-template-columns: minmax(260px, 340px) 1fr; min-height: 520px; height: min(600px, 72vh); background: #fff; }
-        .location-panel { padding: 24px; display: flex; flex-direction: column; gap: 18px; border-right: 1px solid #e6e9e3; position: relative; z-index: 500; }
-        .eyebrow { color: var(--blue); font-size: .7rem; font-weight: 800; letter-spacing: 1.5px; }
-        h1 { font-size: 1.65rem; line-height: 1.05; margin: 6px 0 0; letter-spacing: -.8px; }
-        .intro { color: #69736c; font-size: .84rem; line-height: 1.5; margin: 0; }
+        html, body { height: 100%; }
+        body { margin: 0; color: var(--ink); background: #fff; font-family: 'Barlow', system-ui, sans-serif; }
+        .location-app { display: grid; grid-template-columns: minmax(280px, 360px) 1fr; height: 100vh; min-height: 520px; background: #fff; }
+        .location-panel { padding: 24px; display: flex; flex-direction: column; gap: 16px; border-right: 1px solid var(--line); position: relative; z-index: 500; overflow-y: auto; }
+        .eyebrow { display: inline-flex; align-items: center; gap: 6px; color: var(--blue); font: 600 .78rem/1 'Barlow Condensed', sans-serif; letter-spacing: .16em; }
+        h1 { font-size: 1.9rem; line-height: 1.05; margin: 8px 0 6px; letter-spacing: -.03em; font-weight: 700; }
+        .intro { color: var(--muted); font-size: .95rem; line-height: 1.5; margin: 0; }
         .search-wrap { position: relative; }
-        .search-wrap i { position: absolute; left: 13px; top: 12px; color: #737d76; }
-        #placeSearch { width: 100%; border: 1px solid #dfe4dd; border-radius: 12px; padding: 11px 38px; outline: 0; font: inherit; font-size: .84rem; }
-        #placeSearch:focus { border-color: var(--blue); box-shadow: 0 0 0 4px rgba(58,60,66,.14); }
-        .clear-search { position: absolute; right: 8px; top: 7px; width: 28px; height: 28px; border: 0; border-radius: 50%; background: transparent; color: #737d76; cursor: pointer; }
-        .clear-search:hover { background: #edf1eb; color: var(--ink); }
-        .suggestions { position: absolute; left: 0; right: 0; top: 46px; z-index: 600; display: none; overflow: hidden; border: 1px solid #e0e5df; border-radius: 12px; background: #fff; box-shadow: 0 12px 26px rgba(0,0,0,.13); }
+        .search-wrap > i { position: absolute; left: 14px; top: 15px; color: var(--muted); }
+        #placeSearch { width: 100%; min-height: 48px; border: 1px solid #d4d4d8; border-radius: 12px; padding: 11px 42px; outline: 0; font: inherit; font-size: .95rem; transition: border-color .2s, box-shadow .2s; }
+        #placeSearch:focus { border-color: var(--ink); box-shadow: 0 0 0 4px rgba(16,255,133,.28); }
+        #placeSearch::-webkit-search-cancel-button { display: none; }
+        .clear-search { position: absolute; right: 6px; top: 6px; width: 36px; height: 36px; border: 0; border-radius: 10px; background: transparent; color: var(--muted); cursor: pointer; }
+        .clear-search:hover { background: #f4f4f5; color: var(--ink); }
+        .suggestions { position: absolute; left: 0; right: 0; top: 54px; z-index: 600; display: none; overflow: hidden; border: 1px solid var(--line); border-radius: 12px; background: #fff; box-shadow: 0 16px 40px rgba(9,9,11,.14); }
         .suggestions.visible { display: block; }
-        .suggestion { display: block; width: 100%; border: 0; border-bottom: 1px solid #eef1ed; background: #fff; padding: 10px 12px; color: var(--ink); text-align: left; cursor: pointer; font: .75rem/1.35 Inter, sans-serif; }
+        .suggestion { display: block; width: 100%; min-height: 44px; border: 0; border-bottom: 1px solid #f4f4f5; background: #fff; padding: 10px 12px; color: var(--ink); text-align: left; cursor: pointer; font: .88rem/1.35 'Barlow', sans-serif; }
         .suggestion:last-child { border-bottom: 0; }
-        .suggestion:hover, .suggestion:focus { background: #f3f7ff; outline: 0; }
-        .search-help { font-size: .72rem; color: #858d87; margin: 7px 0 0; }
+        .suggestion:hover, .suggestion:focus { background: #f4f4f5; outline: 0; }
+        .search-help { font-size: .84rem; color: var(--muted); margin: 8px 0 0; }
         .location-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-        .control-btn, .route-btn { border: 0; border-radius: 10px; padding: 10px 9px; font: 700 .74rem Inter, sans-serif; cursor: pointer; transition: transform .2s, opacity .2s; }
-        .control-btn { background: #edf1eb; color: var(--ink); }
-        .route-btn { background: var(--ink); color: #fff; text-decoration: none; text-align: center; display: block; }
-        .control-btn:hover, .route-btn:hover { transform: translateY(-2px); opacity: .88; }
-        .branch-list { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; min-height: 90px; }
-        .branch-item { border: 1px solid #e7ebe5; border-radius: 12px; background: #fff; padding: 11px; text-align: left; cursor: pointer; transition: border-color .2s, background .2s, transform .2s; }
-        .branch-item:hover, .branch-item.active { border-color: var(--blue); background: #f3f7ff; transform: translateX(2px); }
-        .branch-item strong { display: block; font-size: .8rem; }
-        .branch-item span { display: block; color: #737d76; font-size: .7rem; margin-top: 4px; }
+        .control-btn, .route-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; border: 0; border-radius: 999px; padding: 0 12px; font: 600 .9rem 'Barlow', sans-serif; cursor: pointer; transition: background-color .2s, transform .2s; }
+        .control-btn { background: #f4f4f5; color: var(--ink); border: 1px solid var(--line); }
+        .control-btn:hover { background: #e4e4e7; }
+        .control-btn:disabled { opacity: .7; cursor: progress; }
+        .route-btn { width: 100%; min-height: 50px; background: var(--ink); color: #fff; text-decoration: none; }
+        .route-btn:hover { background: #27272a; }
+        .route-btn i { color: var(--lime); }
+        .branch-list { display: flex; flex-direction: column; gap: 8px; min-height: 90px; }
+        .branch-item { border: 1px solid var(--line); border-radius: 12px; background: #fff; padding: 12px 14px; text-align: left; cursor: pointer; font-family: inherit; transition: border-color .2s, background .2s; }
+        .branch-item:hover { border-color: #a1a1aa; }
+        .branch-item.active { border-color: var(--ink); background: #fafafa; box-shadow: inset 3px 0 0 var(--lime); }
+        .branch-item strong { display: flex; align-items: center; gap: 6px; font-size: .95rem; }
+        .branch-item span { display: block; color: var(--muted); font-size: .84rem; margin-top: 3px; }
         .map-shell { position: relative; min-width: 0; }
-        #locationMap { height: 100%; min-height: 520px; width: 100%; }
-        .map-badge { position: absolute; top: 16px; left: 16px; z-index: 400; padding: 9px 12px; border-radius: 999px; background: rgba(255,255,255,.92); box-shadow: 0 5px 20px rgba(0,0,0,.14); font-size: .72rem; font-weight: 700; }
-        .map-badge i { color: var(--blue); margin-right: 5px; }
-        .map-shortcuts { position: absolute; right: 16px; top: 16px; z-index: 400; padding: 8px 10px; border-radius: 10px; background: rgba(255,255,255,.92); color: #69736c; box-shadow: 0 5px 20px rgba(0,0,0,.12); font-size: .68rem; }
-        .gym-pin { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); background: var(--ink); color: var(--lime); border: 3px solid #fff; box-shadow: 0 4px 12px rgba(0,0,0,.28); }
+        #locationMap { height: 100%; min-height: 420px; width: 100%; }
+        .map-badge { position: absolute; top: 16px; left: 16px; z-index: 400; display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 999px; background: var(--ink); color: #fff; box-shadow: 0 6px 20px rgba(0,0,0,.2); font-size: .85rem; font-weight: 600; }
+        .map-badge i { color: var(--lime); }
+        .map-shortcuts { position: absolute; right: 16px; top: 16px; z-index: 400; padding: 8px 12px; border-radius: 10px; background: rgba(255,255,255,.94); color: var(--muted); box-shadow: 0 5px 20px rgba(0,0,0,.12); font-size: .8rem; }
+        .gym-pin { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); background: var(--ink); color: var(--lime); border: 3px solid #fff; box-shadow: 0 4px 12px rgba(0,0,0,.28); }
         .gym-pin i { transform: rotate(45deg); font-size: 16px; }
         .start-pin { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: var(--blue); color: #fff; border: 3px solid #fff; box-shadow: 0 3px 10px rgba(0,0,0,.3); }
-        .route-status { color: #b42318; font-size: .72rem; line-height: 1.35; margin: -8px 0 0; }
-        @media (max-width: 720px) { .location-app { grid-template-columns: 1fr; height: auto; } .location-panel { border-right: 0; border-bottom: 1px solid #e6e9e3; padding: 18px; } #locationMap { min-height: 390px; height: 390px; } .branch-list { max-height: 150px; } }
+        .route-status { margin: 0; padding: 10px 12px; border-radius: 10px; background: #f4f4f5; color: #3f3f46; font-size: .88rem; line-height: 1.4; }
+        .d-none { display: none !important; }
+        .me-1 { margin-right: 4px; } .me-2 { margin-right: 8px; }
+        .spinner-border { display: inline-block; width: 1em; height: 1em; border: .15em solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin .75s linear infinite; vertical-align: -2px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .leaflet-popup-content { font-family: 'Barlow', sans-serif; font-size: .92rem; }
+        :focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+        @media (max-width: 720px) {
+            .location-app { grid-template-columns: 1fr; grid-template-rows: auto 1fr; height: auto; min-height: 100vh; }
+            .location-panel { border-right: 0; border-bottom: 1px solid var(--line); padding: 18px; overflow: visible; }
+            #locationMap { min-height: 380px; height: 380px; }
+            .map-shortcuts { display: none; }
+        }
     </style>
 </head>
 <body>
     <main class="location-app">
         <aside class="location-panel">
-            <div><span class="eyebrow"><i class="bi bi-geo-alt-fill me-1"></i>RED PROJECT-GYMGO</span><h1>Encuentranos.</h1><p class="intro">Explora nuestras ubicaciones y elige desde dónde quieres comenzar tu ruta.</p></div>
+            <div><span class="eyebrow"><i class="bi bi-geo-alt-fill me-1"></i>RED PROJECT-GYMGO</span><h1>Encuéntranos.</h1><p class="intro">Explora nuestras ubicaciones y elige desde dónde quieres comenzar tu ruta.</p></div>
             <div class="search-wrap"><i class="bi bi-search"></i><input id="placeSearch" type="search" placeholder="Buscar ciudad o punto de inicio" autocomplete="off"><button id="clearSearch" class="clear-search" type="button" aria-label="Limpiar búsqueda"><i class="bi bi-x-lg"></i></button><div id="suggestions" class="suggestions" role="listbox"></div><p id="searchHelp" class="search-help">Escribe para ver sugerencias de lugares.</p></div>
             <div class="location-actions"><button id="locateBtn" class="control-btn" type="button"><i class="bi bi-crosshair me-1"></i><span>Mi ubicación</span></button><button id="fitBtn" class="control-btn" type="button"><i class="bi bi-arrows-fullscreen me-1"></i>Ver todos</button></div>
             <div id="branchList" class="branch-list" aria-live="polite"></div>
@@ -96,12 +116,12 @@
                 const coordinates = data.routes?.[0]?.geometry?.coordinates;
                 if (!coordinates?.length) throw new Error('Route not found');
                 if (routeLine) map.removeLayer(routeLine);
-                routeLine = L.geoJSON({ type: 'Feature', geometry: { type: 'LineString', coordinates } }, { style: { color: '#d92d20', weight: 5, opacity: .9 } }).addTo(map);
+                routeLine = L.geoJSON({ type: 'Feature', geometry: { type: 'LineString', coordinates } }, { style: { color: '#067a3d', weight: 5, opacity: .9 } }).addTo(map);
                 routeStatus.textContent = `${(data.routes[0].distance / 1000).toFixed(1)} km · ${(data.routes[0].duration / 3600).toFixed(1)} h en auto`;
                 map.fitBounds(routeLine.getBounds(), { padding: [35, 35] });
             } catch (error) {
                 if (routeLine) map.removeLayer(routeLine);
-                routeLine = L.polyline([[lat, lng], [destination.lat, destination.lng]], { color: '#d92d20', weight: 4, dashArray: '8 8', opacity: .85 }).addTo(map);
+                routeLine = L.polyline([[lat, lng], [destination.lat, destination.lng]], { color: '#067a3d', weight: 4, dashArray: '8 8', opacity: .85 }).addTo(map);
                 routeStatus.textContent = 'Ruta aproximada mostrada. Usa Google Maps para el trayecto exacto.';
                 map.fitBounds(routeLine.getBounds(), { padding: [35, 35] });
             }

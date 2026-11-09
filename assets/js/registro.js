@@ -114,30 +114,46 @@ document.addEventListener('DOMContentLoaded', () => {
             password: password.value
         };
         const checks = updatePasswordMeter();
+        const status = document.getElementById('registroStatus');
+        const submit = document.getElementById('registroSubmit');
+        const notify = (type, message, field) => {
+            if (window.siridStatus && status) window.siridStatus(status, type, message); else alert(message);
+            if (type === 'error') {
+                status?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                field?.focus({ preventScroll: true });
+            }
+        };
+        if (!userData.nombre || !userData.apellidos) {
+            notify('error', 'Escribe tu nombre y apellidos.', userData.nombre ? document.getElementById('regApellidos') : document.getElementById('regNombre'));
+            return;
+        }
         if (!acceptTerms.checked) {
-            alert('Debes aceptar los términos y condiciones para crear tu cuenta.');
+            notify('error', 'Debes aceptar los términos y condiciones para crear tu cuenta.', acceptTerms);
             return;
         }
         if (!acceptPrivacy.checked) {
-            alert('Debes aceptar el aviso de privacidad para crear tu cuenta.');
+            notify('error', 'Debes aceptar el aviso de privacidad para crear tu cuenta.', acceptPrivacy);
             return;
         }
         if (!isValidEmail(userData.email) || !validateBirthDateFields() || userData.fechaNacimiento > currentDate) {
-            alert('Revisa el formato del correo y la fecha de nacimiento.');
+            notify('error', 'Revisa el formato del correo y la fecha de nacimiento.', isValidEmail(userData.email) ? birthDay : email);
             return;
         }
         if (!checks.length || !checks.common || !checks.personal || password.value !== confirmation.value) {
-            alert('Revisa los requisitos de la contraseña y su confirmación.');
+            notify('error', 'Revisa los requisitos de la contraseña y su confirmación.', password);
             return;
         }
+        notify();
+        window.siridLoading?.(submit, true, 'Creando cuenta…');
         try {
             const response = await fetch(`${window.SIRID_API_URL}/api/auth/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...userData, privacyConsent: true }) });
             const data = await response.json();
             if (!response.ok) throw new Error(data.msg || 'No se pudo crear la cuenta.');
-            alert('Cuenta creada exitosamente.');
-            window.location.href = 'login.html';
+            notify('success', 'Cuenta creada exitosamente. Te llevamos a iniciar sesión…');
+            setTimeout(() => { window.location.href = 'login.html'; }, 1200);
         } catch (error) {
-            alert(error.message || 'No se pudo conectar con el servidor.');
+            notify('error', error.message || 'No se pudo conectar con el servidor.');
+            window.siridLoading?.(submit, false);
         }
     });
 });
