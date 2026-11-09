@@ -5,19 +5,10 @@
   "description": "Plataforma B2B SaaS para gimnasios",
   "main": "backend/server.js",
   "scripts": {
-    "start": "node backend/server.js",
-    "local:user": "node backend/seed-local.js",
-    "local:stock": "node backend/restock-local.js"
+    "start": "node backend/server.js"
   },
   "dependencies": {
-    "bcryptjs": "^2.4.3",
-    "cors": "^2.8.5",
     "dotenv": "^16.4.5",
-    "express": "^4.21.1",
-    "google-auth-library": "^11.1.0",
-    "jsonwebtoken": "^9.0.2",
-    "mongoose": "^8.7.1",
-    "nodemailer": "^10.0.10",
-    "pdfkit": "^0.20.2"
+    "express": "^4.21.1"
   }
 }

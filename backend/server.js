@@ -1,27 +1,13 @@
 // backend/server.js
+// Servidor local de la web pública. La web es solo marketing: cuentas, planes y pagos
+// viven en la API de GymGo (repo SIRID-SystemsAppMovil). En Render el frontend lo sirve el Static Site.
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
-const dns = require('dns');
 const express = require('express');
-const mongoose = require('mongoose');
-const cors = require('cors'); // Necesario para que tu frontend (puerto 5500) pueda hablar con tu backend (puerto 3000)
 
 const app = express();
 const frontendRoot = path.join(__dirname, '..');
-
-const dnsServers = (process.env.DNS_SERVERS || '8.8.8.8,1.1.1.1')
-    .split(',')
-    .map((server) => server.trim())
-    .filter(Boolean);
-dns.setServers(dnsServers);
-
-// ==========================================
-// 1. MIDDLEWARES (Configuraciones de seguridad y datos)
-// ==========================================
-const allowedOrigins = (process.env.FRONTEND_ORIGINS || 'https://sirid-systems-1.onrender.com,http://localhost:3000,http://127.0.0.1:3000,http://localhost:5500,http://127.0.0.1:5500')
-    .split(',')
-    .map((origin) => origin.trim())
-    .filter(Boolean);
+const PORT = process.env.PORT || 3000;
 
 app.use((req, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -34,62 +20,15 @@ app.use((req, res, next) => {
     next();
 });
 
-app.use(cors({
-    origin(origin, callback) {
-        if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
-        return callback(new Error('Origen no autorizado por la API.'));
-    }
-})); // Solo permite los frontends configurados
-app.use(express.json()); // Permite que el servidor lea los datos en formato JSON enviados por fetch()
-// Solo en local: en Render el frontend lo sirve el Static Site y esta API no debe exponer archivos del repo
+// Solo en local: en Render el frontend lo sirve el Static Site y este servidor no debe exponer archivos del repo.
 if (process.env.RENDER !== 'true' && process.env.NODE_ENV !== 'production') {
     app.use(express.static(frontendRoot));
 }
 
-// ==========================================
-// 2. CONEXIÓN A LA BASE DE DATOS
-// ==========================================
-const PORT = process.env.PORT || 3000;
-
-mongoose.connect(process.env.MONGO_URI, { serverSelectionTimeoutMS: 10000 })
-    .then(() => {
-        console.log('✅ Conexión exitosa a la bóveda en la nube de MongoDB Atlas');
-    })
-    .catch((error) => {
-        console.error('❌ Error conectando a MongoDB Atlas:', error.message);
-    });
-
-// ==========================================
-// 3. IMPORTACIÓN DE RUTAS (El código que faltaba)
-// ==========================================
-// Importamos el archivo auth.js que manejará el login, registro y encriptación
-const authRoutes = require('./routes/auth'); 
-const planRoutes = require('./routes/plans');
-const paymentRoutes = require('./routes/payments');
-const catalogRoutes = require('./routes/catalog');
-const reviewRoutes = require('./routes/reviews');
-const adminRoutes = require('./routes/admin');
-const { getPlans } = require('./controllers/plan.controller');
-
-// Conectamos las rutas al motor principal
-app.use('/api/auth', authRoutes); 
-app.use('/api/plans', planRoutes);
-app.use('/api/payments', paymentRoutes);
-app.use('/api/catalog', catalogRoutes);
-app.use('/api/reviews', reviewRoutes);
-app.use('/api/admin', adminRoutes);
-
-// Ruta para obtener los planes SaaS desde MongoDB Atlas
-app.get('/api/planes', getPlans);
-
-// Ruta de diagnóstico
 app.get('/api/status', (req, res) => {
-    res.json({ estado: 'Servidor SaaS operando correctamente' });
+    res.json({ estado: 'Web de SIRID Systems operando correctamente' });
 });
 
-// ==========================================
-// 4. INICIALIZACIÓN DEL SERVIDOR
-// ==========================================
 app.listen(PORT, () => {
-    console.log(`Servidor intermedio seguro corriendo en http://localhost:${PORT}`);
+    console.log(`Web de SIRID Systems en http://localhost:${PORT}`);
 });
