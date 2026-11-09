@@ -1,111 +1,49 @@
+/**
+ * Inicio de sesión con la cuenta de GymGo. Vuelve a la página que lo pidió (returnTo) o abre el panel del gimnasio.
+ */
+const SAFE_RETURN = /^[a-z0-9_-]+\.html(?:\?[^#]*)?$/i;
+
 document.addEventListener('DOMContentLoaded', () => {
-    const loginForm = document.getElementById('loginForm');
-    const forgotForm = document.getElementById('forgotPasswordForm');
+    const form = document.getElementById('loginForm');
+    const status = document.getElementById('loginStatus');
+    const submit = document.getElementById('loginSubmit');
+    const returnTo = new URLSearchParams(location.search).get('returnTo');
+    const safeReturn = returnTo && SAFE_RETURN.test(returnTo) ? returnTo : null;
+    const notify = (type, message) => window.siridStatus(status, type, message);
 
-    if (loginForm) {
-        loginForm.addEventListener('submit', async (e) => {
-            e.preventDefault(); // Evita que la página se recargue
-
-            const email = document.getElementById('email').value;
-            const password = document.getElementById('password').value;
-            const status = document.getElementById('loginStatus');
-            const submit = document.getElementById('loginSubmit');
-            const notify = (type, message) => window.siridStatus ? window.siridStatus(status, type, message) : alert(message);
-
-            if (!loginForm.checkValidity()) {
-                notify('error', 'Escribe un correo válido y tu contraseña.');
-                loginForm.reportValidity();
-                return;
-            }
-            notify();
-            window.siridLoading?.(submit, true, 'Entrando…');
-
-            try {
-                // Petición al backend local (cambiar a URL de Railway al subir a producción)
-                const response = await fetch(`${window.SIRID_API_URL}/api/auth/login`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ email, password })
-                });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    // Guardar el token y el nombre en el navegador
-                    localStorage.setItem('token', data.token);
-                    localStorage.setItem('userName', data.user.nombre); 
-                    localStorage.setItem('userData', JSON.stringify(data.user));
-                    
-                    notify('success', `Inicio de sesión exitoso. Hola, ${data.user.nombre}; te estamos redirigiendo…`);
-                    const returnTo = new URLSearchParams(window.location.search).get('returnTo');
-                    setTimeout(() => {
-                        window.location.href = returnTo && /^(?:\.\.\/|[a-zA-Z0-9_-]+\.html(?:\?.*)?)$/.test(returnTo)
-                            ? returnTo
-                            : '../index.html';
-                    }, 700);
-                } else {
-                    notify('error', data.msg || 'No se pudo iniciar sesión.');
-                    window.siridLoading?.(submit, false);
-                }
-            } catch (error) {
-                console.error('Error de conexión:', error);
-                notify('error', 'No se pudo conectar con el servidor. Inténtalo de nuevo en un momento.');
-                window.siridLoading?.(submit, false);
-            }
-        });
+    if (safeReturn?.startsWith('pagos.html')) {
+        document.getElementById('signupLink').href = `registro.html${safeReturn.slice('pagos.html'.length)}`;
     }
 
-    if (forgotForm) {
-        forgotForm.addEventListener('submit', async (event) => {
-            event.preventDefault();
-            const submitButton = forgotForm.querySelector('button[type="submit"]');
-            const status = document.getElementById('forgotPasswordStatus');
-            submitButton.disabled = true;
-            status.className = 'small mt-3 text-secondary';
-            status.textContent = 'Enviando enlace...';
-            try {
-                const response = await fetch(`${window.SIRID_API_URL}/api/auth/forgot-password`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email: document.getElementById('forgotEmail').value })
-                });
-                const data = await response.json();
-                status.className = 'small mt-3 text-success';
-                status.textContent = data.msg || 'Revisa tu correo.';
-            } catch (error) {
-                status.className = 'small mt-3 text-danger';
-                status.textContent = 'No se pudo procesar la solicitud. Inténtalo más tarde.';
-            } finally {
-                submitButton.disabled = false;
+    form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        if (!form.checkValidity()) {
+            notify('error', 'Escribe un correo válido y tu contraseña.');
+            form.reportValidity();
+            return;
+        }
+        notify();
+        window.siridLoading(submit, true, 'Entrando…');
+        try {
+            const data = await GymGo.api('/auth/login', {
+                method: 'POST',
+                auth: false,
+                body: { email: document.getElementById('email').value.trim().toLowerCase(), password: document.getElementById('password').value },
+            });
+            GymGo.saveSession(data);
+            const worksInGym = Boolean(data.subscription) || (data.gyms || []).some((gym) => (gym.roles || []).some((role) => role !== 'Cliente'));
+            if (safeReturn) {
+                location.href = safeReturn;
+            } else if (worksInGym || data.user?.isPlatformAdmin) {
+                notify('success', `Hola, ${data.user?.name || ''}. Abriendo tu panel…`);
+                location.href = GymGo.dashboardUrl();
+            } else {
+                notify('info', 'Tu cuenta es de cliente: entrena y consulta tu membresía desde la app GymGo.');
+                window.siridLoading(submit, false);
             }
-        });
-    }
+        } catch (error) {
+            notify('error', error.status === 400 ? 'Correo o contraseña incorrectos.' : error.message);
+            window.siridLoading(submit, false);
+        }
+    });
 });
-
-async function handleGoogleCredential(response) {
-    try {
-        const result = await fetch(`${window.SIRID_API_URL}/api/auth/google`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ credential: response.credential })
-        });
-        const data = await result.json();
-
-        if (!result.ok) throw new Error(data.msg || 'No se pudo iniciar sesión con Google.');
-
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('userName', data.user.nombre);
-        localStorage.setItem('userData', JSON.stringify(data.user));
-        const returnTo = new URLSearchParams(window.location.search).get('returnTo');
-        window.location.href = returnTo && /^(?:\.\.\/|[a-zA-Z0-9_-]+\.html(?:\?.*)?)$/.test(returnTo)
-            ? returnTo
-            : '../index.html';
-    } catch (error) {
-        console.error('Error de autenticación con Google:', error);
-        const status = document.getElementById('loginStatus');
-        if (window.siridStatus && status) window.siridStatus(status, 'error', error.message || 'No se pudo iniciar sesión con Google.');
-        else alert(error.message || 'No se pudo iniciar sesión con Google.');
-    }
-}

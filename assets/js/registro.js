@@ -1,65 +1,96 @@
+/**
+ * Registro de dueños en GymGo: crea la organización con su primera sucursal y la deja activa
+ * (14 días de prueba de Esencial). Después el dueño paga o entra a su panel.
+ */
 const COMMON_PASSWORDS = new Set([
-    '12345678', '123456789', 'password', 'contraseña', 'qwerty123',
-    'qwertyui', 'abc12345', 'admin123', 'letmein123', 'welcome1',
-    'iloveyou', '00000000', '11111111', 'gymgo123'
+    '1234567890', '12345678910', 'password123', 'contraseña1', 'qwerty1234',
+    'qwertyuiop', 'abc1234567', 'admin12345', 'gymgo12345', '0000000000', '1111111111',
 ]);
 
-const normalizeText = (value) => value.toLocaleLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+const normalizeText = (value) => value.toLocaleLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-
-function isValidEmail(email) {
-    return typeof email === 'string' && email.length <= 254 && EMAIL_PATTERN.test(email.trim());
-}
-
-function isValidBirthDate(value) {
-    if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-    const [year, month, day] = value.split('-').map(Number);
-    const date = new Date(Date.UTC(year, month - 1, day));
-    const today = new Date();
-    const todayUtc = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
-    return year >= 1900 && date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day && date.getTime() <= todayUtc;
-}
-
-function getBirthDateValue(day, month, year) {
-    if (!day || !month || !year) return '';
-    return `${year.padStart(4, '0')}-${month}-${day.padStart(2, '0')}`;
-}
+const RFC_PATTERN = /^[A-ZÑ&]{3,4}\d{6}[A-Z\d]{3}$/;
+const params = new URLSearchParams(location.search);
+const chosenPlan = (params.get('plan') || '').toLowerCase();
+const chosenInterval = params.get('interval') === 'year' ? 'year' : 'month';
 
 function passwordChecks(password, userData) {
     const normalizedPassword = normalizeText(password);
-    const personalValues = [userData.email, userData.nombre, userData.apellidos]
+    const personal = [userData.email, userData.nombre, userData.apellidos, userData.email.split('@')[0]]
         .map(normalizeText)
-        .filter(Boolean);
-    const emailName = normalizeText(userData.email).split('@')[0];
-    const isPersonal = personalValues.some((value) => value === normalizedPassword || (value.length > 3 && normalizedPassword === value)) || normalizedPassword === emailName;
-
+        .filter((value) => value.length > 3);
     return {
-        length: password.length >= 8 && password.length <= 64,
+        length: password.length >= 10 && password.length <= 72,
         common: !COMMON_PASSWORDS.has(normalizedPassword),
-        personal: !isPersonal
+        personal: !personal.includes(normalizedPassword),
     };
 }
 
 function updatePasswordMeter() {
     const password = document.getElementById('regPassword').value;
-    const userData = {
+    const checks = passwordChecks(password, {
         email: document.getElementById('regEmail').value,
         nombre: document.getElementById('regNombre').value,
-        apellidos: document.getElementById('regApellidos').value
-    };
-    const checks = passwordChecks(password, userData);
+        apellidos: document.getElementById('regApellidos').value,
+    });
     const meter = document.getElementById('passwordMeter');
     const status = document.getElementById('passwordStatus');
-    const score = Number(checks.length) + Number(checks.common) + Number(checks.personal) + (password.length >= 12 ? 1 : 0) + (/[A-Z]/.test(password) && /[a-z]/.test(password) && /\d/.test(password) && /[^A-Za-z0-9]/.test(password) ? 1 : 0);
+    const varied = /[A-Z]/.test(password) && /[a-z]/.test(password) && /\d/.test(password) && /[^A-Za-z0-9]/.test(password);
+    const score = Number(checks.length) + Number(checks.common) + Number(checks.personal) + (password.length >= 14 ? 1 : 0) + (varied ? 1 : 0);
 
     meter.className = 'password-meter';
     if (password) meter.classList.add(score <= 2 ? 'is-weak' : score <= 4 ? 'is-medium' : 'is-strong');
     status.className = 'password-status';
-    if (!password) status.textContent = 'Usa entre 8 y 64 caracteres.';
-    else if (!checks.length) { status.textContent = 'La contraseña debe tener entre 8 y 64 caracteres.'; status.classList.add('is-invalid'); }
-    else if (!checks.common || !checks.personal) { status.textContent = !checks.common ? 'Esta contraseña es común o comprometida.' : 'No puede coincidir con tus datos personales.'; status.classList.add('is-invalid'); }
-    else { status.textContent = score >= 5 ? 'Contraseña segura.' : 'Contraseña normal.'; status.classList.add('is-valid'); }
+    if (!password) status.textContent = 'Usa entre 10 y 72 caracteres.';
+    else if (!checks.length) { status.textContent = 'La contraseña debe tener entre 10 y 72 caracteres.'; status.classList.add('is-invalid'); }
+    else if (!checks.common || !checks.personal) { status.textContent = !checks.common ? 'Esta contraseña es muy común.' : 'No puede coincidir con tus datos personales.'; status.classList.add('is-invalid'); }
+    else { status.textContent = score >= 5 ? 'Contraseña segura.' : 'Contraseña aceptable.'; status.classList.add('is-valid'); }
     return checks;
+}
+
+async function showChosenPlan() {
+    if (!chosenPlan) return;
+    try {
+        const { plans } = await GymGo.api('/saas-plans', { auth: false });
+        const plan = plans.find((item) => item.code === chosenPlan && item.selfService);
+        const price = plan?.[chosenInterval === 'year' ? 'yearly' : 'monthly'];
+        if (!plan || !price) return;
+        document.getElementById('planSummary').textContent = plan.code === 'esencial'
+            ? 'Empiezas con 14 días gratis de Esencial. Después pagas desde tu panel.'
+            : `Elegiste ${plan.name}: ${GymGo.money(price.subtotal)} + IVA ${GymGo.intervalLabel(chosenInterval)}. Primero creas tu cuenta y en el siguiente paso pagas.`;
+    } catch {
+        // The plan summary is a courtesy; signing up works without it.
+    }
+}
+
+function showDone(data) {
+    const subscription = data.subscription;
+    const payQuery = new URLSearchParams({ plan: chosenPlan === 'pro' ? 'pro' : (chosenPlan || 'esencial'), interval: chosenInterval });
+    const payUrl = `pagos.html?${payQuery}`;
+
+    // The trial was already used with this email or phone: the gym needs a plan right away.
+    if (subscription?.status !== 'trialing') {
+        location.replace(`${payUrl}&nuevo=1`);
+        return;
+    }
+
+    const card = document.getElementById('registroCard');
+    const done = document.getElementById('registroDone');
+    const pay = document.getElementById('donePay');
+    const dashboard = document.getElementById('doneDashboard');
+    document.getElementById('doneText').textContent = `${data.organization?.name || 'Tu gimnasio'} tiene 14 días gratis del plan Esencial, hasta el ${GymGo.date(subscription.trialEndsAt)}. Puedes pagar ahora o cuando termine la prueba.`;
+    pay.href = payUrl;
+    pay.textContent = chosenPlan === 'pro' ? 'Pagar el plan Pro' : 'Elegir plan y pagar';
+    dashboard.href = GymGo.dashboardUrl();
+    // Who chose Pro came to pay; who chose the trial goes to their panel first.
+    if (chosenPlan !== 'pro') {
+        pay.className = 'btn-gg btn-gg-outline';
+        dashboard.className = 'btn auth-submit';
+        pay.parentElement.prepend(dashboard);
+    }
+    card.classList.add('d-none');
+    done.classList.remove('d-none');
+    done.focus();
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -68,92 +99,82 @@ document.addEventListener('DOMContentLoaded', () => {
     const confirmation = document.getElementById('regPasswordConfirm');
     const confirmStatus = document.getElementById('confirmStatus');
     const email = document.getElementById('regEmail');
-    const birthDay = document.getElementById('regDiaNac');
-    const birthMonth = document.getElementById('regMesNac');
-    const birthYear = document.getElementById('regAnioNac');
-    const birthDateStatus = document.getElementById('birthDateStatus');
-    const acceptTerms = document.getElementById('acceptTerms');
-    const acceptPrivacy = document.getElementById('acceptPrivacy');
-    const today = new Date();
-    const currentDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const phone = document.getElementById('regTelefono');
+    const rfc = document.getElementById('regRfc');
+    const status = document.getElementById('registroStatus');
+    const submit = document.getElementById('registroSubmit');
 
-    function validateBirthDateFields() {
-        const birthDate = getBirthDateValue(birthDay.value, birthMonth.value, birthYear.value);
-        const isValid = isValidBirthDate(birthDate);
-        const message = !birthDay.value || !birthMonth.value || !birthYear.value
-            ? 'Completa día, mes y año.'
-            : isValid ? '' : 'Escribe una fecha de nacimiento válida.';
-        birthDateStatus.textContent = message;
-        [birthDay, birthMonth, birthYear].forEach((field) => field.setCustomValidity(message));
-        return isValid;
-    }
+    if (location.search) document.getElementById('loginLink').href = `login.html?returnTo=${encodeURIComponent(`pagos.html${location.search}`)}`;
+    showChosenPlan();
 
     ['regPassword', 'regEmail', 'regNombre', 'regApellidos'].forEach((id) => document.getElementById(id).addEventListener('input', updatePasswordMeter));
-    email.addEventListener('input', () => email.setCustomValidity(isValidEmail(email.value) ? '' : 'Escribe un correo electrónico válido.'));
-    birthDay.addEventListener('input', () => {
-        birthDay.value = birthDay.value.replace(/\D/g, '').slice(0, 2);
-        validateBirthDateFields();
-    });
-    birthMonth.addEventListener('change', validateBirthDateFields);
-    birthYear.addEventListener('input', () => {
-        birthYear.value = birthYear.value.replace(/\D/g, '').slice(0, 4);
-        validateBirthDateFields();
-    });
+    email.addEventListener('input', () => email.setCustomValidity(EMAIL_PATTERN.test(email.value.trim()) ? '' : 'Escribe un correo electrónico válido.'));
+    phone.addEventListener('input', () => { phone.value = phone.value.replace(/[^\d\s()+-]/g, ''); });
     confirmation.addEventListener('input', () => {
-        confirmStatus.textContent = confirmation.value && confirmation.value !== password.value ? 'Las contraseñas no coinciden.' : confirmation.value ? 'Las contraseñas coinciden.' : '';
-        confirmStatus.className = `password-status ${confirmation.value && confirmation.value !== password.value ? 'is-invalid' : confirmation.value ? 'is-valid' : ''}`;
+        const mismatch = confirmation.value && confirmation.value !== password.value;
+        confirmStatus.textContent = mismatch ? 'Las contraseñas no coinciden.' : confirmation.value ? 'Las contraseñas coinciden.' : '';
+        confirmStatus.className = `password-status ${mismatch ? 'is-invalid' : confirmation.value ? 'is-valid' : ''}`;
     });
+
+    const notify = (type, message, field) => {
+        window.siridStatus(status, type, message);
+        if (type === 'error') {
+            status.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            field?.focus({ preventScroll: true });
+        }
+    };
 
     form.addEventListener('submit', async (event) => {
         event.preventDefault();
-        const userData = {
-            nombre: document.getElementById('regNombre').value.trim(),
-            apellidos: document.getElementById('regApellidos').value.trim(),
-            fechaNacimiento: getBirthDateValue(birthDay.value, birthMonth.value, birthYear.value),
-            email: email.value.trim().toLowerCase(),
-            password: password.value
-        };
+        const value = (id) => document.getElementById(id).value.trim();
+        const digits = phone.value.replace(/\D/g, '');
         const checks = updatePasswordMeter();
-        const status = document.getElementById('registroStatus');
-        const submit = document.getElementById('registroSubmit');
-        const notify = (type, message, field) => {
-            if (window.siridStatus && status) window.siridStatus(status, type, message); else alert(message);
-            if (type === 'error') {
-                status?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                field?.focus({ preventScroll: true });
-            }
-        };
-        if (!userData.nombre || !userData.apellidos) {
-            notify('error', 'Escribe tu nombre y apellidos.', userData.nombre ? document.getElementById('regApellidos') : document.getElementById('regNombre'));
-            return;
+        const rfcValue = rfc.value.trim().toUpperCase();
+
+        if (value('regNegocio').length < 2) return notify('error', 'Escribe el nombre de tu negocio.', document.getElementById('regNegocio'));
+        if (value('regSucursal').length < 2) return notify('error', 'Escribe el nombre de tu primera sucursal.', document.getElementById('regSucursal'));
+        if (rfcValue && !RFC_PATTERN.test(rfcValue)) {
+            rfc.closest('details').open = true;
+            return notify('error', 'El RFC no es válido. Déjalo vacío si no lo necesitas.', rfc);
         }
-        if (!acceptTerms.checked) {
-            notify('error', 'Debes aceptar los términos y condiciones para crear tu cuenta.', acceptTerms);
-            return;
-        }
-        if (!acceptPrivacy.checked) {
-            notify('error', 'Debes aceptar el aviso de privacidad para crear tu cuenta.', acceptPrivacy);
-            return;
-        }
-        if (!isValidEmail(userData.email) || !validateBirthDateFields() || userData.fechaNacimiento > currentDate) {
-            notify('error', 'Revisa el formato del correo y la fecha de nacimiento.', isValidEmail(userData.email) ? birthDay : email);
-            return;
-        }
-        if (!checks.length || !checks.common || !checks.personal || password.value !== confirmation.value) {
-            notify('error', 'Revisa los requisitos de la contraseña y su confirmación.', password);
-            return;
-        }
+        if (value('regNombre').length < 2 || !value('regApellidos')) return notify('error', 'Escribe tu nombre y apellidos.', document.getElementById(value('regNombre').length < 2 ? 'regNombre' : 'regApellidos'));
+        if (!EMAIL_PATTERN.test(value('regEmail'))) return notify('error', 'Escribe un correo electrónico válido.', email);
+        if (digits.length !== 10) return notify('error', 'El teléfono debe tener 10 dígitos.', phone);
+        if (!checks.length || !checks.common || !checks.personal) return notify('error', 'Revisa los requisitos de la contraseña.', password);
+        if (password.value !== confirmation.value) return notify('error', 'Las contraseñas no coinciden.', confirmation);
+        if (!document.getElementById('acceptTerms').checked) return notify('error', 'Debes aceptar los términos y condiciones.', document.getElementById('acceptTerms'));
+        if (!document.getElementById('acceptPrivacy').checked) return notify('error', 'Debes aceptar el aviso de privacidad.', document.getElementById('acceptPrivacy'));
+
         notify();
-        window.siridLoading?.(submit, true, 'Creando cuenta…');
+        window.siridLoading(submit, true, 'Activando tu gimnasio…');
         try {
-            const response = await fetch(`${window.SIRID_API_URL}/api/auth/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...userData, privacyConsent: true }) });
-            const data = await response.json();
-            if (!response.ok) throw new Error(data.msg || 'No se pudo crear la cuenta.');
-            notify('success', 'Cuenta creada exitosamente. Te llevamos a iniciar sesión…');
-            setTimeout(() => { window.location.href = 'login.html'; }, 1200);
+            const data = await GymGo.api('/organizations/signup', {
+                method: 'POST',
+                auth: false,
+                body: {
+                    organizationName: value('regNegocio'),
+                    gymName: value('regSucursal'),
+                    legalName: value('regRazon') || undefined,
+                    rfc: rfcValue || undefined,
+                    name: value('regNombre'),
+                    lastName: value('regApellidos'),
+                    email: value('regEmail').toLowerCase(),
+                    phone: digits,
+                    password: password.value,
+                    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Mexico_City',
+                },
+            });
+            // A rejected application sent again goes back to SIRID's review and has no session yet.
+            if (!data.token) {
+                notify('info', data.message || 'Recibimos tu solicitud.');
+                window.siridLoading(submit, false);
+                return;
+            }
+            GymGo.saveSession(data);
+            showDone(data);
         } catch (error) {
-            notify('error', error.message || 'No se pudo conectar con el servidor.');
-            window.siridLoading?.(submit, false);
+            notify('error', error.message, error.details?.[0]?.path?.[0] === 'email' ? email : undefined);
+            window.siridLoading(submit, false);
         }
     });
 });

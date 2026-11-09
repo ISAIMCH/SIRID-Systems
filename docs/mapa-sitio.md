@@ -43,13 +43,8 @@ flowchart TB
     Ubicacion --> Cobertura[Mixquiahuala, Tlaxcoapan,\nTlahuelilpan, Progreso y alrededores]:::secundaria
 
     Login --> Registro[Crear cuenta\nregistro.html]:::acceso
-    Login --> Google[Inicio con Google]:::externo
-    Login --> Perfil[Mi perfil\nperfil.html]:::privado
-    Perfil --> Datos[Editar datos personales]:::privado
-    Perfil --> Seguridad[Cambiar contrasena]:::privado
-    Login --> Admin[Panel administrativo\nadmin.html]:::privado
-    Admin --> Graficas[Graficas de operacion]:::privado
-    Admin --> Planes[Gestion de planes]:::privado
+    Login --> Dashboard[Panel de GymGo\n/dashboard/]:::privado
+    Registro --> Pagos[Pago del plan\npagos.html]:::conversion
 
     Terminos[Terminos y condiciones\nterminos.html]:::legal
     Inicio --> Terminos
@@ -140,9 +135,9 @@ flowchart TD
 | Ubicacion | `pages/ubicacion.html` | Disponible | Cobertura y mapa |
 | Login | `pages/login.html` | Disponible | Acceso de cuenta |
 | Registro | `pages/registro.html` | Disponible | Crear cuenta |
-| Perfil | `pages/perfil.html` | Disponible | Datos de usuario |
+| Pagos | `pages/pagos.html` | Disponible | Checkout de Stripe y PayPal |
+| Pago exitoso | `pages/pago-exitoso.html` | Disponible | Confirmación de suscripción |
 | Terminos | `pages/terminos.html` | Disponible | Informacion legal |
-| Administracion | `pages/admin.html` | En desarrollo | Operacion del gimnasio |
 | Soluciones | `pages/soluciones.html` | Pendiente | Pagina comercial enlazada desde Inicio |
 | Hardware | `pages/hardware.html` | Pendiente | Pagina del equipo IoT enlazada desde Inicio |
 

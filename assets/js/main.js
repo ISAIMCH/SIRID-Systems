@@ -20,210 +20,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  const products = {
-    esencial: { id: 'esencial', title: 'Básico', price: 99, rec: true },
-    pro: { id: 'pro', title: 'Pro con Hardware IoT', price: 199, rec: true },
-    hw: { id: 'hw', title: 'Enterprise', price: 250, rec: false }
-  };
-  const user = JSON.parse(localStorage.getItem('userData') || 'null');
-  const cartKey = `gg_pay_${user?.id || user?.email || 'guest'}`;
-
-  document.querySelectorAll('.add-to-cart').forEach((button) => {
-    button.addEventListener('click', () => {
-      const product = products[button.dataset.productId];
-      if (!product) return;
-
-      const state = JSON.parse(localStorage.getItem(cartKey) || 'null') || { cart: [], orders: [] };
-      if (product.rec) {
-        state.cart = state.cart.filter((item) => !products[item.pid]?.rec || item.pid === product.id);
-      }
-
-      const item = state.cart.find((cartItem) => cartItem.id === product.id);
-      if (item) {
-        if (!product.rec) item.qty += 1;
-      } else {
-        state.cart.push({ ...product, pid: product.id, qty: 1 });
-      }
-
-      localStorage.setItem(cartKey, JSON.stringify(state));
-      button.textContent = 'Añadido al carrito';
-      setTimeout(() => { button.textContent = 'Añadir al carrito'; }, 1800);
-    });
-  });
-
 });
-
-document.addEventListener("DOMContentLoaded", async () => {
-    const catalogContainer = document.getElementById('catalogProducts');
-    const catalogSearch = document.getElementById('catalogSearch');
-    if (!catalogContainer) return;
-    let catalogProducts = [];
-    const money = (value) => `$${Number(value).toLocaleString('es-MX', { minimumFractionDigits: 2 })}`;
-    const getExperienceContent = (product) => {
-        const productName = product.name.toLocaleLowerCase();
-        const isHardware = productName.includes('hardware') || productName.includes('iot');
-        const isEnterprise = productName.includes('enterprise') || productName.includes('pro');
-        const audience = isHardware
-            ? 'Gimnasios que quieren conectar su espacio físico con la operación digital.'
-            : isEnterprise
-                ? 'Equipos que necesitan visibilidad, control y una operación lista para crecer.'
-                : 'Gimnasios que buscan ordenar su operación sin añadir complejidad.';
-        const outcome = isHardware
-            ? 'Convierte cada acceso y cada dispositivo en información útil para tu equipo.'
-            : isEnterprise
-                ? 'Toma decisiones con una operación más conectada y una experiencia consistente.'
-                : 'Empieza con una base clara para administrar mejor a tus clientes y tu equipo.';
-        const implementation = isHardware ? 'Integración guiada' : isEnterprise ? 'Despliegue acompañado' : 'Activación sencilla';
-        const scale = isEnterprise ? 'Operación avanzada' : isHardware ? 'Espacio conectado' : 'Base funcional';
-
-        return { audience, outcome, implementation, scale };
-    };
-    const renderCatalog = () => {
-        const query = (catalogSearch?.value || '').trim().toLocaleLowerCase();
-        const filtered = catalogProducts.filter((product) =>
-            `${product.name} ${product.description} ${(product.features || []).join(' ')}`
-                .toLocaleLowerCase().includes(query)
-        );
-        catalogContainer.setAttribute('aria-busy', 'false');
-        catalogContainer.innerHTML = filtered.length ? filtered.map((product) => {
-            const experience = getExperienceContent(product);
-            const available = product.stock > 0;
-            return `
-            <div class="col-lg-4 col-md-6 fade-in-up">
-                <article class="pricing-card ${product.featured ? 'destacado' : ''}">
-                    ${product.featured ? '<span class="badge-popular"><i class="bi bi-star-fill"></i>MÁS ELEGIDO</span>' : ''}
-                    <span class="plan-tag">Solución GymGo</span>
-                    <h3>${product.name}</h3>
-                    <p class="pricing-description">${product.description}</p>
-                    <div class="pricing-price">
-                        <span class="price-text">${money(product.price)}</span>
-                        <span class="price-period">MXN ${product.billing || ''}</span>
-                    </div>
-                    <ul class="feature-list">${(product.features || []).slice(0, 5).map((feature) => `<li>${feature}</li>`).join('')}</ul>
-                    <p class="catalog-meta"><span><span class="dot ${available ? '' : 'out'}"></span><strong>${available ? 'Disponible' : 'Agotado'}</strong></span>${product.guarantee ? `<span><i class="bi bi-shield-check"></i>${product.guarantee}</span>` : ''}</p>
-                    <div class="pricing-actions">
-                        <button type="button" class="btn-buy catalog-add-to-cart" data-product-id="${product.id}" ${available ? '' : 'disabled'}><i class="bi bi-bag-plus"></i><span>Añadir al carrito</span></button>
-                        <button type="button" class="catalog-detail-button catalog-open-details" aria-expanded="false">Ver detalles</button>
-                    </div>
-                    <div class="catalog-details-panel" aria-hidden="true">
-                        <button type="button" class="catalog-details-close" aria-label="Cerrar detalles"><i class="bi bi-x-lg"></i></button>
-                        <span class="detail-label">Vista de decisión</span>
-                        <h4 class="mt-2 mb-2">¿Es la solución correcta para tu gimnasio?</h4>
-                        <p class="details-intro">${experience.outcome}</p>
-                        <div class="details-metrics">
-                            <div class="details-metric">
-                                <span class="details-metric-value">${experience.implementation}</span>
-                                <span class="details-metric-label">puesta en marcha</span>
-                            </div>
-                            <div class="details-metric">
-                                <span class="details-metric-value">${experience.scale}</span>
-                                <span class="details-metric-label">enfoque</span>
-                            </div>
-                        </div>
-                        <span class="detail-label">Ideal para</span>
-                        <p class="details-audience">${experience.audience}</p>
-                        <div class="details-next-step">
-                            <i class="bi bi-arrow-up-right-circle"></i>
-                            <div>
-                                <strong>Tu siguiente paso</strong>
-                                <span>Elige esta solución y revisa el resumen antes de confirmar.</span>
-                            </div>
-                        </div>
-                        <button type="button" class="btn-buy catalog-add-to-cart" data-product-id="${product.id}" ${available ? '' : 'disabled'}><span>Elegir esta solución</span></button>
-                    </div>
-                </article>
-            </div>`;
-        }).join('') : `<div class="catalog-state"><i class="bi bi-search"></i>No encontramos soluciones con esa búsqueda.<br><button type="button" class="btn-gg btn-gg-outline btn-gg-sm mt-3" data-clear-catalog>Limpiar búsqueda</button></div>`;
-        catalogContainer.querySelectorAll('.fade-in-up').forEach((element) => element.classList.add('is-visible'));
-    };
-    try {
-        const response = await fetch(`${window.SIRID_API_URL}/api/catalog`);
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.msg || 'No se pudo cargar el catálogo.');
-        catalogProducts = data.products || [];
-        renderCatalog();
-    } catch (error) {
-        console.error('Error conectando al catálogo:', error);
-        catalogContainer.setAttribute('aria-busy', 'false');
-        catalogContainer.innerHTML = `<div class="catalog-state"><i class="bi bi-wifi-off"></i>No se pudo cargar el catálogo. Inténtalo más tarde.<br><button type="button" class="btn-gg btn-gg-outline btn-gg-sm mt-3" onclick="location.reload()">Reintentar</button></div>`;
-    }
-    catalogSearch?.addEventListener('input', renderCatalog);
-    catalogContainer.addEventListener('click', (event) => {
-        if (event.target.closest('[data-clear-catalog]')) {
-            catalogSearch.value = '';
-            renderCatalog();
-            catalogSearch.focus();
-            return;
-        }
-        const detailButton = event.target.closest('.catalog-open-details');
-        if (detailButton) {
-            const card = detailButton.closest('.pricing-card');
-            card?.classList.add('details-open');
-            detailButton.setAttribute('aria-expanded', 'true');
-            card?.querySelector('.catalog-details-panel')?.setAttribute('aria-hidden', 'false');
-            card?.querySelector('.catalog-details-close')?.focus();
-            return;
-        }
-        const closeButton = event.target.closest('.catalog-details-close');
-        if (closeButton) {
-            const card = closeButton.closest('.pricing-card');
-            card?.classList.remove('details-open');
-            card?.querySelector('.catalog-details-panel')?.setAttribute('aria-hidden', 'true');
-            const opener = card?.querySelector('.catalog-open-details');
-            opener?.setAttribute('aria-expanded', 'false');
-            opener?.focus();
-            return;
-        }
-        const button = event.target.closest('.catalog-add-to-cart');
-        const product = catalogProducts.find((item) => item.id === button?.dataset.productId);
-        if (!product) return;
-        const user = JSON.parse(localStorage.getItem('userData') || 'null');
-        const cartKey = `gg_pay_${user?.id || user?.email || 'guest'}`;
-        const state = JSON.parse(localStorage.getItem(cartKey) || 'null') || { cart: [], orders: [] };
-        state.cart = state.cart.filter((item) => item.pid !== product.id || product.billing?.toLowerCase().includes('pago'));
-        const existing = state.cart.find((item) => item.pid === product.id);
-        if (existing) existing.qty += 1;
-        else state.cart.push({ id: product.id, pid: product.id, title: product.name, price: product.price, qty: 1, rec: !product.billing?.toLowerCase().includes('pago') });
-        localStorage.setItem(cartKey, JSON.stringify(state));
-        const label = button.querySelector('span') || button;
-        const originalLabel = label.textContent;
-        label.textContent = 'Añadido al carrito';
-        button.classList.add('is-added');
-        setTimeout(() => { label.textContent = originalLabel; button.classList.remove('is-added'); }, 1800);
-        window.siridUpdateCartCount?.();
-        const toastText = document.getElementById('cartToastText');
-        if (toastText && window.bootstrap) {
-            toastText.textContent = `${product.name} se añadió al carrito`;
-            bootstrap.Toast.getOrCreateInstance('#cartToast').show();
-        }
-    });
-});
-
-// ==========================================
-// Contador del carrito en el menú
-// ==========================================
-window.siridUpdateCartCount = function () {
-    const badge = document.getElementById('navCartCount');
-    if (!badge) return;
-    try {
-        const user = JSON.parse(localStorage.getItem('userData') || 'null');
-        const keys = [`gg_pay_${user?.id || user?.email || 'guest'}`];
-        if (keys[0] !== 'gg_pay_guest') keys.push('gg_pay_guest');
-        const count = keys.reduce((total, key) => {
-            const state = JSON.parse(localStorage.getItem(key) || 'null');
-            return total + (state?.cart || []).reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
-        }, 0);
-        badge.textContent = count > 0 ? String(count) : '';
-        badge.dataset.count = String(count);
-        badge.closest('a')?.setAttribute('aria-label', count > 0 ? `Carrito de compras, ${count} artículo(s)` : 'Carrito de compras');
-    } catch (error) {
-        badge.textContent = '';
-    }
-};
 
 document.addEventListener('DOMContentLoaded', () => {
-    window.siridUpdateCartCount();
-    window.addEventListener('storage', window.siridUpdateCartCount);
 
     // Menú: fondo más sólido al hacer scroll y enlace activo según la sección visible.
     const nav = document.getElementById('siteNav');
@@ -417,26 +216,25 @@ function enviarWhatsApp() {
 
     if (userNavContainer) {
         const navLoginLink = document.getElementById('navLoginLink');
+        const dashboardUrl = window.GYMGO_DASHBOARD_URL || 'pages/login.html';
         if (userName && navLoginLink) {
-            navLoginLink.href = 'pages/perfil.html';
-            navLoginLink.innerHTML = '<i class="bi bi-person-circle"></i><span></span>';
-            navLoginLink.querySelector('span').textContent = userName;
+            navLoginLink.href = dashboardUrl;
+            navLoginLink.innerHTML = '<i class="bi bi-speedometer2"></i><span>Mi panel</span>';
         }
         if (userName) {
-            // Usuario logueado: mostrar sus acciones dentro del panel lateral.
+            // Con sesión de GymGo: su panel, su plan y cerrar sesión.
             userNavContainer.innerHTML = `
-                <div class="small text-white-50 mb-2 px-2"><i class="bi bi-person-circle me-2"></i>${userName}</div>
-                <a class="action-link" href="pages/perfil.html"><i class="bi bi-person fs-5"></i><span>Mi perfil</span></a>
+                <div class="small text-white-50 mb-2 px-2"><i class="bi bi-person-circle me-2"></i><span data-user-name></span></div>
+                <a class="action-link" href="${dashboardUrl}"><i class="bi bi-speedometer2 fs-5"></i><span>Mi panel</span></a>
+                <a class="action-link mt-2" href="pages/pagos.html"><i class="bi bi-credit-card fs-5"></i><span>Mi plan y pagos</span></a>
                 <a class="action-link mt-2" href="#" id="logoutBtn"><i class="bi bi-door-open fs-5"></i><span>Cerrar sesión</span></a>
             `;
+            userNavContainer.querySelector('[data-user-name]').textContent = userName;
 
-            // Darle vida al botón de cerrar sesión dentro del menú
             document.getElementById('logoutBtn').addEventListener('click', (e) => {
                 e.preventDefault();
-                localStorage.removeItem('token');
-                localStorage.removeItem('userName');
-                localStorage.removeItem('userData');
-                window.location.reload(); 
+                ['token', 'userName', 'userData', 'session'].forEach((key) => localStorage.removeItem(key));
+                window.location.reload();
             });
         } else {
             // Usuario NO logueado: Devolver el ícono normal con el enlace al login
