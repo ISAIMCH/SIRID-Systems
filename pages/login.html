@@ -19,11 +19,11 @@
             <div class="position-relative">
                 <span class="kicker on-dark">Bienvenido de vuelta</span>
                 <h2>Tu gimnasio, en foco.</h2>
-                <p>Accede a tu cuenta para continuar tu compra, revisar tu historial y administrar tu perfil.</p>
+                <p>Entra con tu cuenta de GymGo para pagar tu plan o abrir el panel de tu gimnasio.</p>
                 <ul class="auth-points">
-                    <li><i class="bi bi-bag-check"></i>Tu carrito de invitado se asocia a tu cuenta al entrar.</li>
-                    <li><i class="bi bi-receipt"></i>Consulta tus compras y descarga tus recibos.</li>
-                    <li><i class="bi bi-shield-lock"></i>Acceso con correo o con tu cuenta de Google.</li>
+                    <li><i class="bi bi-speedometer2"></i>La misma cuenta del panel y de la app GymGo.</li>
+                    <li><i class="bi bi-receipt"></i>Paga o cambia tu plan cuando lo necesites.</li>
+                    <li><i class="bi bi-shield-lock"></i>Tu sesión se cierra sola al terminar su vigencia.</li>
                 </ul>
             </div>
             <div class="auth-aside-footer">&copy; 2026 SIRID Systems</div>
@@ -57,63 +57,29 @@
                         <div class="mb-4">
                             <div class="d-flex justify-content-between align-items-center">
                                 <label for="password" class="form-label">Contraseña</label>
-                                <a href="#forgotPasswordModal" class="small link-premium mb-2" data-bs-toggle="modal">¿La olvidaste?</a>
+                                <a href="mailto:project.gymgo@gmail.com?subject=Recuperar%20acceso%20a%20GymGo" class="small link-premium mb-2">¿La olvidaste?</a>
                             </div>
                             <div class="input-icon">
                                 <i class="bi bi-lock" aria-hidden="true"></i>
-                                <input type="password" class="form-control form-control-premium has-toggle" id="password" placeholder="••••••••" autocomplete="current-password" required>
+                                <input type="password" class="form-control form-control-premium has-toggle" id="password" placeholder="••••••••••" autocomplete="current-password" maxlength="72" required>
                                 <button type="button" class="toggle-password" data-toggle-password="password" aria-label="Mostrar contraseña"><i class="bi bi-eye"></i></button>
                             </div>
                         </div>
 
                         <button type="submit" class="btn btn-premium w-100" id="loginSubmit">Iniciar sesión</button>
 
-                        <div class="auth-divider">o</div>
-
-                        <div class="d-flex justify-content-center">
-                            <div id="g_id_onload"
-                                data-client_id="342051956504-6lhed41n2j0g8740nmg4j51fcmsurelp.apps.googleusercontent.com"
-                                data-callback="handleGoogleCredential"
-                                data-auto_prompt="false">
-                            </div>
-                            <div class="g_id_signin" data-type="standard" data-size="large" data-shape="pill" data-width="320"></div>
-                        </div>
-
-                        <p class="auth-footer text-center mt-4 mb-0">¿Aún no tienes cuenta? <a href="registro.html">Crear cuenta</a></p>
+                        <p class="auth-footer text-center mt-4 mb-0">¿Aún no tienes cuenta? <a href="registro.html" id="signupLink">Registra tu gimnasio</a></p>
                     </form>
                 </div>
             </div>
         </main>
     </div>
 
-    <div class="modal fade" id="forgotPasswordModal" tabindex="-1" aria-labelledby="forgotPasswordTitle" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content auth-modal">
-                <div class="modal-header border-0 pb-0">
-                    <h2 class="modal-title h4" id="forgotPasswordTitle">Restablece tu contraseña</h2>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
-                </div>
-                <form id="forgotPasswordForm">
-                    <div class="modal-body">
-                        <p class="text-secondary">Escribe tu correo y te enviaremos un enlace para crear una contraseña nueva.</p>
-                        <label for="forgotEmail" class="form-label">Correo electrónico</label>
-                        <input id="forgotEmail" class="form-control form-control-premium" type="email" autocomplete="email" required>
-                        <div id="forgotPasswordStatus" class="small mt-3" aria-live="polite"></div>
-                    </div>
-                    <div class="modal-footer border-0 pt-0">
-                        <button type="button" class="btn-gg btn-gg-outline" data-bs-dismiss="modal">Cancelar</button>
-                        <button type="submit" class="btn btn-premium px-4">Enviar enlace</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script src="../assets/js/config.js"></script>
     <script src="../assets/js/analytics.js"></script>
     <script src="../assets/js/ui.js"></script>
+    <script src="../assets/js/gymgo.js"></script>
     <script src="../assets/js/login.js"></script>
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
 </body>
 </html>

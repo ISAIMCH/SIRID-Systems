@@ -34,9 +34,6 @@
 
             <div class="site-nav-actions">
                 <a class="nav-text-link d-none d-lg-inline-flex" href="pages/login.html" id="navLoginLink"><i class="bi bi-person"></i><span>Iniciar sesión</span></a>
-                <a class="icon-btn" href="pages/pagos.html" aria-label="Carrito de compras">
-                    <i class="bi bi-bag"></i><span class="count-badge" id="navCartCount" data-count="0" aria-live="polite"></span>
-                </a>
                 <a class="btn-gg btn-gg-primary btn-gg-sm d-none d-md-inline-flex" href="https://wa.me/527721050282?text=Hola,%20me%20interesa%20una%20demostraci%C3%B3n%20del%20ecosistema%20GymGo." target="_blank" rel="noopener">Solicitar demo</a>
                 <button class="icon-btn navbar-menu-trigger" type="button" data-bs-toggle="offcanvas" data-bs-target="#actionsPanel" aria-controls="actionsPanel" aria-label="Abrir menú">
                     <i class="bi bi-list"></i>
@@ -67,8 +64,8 @@
             <a class="action-link action-primary" href="https://wa.me/527721050282?text=Hola,%20me%20interesa%20una%20demostraci%C3%B3n%20del%20ecosistema%20GymGo." target="_blank" rel="noopener">
                 <i class="bi bi-whatsapp fs-5"></i><span>Ver demo</span>
             </a>
-            <a class="action-link" href="pages/pagos.html">
-                <i class="bi bi-bag fs-5"></i><span>Carrito de compras</span>
+            <a class="action-link" href="pages/registro.html">
+                <i class="bi bi-rocket-takeoff fs-5"></i><span>Registrar mi gimnasio</span>
             </a>
         </div>
     </aside>
@@ -386,23 +383,24 @@
         <section id="catalogo" class="section section-white divider-top">
             <div class="container">
                 <div class="section-head center">
-                    <span class="kicker">Catálogo GymGo</span>
-                    <h2 class="display-title">Soluciones claras para operar mejor.</h2>
-                    <p class="lead-text">Consulta precios, disponibilidad, beneficios y garantía antes de añadir una solución al carrito.</p>
+                    <span class="kicker">Planes GymGo</span>
+                    <h2 class="display-title">Precios claros para operar mejor.</h2>
+                    <p class="lead-text">Empieza con 14 días gratis del plan Esencial, sin tarjeta. Precios en MXN; el IVA se desglosa antes de pagar.</p>
                 </div>
-                <div class="catalog-toolbar">
-                    <label class="visually-hidden" for="catalogSearch">Buscar en el catálogo</label>
-                    <div class="catalog-search">
-                        <i class="bi bi-search" aria-hidden="true"></i>
-                        <input id="catalogSearch" type="search" placeholder="Buscar planes, funciones o soluciones..." autocomplete="off">
+                <div data-gymgo-plans data-base="pages/">
+                    <div class="plans-toolbar">
+                        <div class="billing-toggle" role="group" aria-label="Periodo de pago" data-plans-toggle>
+                            <button type="button" data-interval="month" aria-pressed="true">Mensual</button>
+                            <button type="button" data-interval="year" aria-pressed="false">Anual <span class="save">2 meses gratis</span></button>
+                        </div>
+                        <p>Paga con tarjeta, en efectivo en OXXO o con PayPal.</p>
                     </div>
-                    <p class="catalog-note"><span><i class="bi bi-currency-dollar"></i>Precios claros en MXN</span><span><i class="bi bi-box-seam"></i>Disponibilidad actualizada</span><span><i class="bi bi-shield-check"></i>Garantía y soporte visibles antes de pagar</span></p>
-                </div>
-                <div id="catalogProducts" class="row g-4 justify-content-center" aria-live="polite" aria-busy="true">
-                    <div class="col-lg-4 col-md-6"><div class="skeleton catalog-skeleton"></div></div>
-                    <div class="col-lg-4 col-md-6 d-none d-md-block"><div class="skeleton catalog-skeleton"></div></div>
-                    <div class="col-lg-4 d-none d-lg-block"><div class="skeleton catalog-skeleton"></div></div>
-                    <p class="visually-hidden">Cargando catálogo...</p>
+                    <div class="row g-4 justify-content-center" data-plans-grid aria-live="polite" aria-busy="true">
+                        <div class="col-lg-4 col-md-6"><div class="skeleton catalog-skeleton"></div></div>
+                        <div class="col-lg-4 col-md-6 d-none d-md-block"><div class="skeleton catalog-skeleton"></div></div>
+                        <div class="col-lg-4 d-none d-lg-block"><div class="skeleton catalog-skeleton"></div></div>
+                        <p class="visually-hidden">Cargando planes...</p>
+                    </div>
                 </div>
             </div>
         </section>
@@ -422,20 +420,20 @@
                     <div class="col-lg-8">
                         <div class="accordion" id="faqGymgo">
                             <div class="accordion-item">
-                                <h3 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faqOne" aria-expanded="false" aria-controls="faqOne">¿Qué incluye cada solución?</button></h3>
-                                <div id="faqOne" class="accordion-collapse collapse" data-bs-parent="#faqGymgo"><div class="accordion-body">Cada solución muestra en el catálogo su precio, características, disponibilidad y garantía. Puedes abrir el detalle de cada tarjeta para entender para quién está pensada antes de elegirla.</div></div>
+                                <h3 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faqOne" aria-expanded="false" aria-controls="faqOne">¿Qué incluye cada plan?</button></h3>
+                                <div id="faqOne" class="accordion-collapse collapse" data-bs-parent="#faqGymgo"><div class="accordion-body">Esencial cubre la operación completa de una sucursal: app para clientes y coaches, membresías, cobros, tienda y acceso con QR. Pro suma hasta 3 sucursales, torniquetes IoT, aforo en vivo, documentos del personal e historial compartido.</div></div>
                             </div>
                             <div class="accordion-item">
-                                <h3 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faqTwo" aria-expanded="false" aria-controls="faqTwo">¿Necesito una cuenta para agregar productos?</button></h3>
-                                <div id="faqTwo" class="accordion-collapse collapse" data-bs-parent="#faqGymgo"><div class="accordion-body">No. Puedes explorar el catálogo y armar tu carrito como invitado. Solo tendrás que iniciar sesión cuando decidas confirmar el pago.</div></div>
+                                <h3 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faqTwo" aria-expanded="false" aria-controls="faqTwo">¿Necesito tarjeta para la prueba gratis?</button></h3>
+                                <div id="faqTwo" class="accordion-collapse collapse" data-bs-parent="#faqGymgo"><div class="accordion-body">No. Registras tu gimnasio y queda activo 14 días con el plan Esencial. Al terminar eliges un plan y pagas con tarjeta, OXXO o PayPal desde tu cuenta.</div></div>
                             </div>
                             <div class="accordion-item">
-                                <h3 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faqThree" aria-expanded="false" aria-controls="faqThree">¿Puedo cambiar de solución más adelante?</button></h3>
-                                <div id="faqThree" class="accordion-collapse collapse" data-bs-parent="#faqGymgo"><div class="accordion-body">La recomendación depende de la operación de tu gimnasio. Nuestro equipo puede acompañarte para revisar el siguiente nivel cuando tus necesidades crezcan.</div></div>
+                                <h3 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faqThree" aria-expanded="false" aria-controls="faqThree">¿Puedo cambiar de plan o cancelar?</button></h3>
+                                <div id="faqThree" class="accordion-collapse collapse" data-bs-parent="#faqGymgo"><div class="accordion-body">Sí. Con tarjeta el plan se renueva solo y lo cambias o cancelas desde tu panel. Con OXXO o PayPal pagas un periodo a la vez. Si creces a más sucursales, el plan Cadena se arma con nuestro equipo.</div></div>
                             </div>
                             <div class="accordion-item">
-                                <h3 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faqFour" aria-expanded="false" aria-controls="faqFour">¿Los pagos actuales son reales?</button></h3>
-                                <div id="faqFour" class="accordion-collapse collapse" data-bs-parent="#faqGymgo"><div class="accordion-body">No. En esta etapa el checkout funciona como simulador para probar el recorrido, las confirmaciones, el inventario y los tickets. Las integraciones reales se configurarán antes de operar comercialmente.</div></div>
+                                <h3 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faqFour" aria-expanded="false" aria-controls="faqFour">¿Qué pasa si no pago a tiempo?</button></h3>
+                                <div id="faqFour" class="accordion-collapse collapse" data-bs-parent="#faqGymgo"><div class="accordion-body">Tu equipo y tus clientes siguen trabajando 3 días más mientras pagas. Después el gimnasio se pausa hasta que el plan quede pagado; tus datos no se pierden.</div></div>
                             </div>
                         </div>
                     </div>
@@ -627,16 +625,11 @@
         </div>
     </div>
 
-    <!-- Aviso al añadir al carrito -->
-    <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1080;">
-        <div id="cartToast" class="toast gg-toast" role="status" aria-live="polite" aria-atomic="true" data-bs-delay="3500">
-            <div class="toast-body"><i class="bi bi-bag-check-fill"></i><span id="cartToastText">Añadido al carrito</span><a href="pages/pagos.html">Ver carrito</a></div>
-        </div>
-    </div>
-
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script src="./assets/js/config.js"></script>
     <script src="./assets/js/analytics.js"></script>
+    <script src="./assets/js/gymgo.js"></script>
+    <script src="./assets/js/planes.js"></script>
     <script src="./assets/js/main.js"></script>
 
     <script type="text/javascript">

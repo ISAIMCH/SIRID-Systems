@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#09090b">
-    <title>Crear cuenta | GymGo</title>
+    <title>Registra tu gimnasio | GymGo</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700;800&display=swap" rel="stylesheet">
@@ -17,12 +17,12 @@
         <aside class="auth-aside" aria-hidden="true">
             <a class="brand" href="../index.html" tabindex="-1"><span class="brand-mark">G</span><span>GYMGO</span></a>
             <div class="position-relative">
-                <span class="kicker on-dark">Comienza hoy</span>
-                <h2>Crea tu cuenta en menos de un minuto.</h2>
-                <p>Con tu cuenta puedes confirmar compras del catálogo, guardar tu carrito y consultar tu historial.</p>
+                <span class="kicker on-dark">Paso 1 de 2</span>
+                <h2>Registra tu gimnasio y empieza hoy.</h2>
+                <p>Tu gimnasio queda activo en cuanto creas la cuenta: 14 días gratis del plan Esencial, sin tarjeta.</p>
                 <ul class="auth-points">
-                    <li><i class="bi bi-lightning-charge"></i>Registro con correo y contraseña segura.</li>
-                    <li><i class="bi bi-receipt"></i>Historial de compras y recibos en PDF.</li>
+                    <li><i class="bi bi-lightning-charge"></i>Activación inmediata, sin esperar aprobación.</li>
+                    <li><i class="bi bi-credit-card"></i>Paga con tarjeta, OXXO o PayPal cuando quieras.</li>
                     <li><i class="bi bi-shield-check"></i>Tus datos se tratan conforme a la LFPDPPP.</li>
                 </ul>
             </div>
@@ -33,25 +33,67 @@
         <main class="auth-main">
             <div class="auth-topbar">
                 <a class="brand d-lg-none" href="../index.html"><span class="brand-mark" aria-hidden="true">G</span><span>GYMGO</span></a>
-                <a class="auth-back-link ms-auto" href="../index.html"><i class="bi bi-arrow-left"></i>Volver al inicio</a>
+                <a class="auth-back-link ms-auto" href="precios.html"><i class="bi bi-arrow-left"></i>Ver planes</a>
             </div>
 
             <div class="auth-center">
-                <div class="auth-card wide">
+                <div class="auth-card wide" id="registroCard">
                     <div class="mb-4">
-                        <h1 class="auth-title">Crea tu cuenta</h1>
-                        <p class="auth-subtitle">Accede al ecosistema digital de tu gimnasio.</p>
+                        <h1 class="auth-title">Registra tu gimnasio</h1>
+                        <p class="auth-subtitle" id="planSummary">Crea la cuenta de dueño de tu negocio.</p>
                     </div>
 
                     <form id="registroForm" novalidate>
                         <div id="registroStatus" class="status-msg mb-3" role="alert" aria-live="assertive"></div>
 
-                        <p class="form-section-title mt-0">Acceso</p>
-                        <div class="mb-3">
-                            <label for="regEmail" class="auth-label">Correo electrónico</label>
-                            <div class="input-icon">
-                                <i class="bi bi-envelope" aria-hidden="true"></i>
-                                <input type="email" class="form-control auth-input" id="regEmail" placeholder="nombre@ejemplo.com" maxlength="254" autocomplete="email" required>
+                        <p class="form-section-title mt-0">Tu negocio</p>
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label for="regNegocio" class="auth-label">Nombre del negocio</label>
+                                <input type="text" class="form-control auth-input" id="regNegocio" placeholder="Ej. Titan Fitness" minlength="2" maxlength="120" autocomplete="organization" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="regSucursal" class="auth-label">Primera sucursal</label>
+                                <input type="text" class="form-control auth-input" id="regSucursal" placeholder="Ej. Titan Centro" minlength="2" maxlength="120" required>
+                            </div>
+                        </div>
+                        <details class="billing-details mb-1">
+                            <summary>Datos de facturación (opcional)</summary>
+                            <div class="row g-3 mt-1">
+                                <div class="col-md-7">
+                                    <label for="regRazon" class="auth-label">Razón social</label>
+                                    <input type="text" class="form-control auth-input" id="regRazon" maxlength="200">
+                                </div>
+                                <div class="col-md-5">
+                                    <label for="regRfc" class="auth-label">RFC</label>
+                                    <input type="text" class="form-control auth-input text-uppercase" id="regRfc" maxlength="13" autocomplete="off">
+                                </div>
+                            </div>
+                        </details>
+
+                        <p class="form-section-title">Tus datos</p>
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label for="regNombre" class="auth-label">Nombre(s)</label>
+                                <input type="text" class="form-control auth-input" id="regNombre" autocomplete="given-name" minlength="2" maxlength="100" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="regApellidos" class="auth-label">Apellidos</label>
+                                <input type="text" class="form-control auth-input" id="regApellidos" autocomplete="family-name" maxlength="50" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="regEmail" class="auth-label">Correo electrónico</label>
+                                <div class="input-icon">
+                                    <i class="bi bi-envelope" aria-hidden="true"></i>
+                                    <input type="email" class="form-control auth-input" id="regEmail" placeholder="nombre@ejemplo.com" maxlength="254" autocomplete="email" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="regTelefono" class="auth-label">Teléfono</label>
+                                <div class="input-icon">
+                                    <i class="bi bi-telephone" aria-hidden="true"></i>
+                                    <input type="tel" class="form-control auth-input" id="regTelefono" placeholder="10 dígitos" inputmode="tel" maxlength="16" autocomplete="tel-national" required>
+                                </div>
                             </div>
                         </div>
 
@@ -60,7 +102,7 @@
                                 <label for="regPassword" class="auth-label">Contraseña</label>
                                 <div class="input-icon">
                                     <i class="bi bi-lock" aria-hidden="true"></i>
-                                    <input type="password" class="form-control auth-input has-toggle" id="regPassword" autocomplete="new-password" minlength="8" maxlength="64" required>
+                                    <input type="password" class="form-control auth-input has-toggle" id="regPassword" autocomplete="new-password" minlength="10" maxlength="72" required>
                                     <button type="button" class="toggle-password" data-toggle-password="regPassword" aria-label="Mostrar contraseña"><i class="bi bi-eye"></i></button>
                                 </div>
                                 <div class="password-meter" id="passwordMeter" aria-hidden="true">
@@ -68,63 +110,19 @@
                                     <span></span>
                                     <span></span>
                                 </div>
-                                <div class="password-status" id="passwordStatus" aria-live="polite">Usa entre 8 y 64 caracteres.</div>
+                                <div class="password-status" id="passwordStatus" aria-live="polite">Usa entre 10 y 72 caracteres.</div>
                             </div>
                             <div class="col-md-6">
                                 <label for="regPasswordConfirm" class="auth-label">Confirmar contraseña</label>
                                 <div class="input-icon">
                                     <i class="bi bi-lock" aria-hidden="true"></i>
-                                    <input type="password" class="form-control auth-input has-toggle" id="regPasswordConfirm" autocomplete="new-password" maxlength="64" required>
+                                    <input type="password" class="form-control auth-input has-toggle" id="regPasswordConfirm" autocomplete="new-password" maxlength="72" required>
                                     <button type="button" class="toggle-password" data-toggle-password="regPasswordConfirm" aria-label="Mostrar contraseña"><i class="bi bi-eye"></i></button>
                                 </div>
                                 <div class="password-status" id="confirmStatus" aria-live="polite"></div>
                             </div>
                         </div>
-
-                        <p class="form-section-title">Datos personales</p>
-                        <div class="row g-3 mb-3">
-                            <div class="col-md-6">
-                                <label for="regNombre" class="auth-label">Nombre(s)</label>
-                                <input type="text" class="form-control auth-input" id="regNombre" autocomplete="given-name" required>
-                            </div>
-                            <div class="col-md-6">
-                                <label for="regApellidos" class="auth-label">Apellidos</label>
-                                <input type="text" class="form-control auth-input" id="regApellidos" autocomplete="family-name" required>
-                            </div>
-                        </div>
-
-                        <fieldset class="mb-3 border-0 p-0">
-                            <legend class="auth-label">Fecha de nacimiento</legend>
-                            <div class="row gx-2 birth-date-group">
-                                <div class="col-3">
-                                    <label for="regDiaNac" class="visually-hidden">Día</label>
-                                    <input type="text" class="form-control auth-input" id="regDiaNac" placeholder="Día" inputmode="numeric" pattern="[0-9]{1,2}" maxlength="2" aria-label="Día de nacimiento" required>
-                                </div>
-                                <div class="col-5">
-                                    <label for="regMesNac" class="visually-hidden">Mes</label>
-                                    <select class="form-select auth-input" id="regMesNac" aria-label="Mes de nacimiento" required>
-                                        <option value="">Mes</option>
-                                        <option value="01">Enero</option>
-                                        <option value="02">Febrero</option>
-                                        <option value="03">Marzo</option>
-                                        <option value="04">Abril</option>
-                                        <option value="05">Mayo</option>
-                                        <option value="06">Junio</option>
-                                        <option value="07">Julio</option>
-                                        <option value="08">Agosto</option>
-                                        <option value="09">Septiembre</option>
-                                        <option value="10">Octubre</option>
-                                        <option value="11">Noviembre</option>
-                                        <option value="12">Diciembre</option>
-                                    </select>
-                                </div>
-                                <div class="col-4">
-                                    <label for="regAnioNac" class="visually-hidden">Año</label>
-                                    <input type="text" class="form-control auth-input" id="regAnioNac" placeholder="Año" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" aria-label="Año de nacimiento" required>
-                                </div>
-                            </div>
-                            <div class="invalid-feedback d-block" id="birthDateStatus" aria-live="polite"></div>
-                        </fieldset>
+                        <p class="field-hint mb-3">Con esta cuenta entras al panel de tu gimnasio y a la app GymGo.</p>
 
                         <div class="form-check terms-consent mb-2">
                             <input class="form-check-input" type="checkbox" id="acceptTerms" required>
@@ -139,10 +137,20 @@
                             </label>
                         </div>
 
-                        <button type="submit" class="btn auth-submit w-100 mb-3" id="registroSubmit">Crear cuenta</button>
+                        <button type="submit" class="btn auth-submit w-100 mb-3" id="registroSubmit">Crear cuenta y activar mi gimnasio</button>
 
-                        <p class="auth-footer text-center mb-0">¿Ya tienes cuenta? <a href="login.html">Inicia sesión</a></p>
+                        <p class="auth-footer text-center mb-0">¿Ya tienes cuenta? <a href="login.html" id="loginLink">Inicia sesión</a></p>
                     </form>
+                </div>
+
+                <div class="auth-card wide d-none" id="registroDone" tabindex="-1">
+                    <span class="done-icon" aria-hidden="true"><i class="bi bi-check-lg"></i></span>
+                    <h1 class="auth-title mt-3" id="doneTitle">¡Tu gimnasio ya está activo!</h1>
+                    <p class="auth-subtitle" id="doneText"></p>
+                    <div class="d-grid gap-2 mt-4">
+                        <a class="btn auth-submit" id="donePay" href="pagos.html">Elegir plan y pagar</a>
+                        <a class="btn-gg btn-gg-outline" id="doneDashboard" href="#">Ir a mi panel</a>
+                    </div>
                 </div>
             </div>
         </main>
@@ -151,6 +159,7 @@
     <script src="../assets/js/config.js"></script>
     <script src="../assets/js/analytics.js"></script>
     <script src="../assets/js/ui.js"></script>
+    <script src="../assets/js/gymgo.js"></script>
     <script src="../assets/js/registro.js"></script>
 </body>
 </html>

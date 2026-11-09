@@ -64,7 +64,7 @@ La aplicación detecta el dominio de GitHub Pages y usa `https://sirid-systems.o
 
 La API usa JWT, bcrypt, validación de datos en servidor, control de rol `Admin`, reserva segura de inventario, cabeceras HTTP de seguridad y CORS restringido a los orígenes configurados. No subas `backend/.env`, contraseñas, claves JWT ni credenciales de Stripe/PayPal al repositorio.
 
-Antes de entregar, comprueba el flujo principal en Chrome, Edge, Firefox y Safari: navegación, registro, login, catálogo, carrito, checkout, descarga de ticket y dashboard. Repite la prueba en móvil y escritorio; GitHub Pages sirve el frontend, pero la compatibilidad también depende de la API desplegada.
+Antes de entregar, comprueba el flujo principal en Chrome, Edge, Firefox y Safari: navegación, precios, registro de gimnasio, login, pago con tarjeta, OXXO y PayPal, pago exitoso y dashboard. Repite la prueba en móvil y escritorio; GitHub Pages sirve el frontend, pero la compatibilidad también depende de la API desplegada.
 
 ### Google Analytics
 
@@ -73,21 +73,18 @@ Antes de entregar, comprueba el flujo principal en Chrome, Edge, Firefox y Safar
 3. El script `assets/js/analytics.js` solo carga Google Analytics después de aceptar la categoría de cookies analíticas.
 4. Publica de nuevo en GitHub Pages y verifica visitas en el informe `Tiempo real`.
 
-### Recibos de pago
+### Planes y pagos de GymGo
 
-Las órdenes registradas pueden descargarse como recibos PDF desde el modal de confirmación de `pages/pagos.html`. El backend genera el documento bajo demanda con los datos almacenados en MongoDB mediante el endpoint autenticado:
+Los dueños de gimnasio compran su plan directamente contra la API de GymGo (repo `SIRID-SystemsAppMovil`, carpeta `api/`); el backend de esta web ya no registra usuarios ni pagos.
 
-```text
-GET /api/payments/:orderId/receipt
-```
+1. `pages/precios.html` (y la sección de planes del inicio) carga `GET /api/saas-plans`: Esencial, Pro y Cadena, mensual o anual, con IVA desglosado.
+2. `pages/registro.html` crea la organización con `POST /api/organizations/signup`. El gimnasio queda activo con 14 días de prueba de Esencial y la sesión se guarda con las mismas claves que el dashboard.
+3. `pages/pagos.html` cobra con Stripe Checkout (tarjeta con renovación automática u OXXO por un periodo) o con los botones de PayPal; la API captura y verifica la orden de PayPal.
+4. `pages/pago-exitoso.html` consulta `GET /api/subscription` hasta que el webhook de Stripe o la captura de PayPal activan el plan; el regreso del navegador nunca activa nada.
 
-El recibo incluye cliente, orden, fecha, método de pago, productos, subtotal, IVA y total. Es un comprobante de operación de prueba y no sustituye una factura fiscal.
+`assets/js/config.js` define `GYMGO_API_URL` (local: `http://localhost:4000`) y `GYMGO_DASHBOARD_URL`. En producción, el origen de la web debe estar en `CORS_ORIGINS` de la API de GymGo: además de CORS, la API solo acepta URLs de regreso de Stripe de esos orígenes.
 
-### Catálogo, compras y privacidad
-
-La página principal muestra el catálogo activo desde `GET /api/catalog`, con búsqueda, precio en MXN, disponibilidad y garantía. El checkout conserva el estilo visual de GymGo, pero carga los productos del catálogo y el backend recalcula precios, IVA y stock antes de registrar una orden.
-
-El registro solicita por separado la aceptación de términos y del aviso de privacidad. Las compras pagadas aparecen en el historial del perfil y permiten publicar una reseña asociada a la orden. Los pagos siguen siendo de demostración hasta sustituir el flujo simulado por Stripe Checkout/Elements o PayPal SDK y sus webhooks en producción.
+Para probar en local, arranca la API de GymGo con `PORT=4000` y las llaves de prueba de Stripe (`sk_test_…`) y PayPal Sandbox en su `.env`; el webhook se reenvía con `stripe listen --forward-to localhost:4000/api/subscription/webhook`. Tarjeta de prueba: `4242 4242 4242 4242`.
 
 ## Estado
 

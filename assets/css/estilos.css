@@ -684,3 +684,22 @@ body.profile-page { background: var(--gg-50); color: var(--gg-900); min-height: 
 .page-hero p { color: var(--gg-400); max-width: 620px; font-size: 1.1rem; }
 .map-card { overflow: hidden; border-radius: var(--gg-r-xl); border: 1px solid var(--gg-200); box-shadow: var(--gg-shadow-md); background: var(--gg-white); }
 #map { min-height: 420px; }
+
+/* Planes de GymGo: selector mensual / anual y nota de precio con IVA */
+.billing-toggle { display: inline-flex; gap: .25rem; padding: .3rem; border: 1px solid var(--gg-200); border-radius: 999px; background: var(--gg-white); box-shadow: var(--gg-shadow-sm); }
+.billing-toggle button { display: inline-flex; align-items: center; gap: .45rem; min-height: 44px; padding: 0 1.15rem; border: 0; border-radius: 999px; background: transparent; color: var(--gg-600); font-weight: 600; transition: background-color .2s var(--gg-ease), color .2s var(--gg-ease); }
+.billing-toggle button:hover { color: var(--gg-950); }
+.billing-toggle button[aria-pressed="true"] { background: var(--gg-950); color: var(--gg-white); }
+.billing-toggle .save { padding: .15rem .5rem; border-radius: 999px; background: var(--gg-green); color: var(--gg-950); font-size: .75rem; font-weight: 700; }
+.plans-toolbar { display: flex; flex-direction: column; align-items: center; gap: .75rem; margin-bottom: 2rem; text-align: center; }
+.plans-toolbar p { margin: 0; color: var(--gg-500); font-size: .92rem; }
+.price-note { margin: .6rem 0 0; color: var(--gg-500); font-size: .88rem; }
+.pricing-card.destacado .price-note { color: var(--gg-400); }
+.pricing-card .pricing-price + .price-note { margin-bottom: 1rem; }
+
+/* Registro de dueños */
+.billing-details summary { display: inline-flex; align-items: center; gap: .4rem; min-height: 44px; color: var(--gg-green-ink); font-weight: 600; cursor: pointer; list-style: none; }
+.billing-details summary::-webkit-details-marker { display: none; }
+.billing-details summary::before { content: "\F64D"; font-family: "bootstrap-icons"; font-size: .9rem; }
+.billing-details[open] summary::before { content: "\F63B"; }
+.done-icon { display: inline-grid; place-items: center; width: 64px; height: 64px; border-radius: 50%; background: var(--gg-green); color: var(--gg-950); font-size: 2rem; }
