@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { FileCheck, Pencil, Plus, Tag, Trash2 } from 'lucide-react'
 import { createPromotion, deletePromotion, getPlans, getProducts, getPromotions, updatePromotion } from '../services/api'
 import type { Plan, Product, Promotion, PromotionTarget } from '../types'
-import { useStaffRoles } from '../utils/access'
+import { useIsOwner } from '../utils/access'
 import { isValidImageValue } from '../utils/imageValidation'
 
 type PromotionsResponse = Promotion[] | { data?: unknown; promotions?: unknown }
@@ -86,6 +86,19 @@ function formatDate(value?: string) {
   })
 }
 
+// The API says whether each promotion applies now; older responses without `state` fall back to the flags.
+const STATE_STYLES = {
+  active: { label: 'Vigente', className: 'bg-green-100 text-green-800' },
+  inactive: { label: 'Inactiva', className: 'bg-slate-100 text-slate-600' },
+  expired: { label: 'Vencida', className: 'bg-amber-100 text-amber-800' },
+} as const
+
+function promotionStateOf(promotion: Promotion): keyof typeof STATE_STYLES {
+  if (promotion.state) return promotion.state
+  if (!promotion.isActive) return 'inactive'
+  return promotion.validUntil && new Date(promotion.validUntil) <= new Date() ? 'expired' : 'active'
+}
+
 function toDateInputValue(value?: string) {
   return value ? value.slice(0, 10) : ''
 }
@@ -106,7 +119,8 @@ function PromotionSkeleton() {
 
 function Promotions() {
   // Recepcion reads promotions to apply them in sales; only Admins manage them.
-  const canManage = useStaffRoles().has('Admin')
+  // Promotions are the organization's catalog: only the owner manages them.
+  const canManage = useIsOwner()
   const [promotions, setPromotions] = useState<Promotion[]>([])
   const [products, setProducts] = useState<Product[]>([])
   const [plans, setPlans] = useState<Plan[]>([])
@@ -187,7 +201,7 @@ function Promotions() {
       title: promotion.title || '',
       description: promotion.description || '',
       discountPercentage: String(promotion.discountPercentage ?? ''),
-      validUntil: toDateInputValue(promotion.validUntil),
+      validUntil: promotion.validUntilDate ?? toDateInputValue(promotion.validUntil ?? undefined),
       isActive: promotion.isActive,
       imageUrl: promotion.imageUrl || '',
       appliesTo: promotion.appliesTo ?? 'store',
@@ -276,7 +290,7 @@ function Promotions() {
       setError('No se puede eliminar una promoción sin identificador.')
       return
     }
-    if (!window.confirm(`¿Eliminar ${promotion.title || 'esta promoción'}?`)) return
+    if (!window.confirm(`¿Retirar ${promotion.title || 'esta promoción'}? Dejará de aplicarse; los pagos y pedidos que la usaron la conservan.`)) return
 
     try {
       await deletePromotion(promotionId)
@@ -360,10 +374,13 @@ function Promotions() {
                         <td className="px-6 py-4 font-medium text-slate-700">
                           {Number(promotion.discountPercentage)}%
                         </td>
-                        <td className="px-6 py-4 text-slate-500">{formatDate(promotion.validUntil)}</td>
+                        <td className="px-6 py-4 text-slate-500">
+                          {promotion.validUntilDate ? formatDate(`${promotion.validUntilDate}T12:00:00`) : formatDate(promotion.validUntil ?? undefined)}
+                          {promotion.validUntilDate && <p className="text-xs text-slate-400">Hasta el final del día</p>}
+                        </td>
                         <td className="px-6 py-4">
-                          <span className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${promotion.isActive ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-600'}`}>
-                            {promotion.isActive ? 'Activa' : 'Inactiva'}
+                          <span className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${STATE_STYLES[promotionStateOf(promotion)].className}`}>
+                            {STATE_STYLES[promotionStateOf(promotion)].label}
                           </span>
                         </td>
                         <td className="px-6 py-4 text-right">

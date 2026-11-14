@@ -25,6 +25,8 @@ const Platform = lazy(() => import('./pages/Platform'))
 const PlatformExercises = lazy(() => import('./pages/PlatformExercises'))
 const Maintenance = lazy(() => import('./pages/Maintenance'))
 const Billing = lazy(() => import('./pages/Billing'))
+const Cashier = lazy(() => import('./pages/Cashier'))
+const Movements = lazy(() => import('./pages/Movements'))
 
 function ProtectedRoute() {
   const { isAuthenticated } = useAuth()
@@ -127,6 +129,8 @@ function App() {
                 <Route path="payments" element={<Payments />} />
                 <Route path="routines" element={<Routines />} />
                 <Route path="sales" element={<Sales />} />
+                <Route path="caja" element={<Cashier />} />
+                <Route path="movimientos" element={<Movements />} />
                 <Route path="subscriptions" element={<Subscriptions />} />
               </Route>
             </Route>

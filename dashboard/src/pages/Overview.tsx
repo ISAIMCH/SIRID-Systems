@@ -128,6 +128,7 @@ function statusLabel(status: string) {
     case 'completed': return 'Completada'
     case 'pending': return 'Pendiente'
     case 'cancelled': return 'Cancelado'
+    case 'reverted': return 'Revertido'
     default: return status
   }
 }
@@ -137,6 +138,7 @@ const STATUS_TONES: Record<string, string> = {
   Completada: 'bg-emerald-50 text-emerald-700',
   Pendiente: 'bg-amber-50 text-amber-800',
   Cancelado: 'bg-slate-100 text-slate-600',
+  Revertido: 'bg-slate-200 text-slate-700',
 }
 
 function relationName(value: unknown) {

@@ -1,14 +1,17 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Pencil, Plus, Trash2 } from 'lucide-react'
+import { Ban, Pencil, Plus, Undo2 } from 'lucide-react'
 import {
+  cancelPayment,
   createPayment,
-  deletePayment,
   getPaymentQuote,
   getPayments,
   getPlans,
   getUsers,
+  newIdempotencyKey,
+  pendingPaymentConflict,
   redeemPaymentPin,
+  revertPayment,
   updatePayment,
 } from '../services/api'
 import type { MembershipQuote, Payment, PaymentPayload, PaymentRelation, PaymentStatus } from '../services/api'
@@ -123,6 +126,7 @@ function statusLabel(status: string) {
     case 'paid': return 'Pagado'
     case 'pending': return 'Pendiente'
     case 'cancelled': return 'Cancelado'
+    case 'reverted': return 'Revertido'
     default: return status
   }
 }
@@ -142,6 +146,8 @@ function statusClasses(status: string) {
     case 'fallido':
     case 'fallida':
       return 'bg-red-100 text-red-800'
+    case 'reverted':
+      return 'bg-slate-200 text-slate-700'
     default:
       return 'bg-slate-100 text-slate-600'
   }
@@ -149,7 +155,7 @@ function statusClasses(status: string) {
 
 function Payments() {
   const { isAllGyms } = useAuth()
-  // Recepcion charges and redeems PINs; only Admins edit or delete payments.
+  // Recepcion charges, redeems PINs and cancels pending requests; only Admins edit pending payments or revert paid ones.
   const canManage = useStaffRoles().has('Admin')
   const [gymId, setGymId] = useState('')
   const [payments, setPayments] = useState<Payment[]>([])
@@ -164,6 +170,8 @@ function Payments() {
   // A paid payment already activated its membership, so the API keeps its plan and amount.
   const [isPaidRecord, setIsPaidRecord] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  // One key per charge being filled in: a double click or a retry sends the same key and the API charges once.
+  const [submitKey, setSubmitKey] = useState(newIdempotencyKey)
   const [modalError, setModalError] = useState<string | null>(null)
   const [reference, setReference] = useState('')
   const [pin, setPin] = useState('')
@@ -252,6 +260,7 @@ function Payments() {
   }, [quoteKey])
 
   function openCreateModal() {
+    setSubmitKey(newIdempotencyKey())
     setForm(emptyForm)
     setIsEditing(false)
     setEditingPaymentId('')
@@ -296,8 +305,27 @@ function Payments() {
       if (isEditing && editingPaymentId) {
         await updatePayment(editingPaymentId, payload)
       } else {
-        await createPayment({ ...payload, ...targetGymField(isAllGyms, gymId) })
+        const body = { ...payload, ...targetGymField(isAllGyms, gymId) }
+        try {
+          await createPayment(body, submitKey)
+        } catch (requestError) {
+          // The client is waiting with a PIN: charging apart would apply the membership twice once that PIN is
+          // redeemed, so this charge must replace the request (the API cancels it in the same operation).
+          const pending = pendingPaymentConflict(requestError)
+          if (!pending || body.status !== 'paid') throw requestError
+          const replaces = window.confirm(
+            `Este cliente tiene una solicitud de pago pendiente con PIN: ${pending.planName}, ${formatMoney(pending.amount)}.\n\n`
+            + 'Aceptar: registrar este cobro y cancelar esa solicitud (su PIN dejará de funcionar).\n'
+            + 'Cancelar: no registrar nada; puedes cobrar la solicitud con el PIN del cliente.',
+          )
+          if (!replaces) {
+            setModalError('No se registró el cobro. Cobra la solicitud pendiente con el PIN del cliente o reemplázala.')
+            return
+          }
+          await createPayment({ ...body, replacesPaymentId: pending.id }, submitKey)
+        }
       }
+      setSubmitKey(newIdempotencyKey())
 
       await refreshPayments()
       setError(null)
@@ -378,20 +406,46 @@ function Payments() {
     }
   }
 
-  async function handleDelete(payment: Payment) {
+  // A pending request is cancelled (its PIN stops working); the record stays in the history.
+  async function handleCancel(payment: Payment) {
     const paymentId = getRecordId(payment)
-    if (!paymentId) {
-      setError('No se puede eliminar un pago sin identificador.')
+    if (!paymentId) return
+    const reason = window.prompt('Motivo de la cancelación (opcional). El PIN del cliente dejará de funcionar.')
+    if (reason === null) return
+    if (reason.trim() && reason.trim().length < 3) {
+      setError('El motivo debe tener al menos 3 caracteres.')
       return
     }
-    if (!window.confirm('¿Eliminar este pago?')) return
-
     try {
-      await deletePayment(paymentId)
+      await cancelPayment(paymentId, reason.trim() || undefined)
       await refreshPayments()
       setError(null)
+      setToast('Solicitud cancelada')
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : 'No se pudo eliminar el pago.')
+      setError(requestError instanceof Error ? requestError.message : 'No se pudo cancelar el pago.')
+    }
+  }
+
+  // A paid payment is reverted, never deleted: the membership loses the time it still gave and the record stays.
+  async function handleRevert(payment: Payment) {
+    const paymentId = getRecordId(payment)
+    if (!paymentId) return
+    const reason = window.prompt(
+      'Motivo de la reversión (obligatorio).\n\nLa membresía pierde el tiempo que este pago aún daba y, si fue el último pago, '
+      + 'recupera el plan anterior. El pago queda en el historial como revertido. No se registra devolución de dinero.',
+    )
+    if (reason === null) return
+    if (reason.trim().length < 3) {
+      setError('Escribe un motivo de al menos 3 caracteres para revertir el pago.')
+      return
+    }
+    try {
+      await revertPayment(paymentId, reason.trim())
+      await refreshPayments()
+      setError(null)
+      setToast('Pago revertido')
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'No se pudo revertir el pago.')
     }
   }
 
@@ -488,6 +542,8 @@ function Payments() {
                   )?.nombre
                   const status = payment.status || 'Sin estado'
                   const isPending = ['pending', 'pendiente'].includes(status.toLowerCase())
+                  const isPaid = status.toLowerCase() === 'paid'
+                  const closedReason = payment.reversal?.reason ?? payment.cancelReason
 
                   return (
                     <tr className="transition-colors hover:bg-slate-50" key={paymentId}>
@@ -518,25 +574,41 @@ function Payments() {
                       <td className="whitespace-nowrap px-6 py-4 text-right">
                         <div className="inline-flex items-center gap-3">
                           {isPending && <span className="text-xs font-medium text-slate-400">Requiere PIN</span>}
-                          {canManage && (
-                            <>
-                              <button
-                                className="cursor-pointer text-slate-400 transition hover:text-green-600"
-                                type="button"
-                                aria-label="Editar pago"
-                                onClick={() => handleEditPayment(payment)}
-                              >
-                                <Pencil className="h-4 w-4" aria-hidden="true" />
-                              </button>
-                              <button
-                                className="cursor-pointer text-slate-400 transition hover:text-red-600"
-                                type="button"
-                                aria-label="Eliminar pago"
-                                onClick={() => handleDelete(payment)}
-                              >
-                                <Trash2 className="h-4 w-4" aria-hidden="true" />
-                              </button>
-                            </>
+                          {!isPending && !isPaid && closedReason && (
+                            <span className="max-w-48 truncate text-xs text-slate-400" title={closedReason}>{closedReason}</span>
+                          )}
+                          {isPending && canManage && (
+                            <button
+                              className="cursor-pointer text-slate-400 transition hover:text-green-600"
+                              type="button"
+                              aria-label="Editar pago pendiente"
+                              title="Editar solicitud pendiente"
+                              onClick={() => handleEditPayment(payment)}
+                            >
+                              <Pencil className="h-4 w-4" aria-hidden="true" />
+                            </button>
+                          )}
+                          {isPending && (
+                            <button
+                              className="cursor-pointer text-slate-400 transition hover:text-red-600"
+                              type="button"
+                              aria-label="Cancelar solicitud"
+                              title="Cancelar solicitud"
+                              onClick={() => handleCancel(payment)}
+                            >
+                              <Ban className="h-4 w-4" aria-hidden="true" />
+                            </button>
+                          )}
+                          {isPaid && canManage && (
+                            <button
+                              className="cursor-pointer text-slate-400 transition hover:text-red-600"
+                              type="button"
+                              aria-label="Revertir pago"
+                              title="Revertir pago"
+                              onClick={() => handleRevert(payment)}
+                            >
+                              <Undo2 className="h-4 w-4" aria-hidden="true" />
+                            </button>
                           )}
                         </div>
                       </td>
@@ -647,19 +719,21 @@ function Payments() {
                 <div>
                   <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="payment-amount">Monto</label>
                   <input
-                    className={`w-full rounded-lg border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100 ${isPaidRecord || selectedPromotion ? 'cursor-not-allowed bg-slate-100 text-slate-500' : 'bg-white'}`}
+                    className={`w-full rounded-lg border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100 cursor-not-allowed bg-slate-100 text-slate-500`}
                     id="payment-amount"
                     type="number"
                     min="0"
                     step="0.01"
                     value={selectedPromotion ? String(selectedPromotion.amount) : form.amount}
-                    onChange={(event) => setForm({ ...form, amount: event.target.value })}
-                    readOnly={isPaidRecord || Boolean(selectedPromotion)}
+                    // The API charges the plan's price or the promotion's: an amount typed here would be refused.
+                    readOnly
                     required
                   />
                   {selectedPromotion
                     ? <p className="mt-1 text-xs text-slate-500">Calculado con la promoción.</p>
-                    : isPaidRecord && <p className="mt-1 text-xs text-slate-500">Monto protegido para conservar el registro.</p>}
+                    : isPaidRecord
+                      ? <p className="mt-1 text-xs text-slate-500">Monto protegido para conservar el registro.</p>
+                      : <p className="mt-1 text-xs text-slate-500">Precio del plan. Los descuentos solo se aplican con una promoción vigente.</p>}
                 </div>
                 <div>
                   <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="payment-source">Método de pago</label>

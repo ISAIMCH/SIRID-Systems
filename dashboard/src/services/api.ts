@@ -392,10 +392,10 @@ export function getPayments<T = unknown[]>() {
   return apiClient<T>('/payments')
 }
 
-export function redeemPaymentPin(pin: string) {
+export function redeemPaymentPin(pin: string, paymentMethod?: CashierPaymentMethod) {
   return apiClient('/payments/redeem', {
     method: 'PATCH',
-    body: JSON.stringify({ pin: pin.trim() }),
+    body: JSON.stringify({ pin: pin.trim(), ...(paymentMethod ? { paymentMethod } : {}) }),
   })
 }
 
@@ -424,13 +424,56 @@ export interface Payment {
   promotionId?: string | null
   listPrice?: number
   discountApplied?: number
+  cancelReason?: string
+  reversal?: { at: string; reason: string; daysReturned?: number; planRestored?: boolean } | null
 }
 
-export function createPayment(paymentData: PaymentPayload) {
+// A key that identifies one commercial operation: sending it again (double click, retry after a lost connection)
+// returns the operation already made instead of charging twice.
+export function newIdempotencyKey() {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID()
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`
+}
+
+export function createPayment(paymentData: PaymentPayload, idempotencyKey?: string) {
   return apiClient('/payments', {
     method: 'POST',
     body: JSON.stringify(paymentData),
+    ...(idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : {}),
   })
+}
+
+// Cancels a pending payment: its PIN stops working. The record stays in the history.
+export function cancelPayment(id: string, reason?: string) {
+  return apiClient<{ payment: Payment }>(`/payments/${id}/cancel`, {
+    method: 'POST',
+    body: JSON.stringify(reason ? { reason } : {}),
+  })
+}
+
+// Reverts a paid payment: the membership loses the time it still gave and, if it was the latest payment, gets
+// back its previous plan. The payment stays in the history as reverted. No money is refunded.
+export function revertPayment(id: string, reason: string) {
+  return apiClient<{ payment: Payment }>(`/payments/${id}/revert`, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  })
+}
+
+// The pending request (PIN) that blocks a paid charge for the same client (409 pending_payment_exists), or null.
+export interface PendingPaymentConflict {
+  id: string
+  planName: string
+  amount: number
+  currency?: string
+  durationDays?: number
+  createdAt?: string
+}
+
+export function pendingPaymentConflict(error: unknown): PendingPaymentConflict | null {
+  if (!(error instanceof ApiError) || error.status !== 409) return null
+  const data = error.response.data as { code?: string; pendingPayment?: PendingPaymentConflict }
+  return data.code === 'pending_payment_exists' && data.pendingPayment ? data.pendingPayment : null
 }
 
 export function updatePayment(id: string, paymentData: PaymentPayload) {
@@ -471,27 +514,59 @@ export interface SalePayload {
   status: string
   promotionId?: string
   gymId?: string
+  // The total shown; the API refuses the sale (409 price_changed) if its price differs.
+  expectedTotal?: number
+}
+
+// The API's price of a store order: every screen shows this, never a total of its own.
+export interface StoreQuoteLine {
+  productId: string
+  quantity: number
+  name: string | null
+  unitPrice: number
+  subtotal: number
+  stock: number
+  available: boolean
+  missing: boolean
+  discountable: boolean
+}
+
+export interface StoreQuote {
+  currency: string
+  gymId: string
+  items: StoreQuoteLine[]
+  subtotal: number
+  discount: number
+  total: number
+  available: boolean
+  promotion: { id: string; title: string; discountPercentage: number; validUntil: string | null } | null
+  warnings: Array<{ code: string; message: string; productId?: string }>
+}
+
+export function quoteSale(data: { userId?: string; items: Array<{ productId: string; quantity: number }>; promotionId?: string; gymId?: string }) {
+  return apiClient<{ quote: StoreQuote }>('/sales/quote', { method: 'POST', body: JSON.stringify(data) })
 }
 
 export function getSales<T = unknown[]>() {
   return apiClient<T>('/sales')
 }
 
-export function redeemSalePin(pin: string) {
+export function redeemSalePin(pin: string, paymentMethod?: CashierPaymentMethod) {
   return apiClient('/sales/redeem', {
     method: 'PATCH',
-    body: JSON.stringify({ pin: pin.trim() }),
+    body: JSON.stringify({ pin: pin.trim(), ...(paymentMethod ? { paymentMethod } : {}) }),
   })
 }
 
-export function createSale(data: SalePayload) {
+export function createSale(data: SalePayload, idempotencyKey?: string) {
   return apiClient('/sales', {
     method: 'POST',
     body: JSON.stringify(data),
+    ...(idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : {}),
   })
 }
 
-export function updateSale(id: string, data: Partial<SalePayload>) {
+export function updateSale(id: string, data: Partial<SalePayload> & { reason?: string }) {
   const statusMap: Record<string, string> = {
     pagado: 'paid',
     pendiente: 'pending',
@@ -538,12 +613,15 @@ export function updateMaintenanceReport(id: string, data: {
   return apiClient<{ report: MaintenanceReport }>(`/maintenance/reports/${id}`, { method: 'PATCH', body: JSON.stringify(data) })
 }
 
-export function deletePayment(id: string) {
+// Payments are no longer deleted: the API cancels a pending one and reverts a paid one (which needs a reason).
+export function deletePayment(id: string, reason?: string) {
   return apiClient(`/payments/${id}`, {
     method: 'DELETE',
+    ...(reason ? { body: JSON.stringify({ reason }) } : {}),
   })
 }
 
+// What the payment form can set; reverted is only reached through revertPayment.
 export type PaymentStatus = 'paid' | 'pending' | 'cancelled'
 
 export interface PaymentPayload {
@@ -557,6 +635,14 @@ export interface PaymentPayload {
   reference?: string
   status: PaymentStatus
   gymId?: string
+  // The client's pending request (PIN) this paid charge replaces; the API cancels it in the same operation.
+  replacesPaymentId?: string
+}
+
+// Stock changes of the gyms the user sees (sales, counts, initial stock), newest first.
+export function getInventoryMovements(params: { productId?: string; gymId?: string; page?: number; limit?: number } = {}) {
+  const query = new URLSearchParams(Object.entries(params).filter(([, value]) => value !== undefined && value !== '').map(([key, value]) => [key, String(value)]))
+  return apiClient<{ movements: import('../types').InventoryMovement[]; total: number; page: number; limit: number }>(`/products/movements?${query}`)
 }
 
 export function getProducts<T = unknown[]>() {
@@ -1417,4 +1503,252 @@ function announcePlanError(status: number, data: { code?: string; feature?: Plan
   } else if (status === 402 && data.code === 'subscription_required') {
     window.dispatchEvent(new CustomEvent(SUBSCRIPTION_REQUIRED_EVENT))
   }
+}
+
+// ---------- Caja (cash desk) ----------
+
+export type CashierPaymentMethod = 'Cash' | 'Card' | 'Transfer'
+
+export interface CashierClientRef {
+  id: string
+  name: string
+  email?: string
+}
+
+export interface CashierQueueItem {
+  id: string
+  kind: 'membership' | 'order'
+  client: CashierClientRef | null
+  gym: { id: string; name: string }
+  amount: number
+  currency: string
+  createdAt: string
+  ageMinutes: number
+  planName?: string
+  durationDays?: number
+  itemCount?: number
+  expiresAt?: string | null
+}
+
+export function getCashierQueue(params: { type?: 'all' | 'membership' | 'order'; q?: string; page?: number; limit?: number } = {}) {
+  const query = new URLSearchParams(Object.entries(params).filter(([, value]) => value !== undefined && value !== '').map(([key, value]) => [key, String(value)]))
+  return apiClient<{ items: CashierQueueItem[]; total: number; page: number; limit: number }>(`/cashier/queue?${query}`)
+}
+
+interface PopulatedUser { _id: string; name?: string; lastName?: string; email?: string }
+
+export interface CashierPinMatch {
+  kind: 'membership' | 'order'
+  payment?: { _id: string; user: PopulatedUser | null; planName: string; amount: number; listPrice?: number; discountApplied?: number; durationDays: number; currency: string; createdAt: string }
+  order?: { _id: string; userId: PopulatedUser | null; items: Array<{ productId: { name?: string } | null; quantity: number; price: number }>; subtotal?: number; discountApplied?: number; totalAmount: number; createdAt: string; expiresAt?: string | null }
+}
+
+export function lookupCashierPin(pin: string) {
+  return apiClient<CashierPinMatch>(`/cashier/pin/${encodeURIComponent(pin.trim())}`)
+}
+
+export interface CashierMembershipView {
+  status: 'pending' | 'active' | 'suspended' | 'expired'
+  planId: string | null
+  planName: string | null
+  price: number | null
+  durationDays: number | null
+  startsAt: string | null
+  expiresAt: string | null
+  daysLeft: number
+  requiredDocument: string | null
+}
+
+export interface CashierClientResult extends CashierClientRef {
+  phone: string | null
+  membership: { status: CashierMembershipView['status']; planName: string | null; expiresAt: string | null } | null
+}
+
+export function searchCashierClients(q: string) {
+  return apiClient<{ clients: CashierClientResult[] }>(`/cashier/clients?q=${encodeURIComponent(q.trim())}`)
+}
+
+export interface CashierPendingSummary {
+  id: string
+  planName: string
+  amount: number
+  currency?: string
+  durationDays?: number
+  gymId?: string | null
+  createdAt?: string
+}
+
+export interface CashierHistoryPayment {
+  _id: string
+  planName: string
+  amount: number
+  status: string
+  paymentMethod?: string
+  source?: string
+  createdAt: string
+  processedAt?: string
+}
+
+export interface CashierHistoryOrder {
+  _id: string
+  items: Array<{ productId: { name?: string } | null; quantity: number }>
+  totalAmount: number
+  status: string
+  paymentMethod?: string
+  createdAt: string
+  expiresAt?: string | null
+}
+
+export interface CashierProfile {
+  client: { id: string; name: string; email: string | null; phone: string | null; memberSince: string | null }
+  membership: CashierMembershipView | null
+  documents: Array<{ category: string; status: string; validUntil: string | null }>
+  pendingPayment: CashierPendingSummary | null
+  pendingOrders: CashierHistoryOrder[]
+  recentPayments: CashierHistoryPayment[]
+  recentOrders: CashierHistoryOrder[]
+}
+
+export function getCashierClient(id: string) {
+  return apiClient<CashierProfile>(`/cashier/clients/${id}`)
+}
+
+export interface CheckoutPayload {
+  userId: string
+  gymId?: string
+  membership?: { planId: string; promotionId?: string; replacesPaymentId?: string } | null
+  items: Array<{ productId: string; quantity: number }>
+  promotionId?: string
+}
+
+export interface CheckoutMembershipQuote {
+  plan: { id: string; name: string; price: number; durationDays: number }
+  listPrice: number
+  discount: number
+  amount: number
+  promotion: { promotionId: string; title: string; discountPercentage: number } | null
+  promotions: Array<{ promotionId: string; title: string; discountPercentage: number; eligible: boolean | null; amount: number; requiredDocument: string | null }>
+  kind: 'first' | 'renewal'
+  startsAt: string
+  expiresAt: string
+  pendingPayment: CashierPendingSummary | null
+  notices: Array<{ code: string; message: string }>
+}
+
+export interface CheckoutQuote {
+  gymId: string
+  membership: CheckoutMembershipQuote | null
+  store: StoreQuote | null
+  total: number
+  currency: string
+}
+
+export function quoteCheckout(payload: CheckoutPayload) {
+  return apiClient<{ quote: CheckoutQuote }>('/cashier/quote', { method: 'POST', body: JSON.stringify(payload) })
+}
+
+export interface CheckoutResult {
+  checkoutId: string
+  total: number
+  replayed?: boolean
+  payment: { _id: string; planName: string; amount: number; membershipPeriod?: { startsAt: string; endsAt: string } } | null
+  order: { _id: string; totalAmount: number } | null
+}
+
+// Charges the membership and products in one server transaction; the same key returns the same checkout.
+export function checkoutCashier(payload: CheckoutPayload & { paymentMethod: CashierPaymentMethod; expectedTotal: number; reference?: string }, idempotencyKey: string) {
+  return apiClient<CheckoutResult>('/cashier/checkout', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    headers: { 'Idempotency-Key': idempotencyKey },
+  })
+}
+
+// The new quote the API returns when the total changed between showing it and charging.
+export function changedQuote(error: unknown): CheckoutQuote | null {
+  if (!(error instanceof ApiError) || error.status !== 409) return null
+  const data = error.response.data as { code?: string; quote?: CheckoutQuote }
+  return data.code === 'price_changed' && data.quote ? data.quote : null
+}
+
+// ---------- Movimientos comerciales ----------
+
+export type MovementKind = 'membership' | 'order' | 'adjustment'
+
+export interface CommercialMovement {
+  id: string
+  kind: MovementKind
+  at: string
+  status: 'pending' | 'paid' | 'cancelled' | 'reverted' | 'recorded'
+  amount: number | null
+  discount: number
+  method: string | null
+  description: string | null
+  reason?: string | null
+  itemCount?: number
+  change?: number
+  quantityBefore?: number
+  quantityAfter?: number
+  checkoutId: string | null
+  client: { id: string; name: string | null } | null
+  staff: { id: string; name: string | null } | null
+  gym: { id: string; name: string }
+}
+
+export interface MovementSummary {
+  collected: { total: number; count: number; byMethod: Record<string, number>; byKind: { membership: number; order: number }; discounts: number }
+  pending: { total: number; count: number }
+  cancelled: { total: number; count: number }
+  reverted: { total: number; count: number }
+  adjustments: { count: number }
+}
+
+export interface MovementFilters {
+  from?: string
+  to?: string
+  type?: 'all' | MovementKind
+  status?: string
+  method?: string
+  userId?: string
+  staffId?: string
+  page?: number
+  limit?: number
+}
+
+const toQuery = (params: object) => new URLSearchParams(Object.entries(params).filter(([, value]) => value !== undefined && value !== '').map(([key, value]) => [key, String(value)]))
+
+export function getMovements(filters: MovementFilters) {
+  return apiClient<{ items: CommercialMovement[]; total: number; page: number; limit: number; summary: MovementSummary; timezone: string }>(`/commercial/movements?${toQuery(filters)}`)
+}
+
+export interface MovementEvent {
+  type: string
+  at: string
+  by: { id: string; name: string | null } | null
+  from?: string
+  to?: string
+  reason?: string
+}
+
+export interface MovementDetail {
+  kind: 'membership' | 'order'
+  record: Record<string, unknown> & { _id: string; status: string; createdAt: string }
+  timeline: MovementEvent[]
+  related: { kind: 'membership' | 'order'; _id: string; amount?: number; totalAmount?: number; planName?: string; status: string } | null
+  stockMovements: Array<{ _id: string; productId: { name?: string } | null; change: number; quantityBefore: number; quantityAfter: number }>
+}
+
+export function getMovement(kind: 'membership' | 'order', id: string) {
+  return apiClient<MovementDetail>(`/commercial/movements/${kind}/${id}`)
+}
+
+export interface CashCut {
+  date: string
+  timezone: string
+  summary: MovementSummary
+  byStaff: Array<{ id: string | null; name: string; total: number; count: number; byMethod: Record<string, number> }>
+}
+
+export function getCashCut(params: { date?: string; staffId?: string } = {}) {
+  return apiClient<CashCut>(`/commercial/cash-cut?${toQuery(params)}`)
 }

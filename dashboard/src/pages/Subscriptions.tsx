@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Clock, FileCheck, MapPin, MoreVertical, Pencil, Trash2 } from 'lucide-react'
 import { createPlan, deletePlan, getPlans, updatePlan } from '../services/api'
 import { useAuth } from '../store/useAuth'
-import { useStaffRoles } from '../utils/access'
+import { useIsOwner } from '../utils/access'
 import { useQuickAction } from '../utils/quickAction'
 import type { GymAccessScope, Plan, PlanType } from '../types'
 
@@ -137,7 +137,8 @@ function Subscriptions() {
   const { organizationGyms } = useAuth()
   const gymNames = new Map(organizationGyms.map((gym) => [gym.id, gym.name]))
   // Recepcion reads plans to charge them; only Admins manage them.
-  const canManage = useStaffRoles().has('Admin')
+  // Plans are the organization's catalog: only the owner manages them.
+  const canManage = useIsOwner()
   const [plans, setPlans] = useState<Plan[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)

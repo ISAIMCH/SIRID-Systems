@@ -27,6 +27,8 @@ const PAGE_ROLES: Record<string, StaffRole[]> = {
   '/promotions': ['Admin', 'Recepcion'],
   '/payments': ['Admin', 'Recepcion'],
   '/sales': ['Admin', 'Recepcion'],
+  '/caja': ['Admin', 'Recepcion'],
+  '/movimientos': ['Admin', 'Recepcion'],
   '/subscriptions': ['Admin', 'Recepcion'],
 }
 
@@ -44,6 +46,12 @@ export function useStaffRoles() {
   const scopeGyms = isAllGyms ? organizationGyms : gyms.filter((gym) => gym.id === activeGymId)
   const roleNames = scopeGyms.length > 0 ? scopeGyms.flatMap((gym) => gym.roles) : [session?.user.role ?? '']
   return new Set(roleNames.map(toStaffRole).filter((role) => role !== null))
+}
+
+// The organization's owner (or SIRID staff). Only the owner changes the catalog: products, plans and promotions.
+export function useIsOwner() {
+  const { session, organizationGyms } = useAuth()
+  return Boolean(session?.user.isPlatformAdmin) || organizationGyms.some((gym) => gym.roles.includes('Propietario'))
 }
 
 // `path` is a page path like '/payments'; nested paths are checked by their first segment.
