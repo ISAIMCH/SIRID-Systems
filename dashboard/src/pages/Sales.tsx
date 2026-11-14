@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Minus, Plus, Trash2 } from 'lucide-react'
-import { createSale, getProducts, getPromotions, getSales, getUsers, redeemSalePin, updateSale } from '../services/api'
+import { createSale, getProducts, getPromotions, getSales, getUsers, newIdempotencyKey, redeemSalePin, updateSale } from '../services/api'
 import type { Sale, SaleItem, SalePayload } from '../services/api'
 import { socket } from '../services/socket'
+import { useStoreQuote } from '../hooks/useStoreQuote'
 import type { Product, Promotion, User } from '../types'
 import GymSelect from '../components/GymSelect'
 import { useAuth } from '../store/useAuth'
@@ -91,6 +92,8 @@ function Sales() {
   const [productToAdd, setProductToAdd] = useState('')
   const [quantityToAdd, setQuantityToAdd] = useState('1')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  // One key per sale being filled in: a double click or a retry creates the sale once.
+  const [submitKey, setSubmitKey] = useState(newIdempotencyKey)
   const [modalError, setModalError] = useState<string | null>(null)
   const [pin, setPin] = useState('')
   const [isRedeemingPin, setIsRedeemingPin] = useState(false)
@@ -178,8 +181,12 @@ function Sales() {
         status: form.status,
         promotionId: form.promotionId || undefined,
         ...targetGymField(isAllGyms, gymId),
+        ...(quote ? { expectedTotal: quote.total } : {}),
       }
-      await createSale(payload)
+      if (!quote) throw new Error('Espera a que se calcule el total.')
+      if (form.status === 'paid' && !quote.available) throw new Error('No hay existencias suficientes para cobrar esta venta.')
+      await createSale(payload, submitKey)
+      setSubmitKey(newIdempotencyKey())
       await refreshSales(); setError(null); closeModal()
     } catch (requestError) {
       setModalError(requestError instanceof Error ? requestError.message : 'No se pudo guardar la venta.')
@@ -204,10 +211,17 @@ function Sales() {
 
   // Only pending orders are cancelled: the API keeps a paid sale and the stock it took.
   async function handleCancelSale(saleId: string, userName: string) {
-    if (!window.confirm(`¿Cancelar el pedido pendiente de ${userName}? Su PIN dejará de funcionar.`)) return
+    const reason = window.prompt(`¿Cancelar el pedido pendiente de ${userName}? Su PIN dejará de funcionar.
+
+Motivo (opcional):`)
+    if (reason === null) return
+    if (reason.trim() && reason.trim().length < 3) {
+      setError('El motivo debe tener al menos 3 caracteres.')
+      return
+    }
     setCancellingId(saleId); setToast(null); setError(null)
     try {
-      await updateSale(saleId, { status: 'cancelled' })
+      await updateSale(saleId, { status: 'cancelled', ...(reason.trim() ? { reason: reason.trim() } : {}) })
       await refreshSales()
       setToast('Pedido cancelado')
     } catch (requestError) {
@@ -223,28 +237,16 @@ function Sales() {
     if (applicableProducts.length === 0) return true
     return form.items.some((item) => applicableProducts.includes(item.productId))
   })
-  let calculatedBaseTotal = 0
-  let discountableSubtotal = 0
-  const selectedPromo = promotions.find((promotion) => recordId(promotion) === form.promotionId)
-
-  form.items.forEach((item) => {
-    const product = products.find((candidate) => recordId(candidate) === item.productId)
-    const itemTotal = (Number(product?.price) || 0) * item.quantity
-
-    calculatedBaseTotal += itemTotal
-
-    if (selectedPromo) {
-      const applicableProducts = selectedPromo.applicableProducts || []
-      if (applicableProducts.length === 0 || applicableProducts.includes(recordId(product || {}))) {
-        discountableSubtotal += itemTotal
-      }
-    }
-  })
-
-  const calculatedDiscount = selectedPromo
-    ? (discountableSubtotal * Number(selectedPromo.discountPercentage || 0)) / 100
-    : 0
-  const finalTotal = calculatedBaseTotal - calculatedDiscount
+  // Totals, discounts and stock come from the API's quote, the same one the app and the cash desk show.
+  const { quote, error: quoteError, isLoading: isQuoting } = useStoreQuote({
+    userId: form.userId || undefined,
+    items: form.items.map((item) => ({ productId: item.productId, quantity: item.quantity })),
+    promotionId: form.promotionId || undefined,
+    // Not targetGymField: it throws while no branch is chosen, and this runs on every render (the page went blank
+    // in the all-branches view). The quote waits until a branch is chosen; submitting still requires one.
+    ...(isAllGyms && gymId ? { gymId } : {}),
+  }, isModalOpen && (!isAllGyms || Boolean(gymId)))
+  const lineByProduct = new Map((quote?.items ?? []).map((line) => [line.productId, line]))
 
   return (
     <section className="min-h-screen bg-canvas px-8 py-10">
@@ -280,35 +282,32 @@ function Sales() {
               <div className="text-xs font-medium uppercase tracking-wide text-slate-500">Detalle de compra</div>
               {form.items.map((item) => {
                 const product = products.find((candidate) => recordId(candidate) === item.productId)
-                const rowBaseTotal = (Number(product?.price) || 0) * item.quantity
-                const applicableProducts = selectedPromo?.applicableProducts || []
-                const isDiscountable = Boolean(selectedPromo) && (
-                  applicableProducts.length === 0 || applicableProducts.includes(recordId(product || {}))
-                )
-                const rowDiscount = isDiscountable
-                  ? (rowBaseTotal * Number(selectedPromo?.discountPercentage || 0)) / 100
-                  : 0
-
+                const line = lineByProduct.get(item.productId)
                 return (
                   <div className="flex items-start justify-between gap-4 border-b border-slate-200 pb-2 text-sm last:border-b-0 last:pb-0" key={item.productId}>
                     <div className="min-w-0">
                       <div className="truncate font-medium text-slate-700">{product?.name || item.productId} x {item.quantity}</div>
-                      {rowDiscount > 0 && <div className="mt-1 text-xs text-green-700">Descuento promo: -{formatCurrency(rowDiscount)}</div>}
+                      {line?.discountable && <div className="mt-1 text-xs text-green-700">Con promoción</div>}
+                      {line && !line.available && <div className="mt-1 text-xs font-medium text-red-700">{line.missing ? 'Ya no está en el catálogo' : `Solo hay ${line.stock} en esta sucursal`}</div>}
                     </div>
-                    <div className="shrink-0 font-medium text-slate-700">{formatCurrency(rowBaseTotal)}</div>
+                    <div className="shrink-0 font-medium text-slate-700">{line ? formatCurrency(line.subtotal) : '—'}</div>
                   </div>
                 )
               })}
+              {quote?.warnings.filter((warning) => warning.code.startsWith('promotion_')).map((warning) => (
+                <p className="text-xs font-medium text-amber-700" key={warning.code}>{warning.message}</p>
+              ))}
+              {quoteError && <p className="text-xs font-medium text-red-700">{quoteError}</p>}
             </div>
             <div className="border-t border-slate-200 pt-3 text-right sm:min-w-40 sm:border-l sm:border-t-0 sm:pl-4 sm:pt-0">
               <div className="text-sm text-slate-500">Total</div>
-              {calculatedDiscount > 0 && <div className="text-sm text-slate-400 line-through">{formatCurrency(calculatedBaseTotal)}</div>}
-              <div className="text-2xl font-semibold text-slate-900">{formatCurrency(finalTotal)}</div>
-              {calculatedDiscount > 0 && <div className="text-xs font-medium text-green-700">Descuento: {formatCurrency(calculatedDiscount)}</div>}
+              {quote && quote.discount > 0 && <div className="text-sm text-slate-400 line-through">{formatCurrency(quote.subtotal)}</div>}
+              <div className="text-2xl font-semibold text-slate-900">{isQuoting || !quote ? '…' : formatCurrency(quote.total)}</div>
+              {quote && quote.discount > 0 && <div className="text-xs font-medium text-green-700">{quote.promotion?.title}: −{formatCurrency(quote.discount)}</div>}
             </div>
           </div>
           <div><label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="sale-status">Estado</label><select className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900" id="sale-status" value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })}><option value="paid">Pagado</option><option value="pending">Pendiente</option><option value="cancelled">Cancelado</option></select></div>
-          {modalError && <p className="text-sm text-red-600" role="alert">{modalError}</p>}<div className="flex justify-end gap-3 pt-2"><button className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100" type="button" onClick={closeModal}>Cancelar</button><button className="rounded-lg bg-ink px-4 py-2 text-sm font-medium text-white disabled:opacity-50" type="submit" disabled={isSubmitting}>{isSubmitting ? 'Guardando...' : 'Guardar venta'}</button></div>
+          {modalError && <p className="text-sm text-red-600" role="alert">{modalError}</p>}<div className="flex justify-end gap-3 pt-2"><button className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100" type="button" onClick={closeModal}>Cancelar</button><button className="rounded-lg bg-ink px-4 py-2 text-sm font-medium text-white disabled:opacity-50" type="submit" disabled={isSubmitting || isQuoting || !quote}>{isSubmitting ? 'Guardando...' : 'Guardar venta'}</button></div>
         </form></div></div>}
     </section>
   )

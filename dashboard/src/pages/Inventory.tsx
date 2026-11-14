@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
-import { Pencil, Plus, Trash2 } from 'lucide-react'
-import { createProduct, deleteProduct, getProducts, updateProduct } from '../services/api'
-import type { Product } from '../types'
+import { Archive, History, Pencil, Plus } from 'lucide-react'
+import { createProduct, deleteProduct, getInventoryMovements, getProducts, updateProduct } from '../services/api'
+import type { InventoryMovement, Product } from '../types'
 import { isValidImageValue } from '../utils/imageValidation'
 import GymSelect from '../components/GymSelect'
 import { useAuth } from '../store/useAuth'
 import { targetGymField } from '../utils/targetGym'
+import { useIsOwner } from '../utils/access'
 
 type ProductsResponse = Product[] | { data?: unknown; products?: unknown }
 
@@ -55,6 +56,12 @@ function ProductSkeleton() {
 
 function Inventory() {
   const { isAllGyms, organizationGyms } = useAuth()
+  // The catalog (name, price, category, image, new products) is the owner's; a Gerente counts its gym's stock.
+  const isOwner = useIsOwner()
+  const [stockReason, setStockReason] = useState('')
+  const [movementsFor, setMovementsFor] = useState<Product | null>(null)
+  const [movements, setMovements] = useState<InventoryMovement[] | null>(null)
+  const [movementsError, setMovementsError] = useState<string | null>(null)
   const [products, setProducts] = useState<Product[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -118,8 +125,23 @@ function Inventory() {
       gymId: '',
     })
     setCustomCategory(isPresetCategory ? '' : category)
+    setStockReason('')
     setModalError(null)
     setIsModalOpen(true)
+  }
+
+  async function openMovements(product: Product) {
+    const productId = product._id || product.id
+    if (!productId) return
+    setMovementsFor(product)
+    setMovements(null)
+    setMovementsError(null)
+    try {
+      const response = await getInventoryMovements({ productId, limit: 50 })
+      setMovements(response.movements)
+    } catch (requestError) {
+      setMovementsError(requestError instanceof Error ? requestError.message : 'No se pudo cargar el historial.')
+    }
   }
 
   function closeModal() {
@@ -159,6 +181,8 @@ function Inventory() {
         category: (form.categoria === customCategoryOption ? customCategory : form.categoria).trim(),
         price: Number(form.precio),
         ...(isStockReadOnly ? {} : { stock: Number(form.stock) }),
+        // What was on screen when editing started: a sale made meanwhile is reported instead of overwritten.
+        ...(editingProduct && !isStockReadOnly ? { stockBefore: Number(editingProduct.stock ?? 0), ...(stockReason.trim() ? { stockReason: stockReason.trim() } : {}) } : {}),
         ...(imageUrl ? { imageUrl } : {}),
         ...(editingProduct ? {} : targetGymField(isAllGyms, form.gymId)),
       }
@@ -196,14 +220,14 @@ function Inventory() {
       setError('No se puede eliminar un producto sin identificador.')
       return
     }
-    if (!window.confirm(`¿Eliminar ${product.name || 'este producto'}?`)) return
+    if (!window.confirm(`¿Descontinuar ${product.name || 'este producto'}? Deja de venderse; su stock, sus pedidos y su historial se conservan.`)) return
 
     try {
       await deleteProduct(productId)
       setProducts(await fetchProducts())
       setError(null)
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : 'No se pudo eliminar el producto.')
+      setError(requestError instanceof Error ? requestError.message : 'No se pudo descontinuar el producto.')
     }
   }
 
@@ -237,14 +261,16 @@ function Inventory() {
             value={searchTerm}
             onChange={(event) => setSearchTerm(event.target.value)}
           />
-          <button
-            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-brand px-4 py-2 font-medium text-ink transition hover:bg-brand-hover"
-            type="button"
-            onClick={openCreateModal}
-          >
-            <Plus size={18} aria-hidden="true" />
-            Nuevo Producto
-          </button>
+          {isOwner && (
+            <button
+              className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-brand px-4 py-2 font-medium text-ink transition hover:bg-brand-hover"
+              type="button"
+              onClick={openCreateModal}
+            >
+              <Plus size={18} aria-hidden="true" />
+              Nuevo Producto
+            </button>
+          )}
         </div>
       </div>
 
@@ -293,14 +319,25 @@ function Inventory() {
                               <Pencil size={17} aria-hidden="true" />
                             </button>
                             <button
-                              className="cursor-pointer text-slate-400 transition hover:text-red-600"
+                              className="cursor-pointer text-slate-400 transition hover:text-sky-600"
                               type="button"
-                              aria-label={`Eliminar ${product.name || 'producto'}`}
-                              title="Eliminar"
-                              onClick={() => handleDelete(product)}
+                              aria-label={`Movimientos de ${product.name || 'producto'}`}
+                              title="Movimientos de inventario"
+                              onClick={() => void openMovements(product)}
                             >
-                              <Trash2 size={17} aria-hidden="true" />
+                              <History size={17} aria-hidden="true" />
                             </button>
+                            {isOwner && (
+                              <button
+                                className="cursor-pointer text-slate-400 transition hover:text-red-600"
+                                type="button"
+                                aria-label={`Descontinuar ${product.name || 'producto'}`}
+                                title="Descontinuar"
+                                onClick={() => handleDelete(product)}
+                              >
+                                <Archive size={17} aria-hidden="true" />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -339,6 +376,11 @@ function Inventory() {
               </button>
             </div>
 
+            {!isOwner && editingProduct && (
+              <p className="mt-4 rounded-lg bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                Puedes ajustar el stock de tu sucursal. El nombre, precio, categoría e imagen los cambia el propietario.
+              </p>
+            )}
             <form className="mt-6 space-y-5" onSubmit={handleSubmit}>
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="product-name">
@@ -347,6 +389,7 @@ function Inventory() {
                 <input
                   className="w-full rounded-lg border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
                   id="product-name"
+                  disabled={!isOwner}
                   type="text"
                   value={form.nombre}
                   onChange={(event) => setForm({ ...form, nombre: event.target.value })}
@@ -361,6 +404,7 @@ function Inventory() {
                 <select
                   className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
                   id="product-category"
+                  disabled={!isOwner}
                   value={form.categoria}
                   onChange={(event) => setForm({ ...form, categoria: event.target.value })}
                   required
@@ -379,6 +423,7 @@ function Inventory() {
                   <input
                     className="w-full rounded-lg border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
                     id="product-custom-category"
+                  disabled={!isOwner}
                     type="text"
                     value={customCategory}
                     onChange={(event) => setCustomCategory(event.target.value)}
@@ -394,6 +439,7 @@ function Inventory() {
                 <input
                   className="w-full rounded-lg border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
                   id="product-price"
+                  disabled={!isOwner}
                   type="number"
                   min="0"
                   step="0.01"
@@ -431,6 +477,16 @@ function Inventory() {
                     onChange={(event) => setForm({ ...form, stock: event.target.value })}
                     required
                   />
+                  {editingProduct && String(editingProduct.stock ?? '') !== form.stock && (
+                    <input
+                      className="mt-2 w-full rounded-lg border border-slate-200 px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                      aria-label="Motivo del ajuste de stock"
+                      placeholder="Motivo del ajuste (conteo, merma, llegada de mercancía...)"
+                      maxLength={300}
+                      value={stockReason}
+                      onChange={(event) => setStockReason(event.target.value)}
+                    />
+                  )}
                 </div>
               )}
 
@@ -448,6 +504,7 @@ function Inventory() {
                 <input
                   className="w-full rounded-lg border border-slate-200 px-4 py-3 text-slate-900 outline-none transition file:mr-4 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-medium file:text-slate-700 hover:file:bg-slate-200"
                   id="product-image-file"
+                  disabled={!isOwner}
                   type="file"
                   accept="image/png,image/jpeg,image/webp,image/gif"
                   onChange={handleImageChange}
@@ -478,6 +535,44 @@ function Inventory() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {movementsFor && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4 backdrop-blur-sm">
+          <div className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium uppercase tracking-[0.2em] text-emerald-700">Movimientos</p>
+                <h2 className="mt-2 text-2xl font-semibold text-slate-900">{movementsFor.name}</h2>
+              </div>
+              <button className="text-2xl leading-none text-slate-400 transition hover:text-slate-700" type="button" aria-label="Cerrar" onClick={() => setMovementsFor(null)}>×</button>
+            </div>
+            {movementsError && <p className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">{movementsError}</p>}
+            {!movements && !movementsError && <p className="mt-6 text-sm text-slate-500">Cargando...</p>}
+            {movements && movements.length === 0 && <p className="mt-6 text-sm text-slate-500">Sin movimientos registrados.</p>}
+            {movements && movements.length > 0 && (
+              <table className="mt-4 min-w-full text-left text-sm">
+                <thead className="text-xs uppercase tracking-wider text-slate-500">
+                  <tr><th className="py-2 pr-4 font-medium">Fecha</th><th className="py-2 pr-4 font-medium">Tipo</th><th className="py-2 pr-4 font-medium">Cambio</th><th className="py-2 pr-4 font-medium">Stock</th><th className="py-2 font-medium">Quién / motivo</th></tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {movements.map((movement) => (
+                    <tr key={movement._id}>
+                      <td className="whitespace-nowrap py-2 pr-4 text-slate-500">{new Date(movement.createdAt).toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' })}</td>
+                      <td className="py-2 pr-4">{({ initial: 'Alta', sale: 'Venta', adjustment: 'Ajuste' } as const)[movement.type]}</td>
+                      <td className={`py-2 pr-4 font-medium ${movement.change < 0 ? 'text-red-700' : 'text-emerald-700'}`}>{movement.change > 0 ? `+${movement.change}` : movement.change}</td>
+                      <td className="py-2 pr-4 text-slate-500">{movement.quantityBefore} → {movement.quantityAfter}</td>
+                      <td className="py-2 text-slate-500">
+                        {typeof movement.by === 'object' && movement.by ? movement.by.name : 'Sistema'}
+                        {isAllGyms && typeof movement.gymId === 'object' && movement.gymId ? ` · ${movement.gymId.name}` : ''}
+                        {movement.reason && <span className="block text-xs text-slate-400">{movement.reason}</span>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
       )}

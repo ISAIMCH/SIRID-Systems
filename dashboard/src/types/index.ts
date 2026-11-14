@@ -35,7 +35,12 @@ export interface User {
   observations?: string
   // When the person joined the organization (GET /users); missing on older API versions.
   joinedAt?: string | null
+  // The API's verdict for clients (GET /users); null for staff, missing on older API versions.
+  membershipState?: MembershipState | null
+  hasPendingPayment?: boolean
 }
+
+export type MembershipState = 'active' | 'expiring' | 'expired' | 'suspended' | 'pending' | 'none'
 
 export interface UserReference {
   id?: string
@@ -99,6 +104,20 @@ export interface Product {
   imageUrl?: string
 }
 
+export interface InventoryMovement {
+  _id: string
+  productId: { _id: string; name: string } | string | null
+  gymId: { _id: string; name: string } | string | null
+  type: 'initial' | 'sale' | 'adjustment'
+  quantityBefore: number
+  change: number
+  quantityAfter: number
+  reason?: string
+  by: { _id: string; name: string } | string | null
+  orderId?: string | null
+  createdAt: string
+}
+
 // Same values as the API; it derives them from the quantities (out of service = no unit available).
 export type EquipmentStatus = 'available' | 'out_of_service'
 
@@ -123,7 +142,10 @@ export interface Promotion {
   title: string
   description: string
   discountPercentage: number
-  validUntil?: string
+  validUntil?: string | null
+  // The last valid day in the organization's time zone, and the API's verdict on whether it applies now.
+  validUntilDate?: string | null
+  state?: 'active' | 'inactive' | 'expired'
   isActive: boolean
   imageUrl?: string
   // store: products in sales and the app; membership: plans charged in Payments.

@@ -4,7 +4,7 @@ import { ChartColumn, History, KeyRound, Pencil } from 'lucide-react'
 import { ApiError, createUser, getPlans, getUsers, regenerateActivationCode, updateUser } from '../services/api'
 import { socket } from '../services/socket'
 import type { UserPayload } from '../services/api'
-import type { AssignableRole, GymRole, MemberRole, Plan, User, UserReference } from '../types'
+import type { AssignableRole, GymRole, MemberRole, Plan, User, UserReference, MembershipState } from '../types'
 import GymSelect from '../components/GymSelect'
 import ClientHistoryPanel from '../components/ClientHistoryPanel'
 import ClientProgressPanel, { type ProgressClient } from '../components/ClientProgressPanel'
@@ -65,6 +65,17 @@ const emptyUserForm: UserFormState = {
   observations: '',
 }
 
+
+// Same states as the API (utils/membership.js membershipState); 'expiring' ends within 7 days.
+const MEMBERSHIP_FILTERS: ReadonlyArray<readonly [MembershipState | 'pendingPayment', string]> = [
+  ['active', 'Activa'],
+  ['expiring', 'Por vencer (7 días)'],
+  ['expired', 'Vencida'],
+  ['suspended', 'Suspendida'],
+  ['pending', 'Sin activar'],
+  ['none', 'Sin membresía'],
+  ['pendingPayment', 'Con pago pendiente'],
+]
 function UserSkeleton() {
   return (
     <div className="space-y-4 p-6" aria-label="Cargando usuarios" aria-busy="true">
@@ -162,6 +173,8 @@ function Users() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [modalError, setModalError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
+  // '' shows every client; 'pendingPayment' those waiting with a PIN request.
+  const [membershipFilter, setMembershipFilter] = useState<MembershipState | 'pendingPayment' | ''>('')
   const [activeTab, setActiveTab] = useState<'clientes' | 'staff' | 'invitaciones'>('clientes')
   // Opens the invite form; set from the header or when "Agregar trabajador" finds the email already has an account.
   const [invitePrefill, setInvitePrefill] = useState<InvitePrefill | null>(null)
@@ -407,7 +420,10 @@ function Users() {
 
   const matchesSearch = (user: User) =>
     `${userDisplayName(user)} ${user.email || ''}`.toLocaleLowerCase().includes(searchTerm.trim().toLocaleLowerCase())
-  const clients = users.filter((user) => isClientUser(user) && matchesSearch(user))
+  const matchesMembership = (user: User) => !membershipFilter
+    || (membershipFilter === 'pendingPayment' ? user.hasPendingPayment === true : user.membershipState === membershipFilter)
+  const allClients = users.filter(isClientUser)
+  const clients = allClients.filter((user) => matchesSearch(user) && matchesMembership(user))
   const staff = users.filter((user) => !isClientUser(user) && matchesSearch(user))
 
   function renderUsersTable(groupUsers: User[], emptyMessage: string, showMembership: boolean) {
@@ -602,6 +618,21 @@ function Users() {
             value={searchTerm}
             onChange={(event) => setSearchTerm(event.target.value)}
           />
+          {activeTab === 'clientes' && (
+            <select
+              className="mt-3 w-full max-w-sm rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100 sm:ml-3 sm:mt-0 sm:w-auto"
+              aria-label="Filtrar por membresía"
+              value={membershipFilter}
+              onChange={(event) => setMembershipFilter(event.target.value as MembershipState | 'pendingPayment' | '')}
+            >
+              <option value="">Todas las membresías</option>
+              {MEMBERSHIP_FILTERS.map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label} ({allClients.filter((user) => (value === 'pendingPayment' ? user.hasPendingPayment === true : user.membershipState === value)).length})
+                </option>
+              ))}
+            </select>
+          )}
         </div>
 
         {isLoading ? (
