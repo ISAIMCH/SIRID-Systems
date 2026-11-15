@@ -328,7 +328,7 @@ function Overview() {
   const quickActions: QuickAction[] = [
     { label: 'Registrar cliente', description: 'Alta con código de activación', to: '/users?accion=registrar', icon: UserPlus, visible: canEnroll },
     { label: 'Crear membresía', description: 'Nuevo plan de suscripción', to: '/subscriptions?accion=nuevo', icon: BadgePlus, visible: roles.has('Admin') },
-    { label: 'Registrar pago', description: 'Cobro de membresía', to: '/payments?accion=nuevo', icon: Receipt, visible: canSeeBilling },
+    { label: 'Cobrar', description: 'Membresías, productos y pedidos', to: '/caja', icon: Wallet, visible: canAccessPage(roles, '/caja') },
     { label: 'Asistencias', description: 'Control de acceso en vivo', to: '/access', icon: ScanLine, visible: canAccessPage(roles, '/access') },
     { label: 'Crear rutina', description: 'Rutina asignada a un cliente', to: '/routines?accion=nuevo', icon: ClipboardList, visible: canAccessPage(roles, '/routines') },
   ]

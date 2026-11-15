@@ -10,7 +10,6 @@ import Overview from './pages/Overview'
 import Promotions from './pages/Promotions'
 import Payments from './pages/Payments'
 import Routines from './pages/Routines'
-import Sales from './pages/Sales'
 import Subscriptions from './pages/Subscriptions'
 import Users from './pages/Users'
 import AuthProvider from './store/AuthContext'
@@ -128,7 +127,7 @@ function App() {
                 <Route path="users" element={<Users />} />
                 <Route path="payments" element={<Payments />} />
                 <Route path="routines" element={<Routines />} />
-                <Route path="sales" element={<Sales />} />
+                <Route path="sales" element={<Navigate to="/caja" replace />} />
                 <Route path="caja" element={<Cashier />} />
                 <Route path="movimientos" element={<Movements />} />
                 <Route path="subscriptions" element={<Subscriptions />} />
