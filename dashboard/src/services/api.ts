@@ -435,14 +435,6 @@ export function newIdempotencyKey() {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`
 }
 
-export function createPayment(paymentData: PaymentPayload, idempotencyKey?: string) {
-  return apiClient('/payments', {
-    method: 'POST',
-    body: JSON.stringify(paymentData),
-    ...(idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : {}),
-  })
-}
-
 // Cancels a pending payment: its PIN stops working. The record stays in the history.
 export function cancelPayment(id: string, reason?: string) {
   return apiClient<{ payment: Payment }>(`/payments/${id}/cancel`, {
@@ -458,22 +450,6 @@ export function revertPayment(id: string, reason: string) {
     method: 'POST',
     body: JSON.stringify({ reason }),
   })
-}
-
-// The pending request (PIN) that blocks a paid charge for the same client (409 pending_payment_exists), or null.
-export interface PendingPaymentConflict {
-  id: string
-  planName: string
-  amount: number
-  currency?: string
-  durationDays?: number
-  createdAt?: string
-}
-
-export function pendingPaymentConflict(error: unknown): PendingPaymentConflict | null {
-  if (!(error instanceof ApiError) || error.status !== 409) return null
-  const data = error.response.data as { code?: string; pendingPayment?: PendingPaymentConflict }
-  return data.code === 'pending_payment_exists' && data.pendingPayment ? data.pendingPayment : null
 }
 
 export function updatePayment(id: string, paymentData: PaymentPayload) {
@@ -555,14 +531,6 @@ export function redeemSalePin(pin: string, paymentMethod?: CashierPaymentMethod)
   return apiClient('/sales/redeem', {
     method: 'PATCH',
     body: JSON.stringify({ pin: pin.trim(), ...(paymentMethod ? { paymentMethod } : {}) }),
-  })
-}
-
-export function createSale(data: SalePayload, idempotencyKey?: string) {
-  return apiClient('/sales', {
-    method: 'POST',
-    body: JSON.stringify(data),
-    ...(idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : {}),
   })
 }
 
@@ -749,31 +717,6 @@ export function deleteExercise(id: string) {
 
 export function getPromotions<T = unknown[]>(appliesTo?: 'store' | 'membership') {
   return apiClient<T>(appliesTo ? `/promotions?appliesTo=${appliesTo}` : '/promotions')
-}
-
-export interface MembershipQuoteOption {
-  promotionId: string
-  title: string
-  discountPercentage: number
-  requiredDocument: string | null
-  validUntil: string | null
-  // false: the client lacks the required document; null: no client chosen yet.
-  eligible: boolean | null
-  listPrice: number
-  discountApplied: number
-  amount: number
-}
-
-export interface MembershipQuote {
-  listPrice: number
-  promotions: MembershipQuoteOption[]
-  best: MembershipQuoteOption | null
-}
-
-// Current membership promotions for the plan and the price with each one.
-export function getPaymentQuote(planId: string, userId?: string) {
-  const query = new URLSearchParams({ planId, ...(userId ? { userId } : {}) })
-  return apiClient<MembershipQuote>(`/payments/quote?${query}`)
 }
 
 export interface PromotionPayload {

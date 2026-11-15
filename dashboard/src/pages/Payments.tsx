@@ -1,27 +1,18 @@
 import { useEffect, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
-import { Ban, Pencil, Plus, Undo2 } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Ban, Pencil, Undo2, Wallet } from 'lucide-react'
 import {
   cancelPayment,
-  createPayment,
-  getPaymentQuote,
   getPayments,
   getPlans,
   getUsers,
-  newIdempotencyKey,
-  pendingPaymentConflict,
-  redeemPaymentPin,
   revertPayment,
   updatePayment,
 } from '../services/api'
-import type { MembershipQuote, Payment, PaymentPayload, PaymentRelation, PaymentStatus } from '../services/api'
+import type { Payment, PaymentPayload, PaymentRelation, PaymentStatus } from '../services/api'
 import { socket } from '../services/socket'
 import type { Plan, User } from '../types'
-import GymSelect from '../components/GymSelect'
-import { useAuth } from '../store/useAuth'
 import { useStaffRoles } from '../utils/access'
-import { targetGymField } from '../utils/targetGym'
-import { useQuickAction } from '../utils/quickAction'
 
 interface PaymentFormState {
   userId: string
@@ -69,31 +60,6 @@ function getPaymentPlanName(payment: Payment) {
   if (payment.planName) return payment.planName
   if (typeof payment.plan === 'string') return payment.plan
   return payment.plan?.name || payment.plan?.nombre || ''
-}
-
-function getAssignedPlan(user: User, plans: Plan[]) {
-  const membership = user.membership
-  const assignedPlan = user.planId
-  const assignedPlanId = getRelationId(assignedPlan) || getRelationId(membership?.planId) || getRelationId(membership?.plan)
-  const assignedPlanName = (typeof assignedPlan === 'object' ? assignedPlan.name || assignedPlan.nombre : undefined)
-    || (typeof membership?.plan === 'object' ? membership.plan.name || membership.plan.nombre : undefined)
-    || membership?.planName
-
-  return plans.find((plan) => (
-    assignedPlanId && getRecordId(plan) === assignedPlanId
-  ) || (
-    assignedPlanName && (plan.name || plan.nombre) === assignedPlanName
-  ))
-}
-
-// Suggests the client's current plan to renew it; picking another one changes the plan when the payment is paid.
-function clientFormFields(user: User | undefined, plans: Plan[]) {
-  const activePlan = user ? getAssignedPlan(user, plans) : undefined
-  const activePlanPrice = activePlan?.price ?? activePlan?.precio
-  return {
-    planId: activePlan ? getRecordId(activePlan) : '',
-    amount: activePlanPrice === undefined ? '' : String(activePlanPrice),
-  }
 }
 
 function formatSource(source: string | undefined) {
@@ -154,10 +120,8 @@ function statusClasses(status: string) {
 }
 
 function Payments() {
-  const { isAllGyms } = useAuth()
-  // Recepcion charges, redeems PINs and cancels pending requests; only Admins edit pending payments or revert paid ones.
+  // Charging lives in Caja. Here Recepcion cancels pending requests; only Admins edit pending payments or revert paid ones.
   const canManage = useStaffRoles().has('Admin')
-  const [gymId, setGymId] = useState('')
   const [payments, setPayments] = useState<Payment[]>([])
   const [users, setUsers] = useState<User[]>([])
   const [plans, setPlans] = useState<Plan[]>([])
@@ -165,24 +129,13 @@ function Payments() {
   const [error, setError] = useState<string | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [form, setForm] = useState<PaymentFormState>(emptyForm)
-  const [isEditing, setIsEditing] = useState(false)
   const [editingPaymentId, setEditingPaymentId] = useState('')
   // A paid payment already activated its membership, so the API keeps its plan and amount.
   const [isPaidRecord, setIsPaidRecord] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  // One key per charge being filled in: a double click or a retry sends the same key and the API charges once.
-  const [submitKey, setSubmitKey] = useState(newIdempotencyKey)
   const [modalError, setModalError] = useState<string | null>(null)
   const [reference, setReference] = useState('')
-  const [pin, setPin] = useState('')
-  const [isRedeemingPin, setIsRedeemingPin] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
-  // The quote and the promotion picked belong to one plan and client (quoteKey); a new pair starts over.
-  const [quoteState, setQuoteState] = useState<{ key: string; quote: MembershipQuote } | null>(null)
-  const [chosenPromotion, setChosenPromotion] = useState<{ key: string; promotionId: string } | null>(null)
-  // ?cliente=<id> (from "Registrar cliente") opens a new payment for that client once the data loads.
-  const [searchParams, setSearchParams] = useSearchParams()
-  const [preselectedClientId] = useState(() => searchParams.get('cliente'))
 
   async function refreshPayments() {
     const response = await getPayments<unknown>()
@@ -201,19 +154,10 @@ function Payments() {
         ])
         if (!isMounted) return
 
-        const loadedUsers = extractArray<User>(usersResponse, ['data', 'users'])
-        const loadedPlans = extractArray<Plan>(plansResponse, ['data', 'plans', 'planes'])
         setPayments(extractArray<Payment>(paymentsResponse, ['data', 'payments', 'pagos']))
-        setUsers(loadedUsers)
-        setPlans(loadedPlans)
+        setUsers(extractArray<User>(usersResponse, ['data', 'users']))
+        setPlans(extractArray<Plan>(plansResponse, ['data', 'plans', 'planes']))
         setError(null)
-        const preselectedUser = preselectedClientId
-          ? loadedUsers.find((user) => getRecordId(user) === preselectedClientId)
-          : undefined
-        if (preselectedUser) {
-          setForm({ ...emptyForm, userId: preselectedClientId ?? '', ...clientFormFields(preselectedUser, loadedPlans) })
-          setIsModalOpen(true)
-        }
       } catch (requestError) {
         if (isMounted) {
           setError(requestError instanceof Error ? requestError.message : 'No se pudieron cargar los pagos.')
@@ -227,7 +171,7 @@ function Payments() {
     return () => {
       isMounted = false
     }
-  }, [preselectedClientId])
+  }, [])
 
   useEffect(() => {
     const refreshFromEvent = () => {
@@ -243,39 +187,9 @@ function Payments() {
     }
   }, [])
 
-  // New payments are priced by the API with the current membership promotions of the plan.
-  const quoteKey = isModalOpen && !isEditing && form.planId ? `${form.planId}:${form.userId}` : ''
-  const quote = quoteState?.key === quoteKey ? quoteState.quote : null
-  const selectedPromotionId = chosenPromotion?.key === quoteKey ? chosenPromotion.promotionId : quote?.best?.promotionId ?? ''
-  const selectedPromotion = quote?.promotions.find((option) => option.promotionId === selectedPromotionId) ?? null
-
-  useEffect(() => {
-    if (!quoteKey) return
-    let isCurrent = true
-    const [planId, userId] = quoteKey.split(':')
-    getPaymentQuote(planId, userId || undefined)
-      .then((result) => { if (isCurrent) setQuoteState({ key: quoteKey, quote: result }) })
-      .catch(() => { if (isCurrent) setQuoteState(null) })
-    return () => { isCurrent = false }
-  }, [quoteKey])
-
-  function openCreateModal() {
-    setSubmitKey(newIdempotencyKey())
-    setForm(emptyForm)
-    setIsEditing(false)
-    setEditingPaymentId('')
-    setIsPaidRecord(false)
-    setModalError(null)
-    setIsModalOpen(true)
-  }
-
-  useQuickAction('nuevo', openCreateModal)
-
   function closeModal() {
     if (isSubmitting) return
-    if (searchParams.has('cliente')) setSearchParams({}, { replace: true })
     setForm(emptyForm)
-    setIsEditing(false)
     setEditingPaymentId('')
     setIsPaidRecord(false)
     setReference('')
@@ -289,63 +203,29 @@ function Payments() {
     setIsSubmitting(true)
 
     try {
-      const selectedPlan = plans.find((plan) => getRecordId(plan) === form.planId)
-      if (!selectedPlan) throw new Error('Selecciona un plan válido.')
-
+      if (!editingPaymentId) return
       const payload: PaymentPayload = {
         userId: form.userId,
         planId: form.planId,
-        amount: selectedPromotion ? selectedPromotion.amount : Number(form.amount),
-        ...(!isEditing && selectedPromotion ? { promotionId: selectedPromotion.promotionId } : {}),
+        amount: Number(form.amount),
         source: 'reception',
         paymentDate: form.paymentDate,
         reference: reference.trim() || undefined,
         status: form.status,
       }
-      if (isEditing && editingPaymentId) {
-        await updatePayment(editingPaymentId, payload)
-      } else {
-        const body = { ...payload, ...targetGymField(isAllGyms, gymId) }
-        try {
-          await createPayment(body, submitKey)
-        } catch (requestError) {
-          // The client is waiting with a PIN: charging apart would apply the membership twice once that PIN is
-          // redeemed, so this charge must replace the request (the API cancels it in the same operation).
-          const pending = pendingPaymentConflict(requestError)
-          if (!pending || body.status !== 'paid') throw requestError
-          const replaces = window.confirm(
-            `Este cliente tiene una solicitud de pago pendiente con PIN: ${pending.planName}, ${formatMoney(pending.amount)}.\n\n`
-            + 'Aceptar: registrar este cobro y cancelar esa solicitud (su PIN dejará de funcionar).\n'
-            + 'Cancelar: no registrar nada; puedes cobrar la solicitud con el PIN del cliente.',
-          )
-          if (!replaces) {
-            setModalError('No se registró el cobro. Cobra la solicitud pendiente con el PIN del cliente o reemplázala.')
-            return
-          }
-          await createPayment({ ...body, replacesPaymentId: pending.id }, submitKey)
-        }
-      }
-      setSubmitKey(newIdempotencyKey())
-
+      await updatePayment(editingPaymentId, payload)
       await refreshPayments()
       setError(null)
       setForm(emptyForm)
-      setIsEditing(false)
       setEditingPaymentId('')
       setIsPaidRecord(false)
       setReference('')
       setIsModalOpen(false)
-      if (searchParams.has('cliente')) setSearchParams({}, { replace: true })
     } catch (requestError) {
       setModalError(requestError instanceof Error ? requestError.message : 'No se pudo guardar el pago.')
     } finally {
       setIsSubmitting(false)
     }
-  }
-
-  function handleUserChange(userId: string) {
-    const selectedUser = users.find((user) => getRecordId(user) === userId)
-    setForm((current) => ({ ...current, userId, ...clientFormFields(selectedUser, plans) }))
   }
 
   function handlePlanChange(planId: string) {
@@ -381,29 +261,10 @@ function Payments() {
       status: toPaymentStatus(payment.status),
     })
     setReference(payment.reference || '')
-    setIsEditing(true)
     setEditingPaymentId(paymentId)
     setIsPaidRecord(toPaymentStatus(payment.status) === 'paid')
     setModalError(null)
     setIsModalOpen(true)
-  }
-
-  async function handleRedeemPin(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    if (!pin.trim()) return
-    setIsRedeemingPin(true)
-    setToast(null)
-    setError(null)
-    try {
-      await redeemPaymentPin(pin)
-      await refreshPayments()
-      setPin('')
-      setToast('Pago cobrado y membresía activada')
-    } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : 'No se pudo canjear el PIN.')
-    } finally {
-      setIsRedeemingPin(false)
-    }
   }
 
   // A pending request is cancelled (its PIN stops working); the record stays in the history.
@@ -455,35 +316,15 @@ function Payments() {
       <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-4xl font-semibold tracking-tight text-slate-900">Pagos</h1>
-          <p className="mt-3 text-slate-500">Consulta y administra los pagos registrados.</p>
+          <p className="mt-3 text-slate-500">Consulta y administra los pagos de membresía. Los cobros se hacen en Caja.</p>
         </div>
-        <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
-          <form className="flex gap-2" onSubmit={handleRedeemPin}>
-            <input
-              className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-100 sm:w-52"
-              type="text"
-              placeholder="Código PIN Membresía"
-              aria-label="Código PIN Membresía"
-              value={pin}
-              onChange={(event) => setPin(event.target.value)}
-            />
-            <button
-              className="shrink-0 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:border-green-400 hover:text-green-700 disabled:cursor-not-allowed disabled:opacity-50"
-              type="submit"
-              disabled={isRedeemingPin || !pin.trim()}
-            >
-              {isRedeemingPin ? 'Canjeando...' : 'Canjear PIN'}
-            </button>
-          </form>
-          <button
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-brand px-4 py-2 font-medium text-ink transition hover:bg-brand-hover"
-            type="button"
-            onClick={openCreateModal}
-          >
-            <Plus size={18} aria-hidden="true" />
-            Nuevo Pago
-          </button>
-        </div>
+        <Link
+          className="inline-flex items-center justify-center gap-2 rounded-lg bg-brand px-4 py-2 font-medium text-ink transition hover:bg-brand-hover"
+          to="/caja"
+        >
+          <Wallet size={18} aria-hidden="true" />
+          Ir a Caja
+        </Link>
       </div>
 
       {toast && (
@@ -634,7 +475,7 @@ function Payments() {
               <div>
                 <p className="text-sm font-medium uppercase tracking-[0.2em] text-emerald-700">Comercial</p>
                 <h2 className="mt-2 text-2xl font-semibold text-slate-900">
-                  {isEditing ? 'Editar pago' : 'Nuevo pago'}
+                  Editar pago
                 </h2>
               </div>
               <button
@@ -648,15 +489,13 @@ function Payments() {
             </div>
 
             <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
-              {!isEditing && <GymSelect id="payment-gym" label="Sucursal que cobra" value={gymId} onChange={setGymId} />}
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="payment-user">Usuario</label>
                 <select
                   className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
                   id="payment-user"
                   value={form.userId}
-                  onChange={(event) => handleUserChange(event.target.value)}
-                  disabled={isEditing}
+                  disabled
                   required
                 >
                   <option value="">Selecciona un usuario</option>
@@ -686,35 +525,6 @@ function Payments() {
                 {isPaidRecord && <p className="mt-1 text-xs text-slate-500">El pago ya activó la membresía; para cambiar de plan registra un pago nuevo.</p>}
               </div>
 
-              {quote && quote.promotions.length > 0 && (
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="payment-promotion">Promoción</label>
-                  <select
-                    className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
-                    id="payment-promotion"
-                    value={selectedPromotionId}
-                    onChange={(event) => setChosenPromotion({ key: quoteKey, promotionId: event.target.value })}
-                  >
-                    <option value="">Sin promoción · {formatMoney(quote.listPrice)}</option>
-                    {quote.promotions.map((option) => (
-                      <option key={option.promotionId} value={option.promotionId} disabled={option.eligible === false}>
-                        {option.title} · −{option.discountPercentage}% · {formatMoney(option.amount)}
-                        {option.eligible === false ? ' (falta documento verificado)' : ''}
-                      </option>
-                    ))}
-                  </select>
-                  {selectedPromotion ? (
-                    <p className="mt-2 text-xs text-emerald-700">
-                      {formatMoney(selectedPromotion.listPrice)} − {formatMoney(selectedPromotion.discountApplied)} de descuento = {formatMoney(selectedPromotion.amount)}
-                    </p>
-                  ) : quote.promotions.some((option) => option.eligible === false) && (
-                    <p className="mt-2 text-xs text-slate-500">
-                      Hay promociones que piden un documento verificado del cliente; revísalo en Documentos.
-                    </p>
-                  )}
-                </div>
-              )}
-
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="payment-amount">Monto</label>
@@ -724,14 +534,12 @@ function Payments() {
                     type="number"
                     min="0"
                     step="0.01"
-                    value={selectedPromotion ? String(selectedPromotion.amount) : form.amount}
+                    value={form.amount}
                     // The API charges the plan's price or the promotion's: an amount typed here would be refused.
                     readOnly
                     required
                   />
-                  {selectedPromotion
-                    ? <p className="mt-1 text-xs text-slate-500">Calculado con la promoción.</p>
-                    : isPaidRecord
+                  {isPaidRecord
                       ? <p className="mt-1 text-xs text-slate-500">Monto protegido para conservar el registro.</p>
                       : <p className="mt-1 text-xs text-slate-500">Precio del plan. Los descuentos solo se aplican con una promoción vigente.</p>}
                 </div>

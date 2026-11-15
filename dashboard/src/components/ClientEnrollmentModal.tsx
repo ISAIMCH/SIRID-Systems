@@ -175,7 +175,7 @@ function ClientEnrollmentModal({ initialOutcome = null, coaches = [], onEnrolled
           {current.client.id && (
             <Link
               className="rounded-lg bg-brand px-4 py-2 font-medium text-ink transition hover:bg-brand-hover"
-              to={`/payments?cliente=${encodeURIComponent(current.client.id)}`}
+              to={`/caja?cliente=${encodeURIComponent(current.client.id)}`}
             >
               Cobrar membresía
             </Link>
