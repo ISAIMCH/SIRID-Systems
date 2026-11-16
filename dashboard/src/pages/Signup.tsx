@@ -48,7 +48,7 @@ function Signup() {
   const [form, setForm] = useState(EMPTY_FORM)
   const [error, setError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [result, setResult] = useState<{ name: string; existingAccount: boolean } | null>(null)
+  const [result, setResult] = useState<{ name: string; existingAccount: boolean; verifyEmail?: string } | null>(null)
 
   const update = (field: keyof OwnerSignupPayload) => (event: { target: { value: string } }) => {
     setForm((current) => ({ ...current, [field]: event.target.value }))
@@ -61,7 +61,11 @@ function Signup() {
     try {
       const trimmed = Object.fromEntries(Object.entries(form).map(([key, value]) => [key, key === 'password' ? value : value.trim()]))
       const response = await signupOwner(trimmed as Required<OwnerSignupPayload>)
-      setResult({ name: response.organization.name, existingAccount: response.existingAccount })
+      setResult({
+        name: response.organization.name,
+        existingAccount: response.existingAccount,
+        verifyEmail: response.verificationRequired ? response.email : undefined,
+      })
     } catch (requestError) {
       setError(signupErrorMessage(requestError))
     } finally {
@@ -78,11 +82,18 @@ function Signup() {
         {result ? (
           <div className="mt-8">
             <CheckCircle2 className="text-emerald-600" size={40} aria-hidden="true" />
-            <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-900">Solicitud enviada</h1>
+            <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-900">{result.verifyEmail ? 'Confirma tu correo' : 'Solicitud enviada'}</h1>
+            {result.verifyEmail ? (
+            <p className="mt-3 text-sm leading-6 text-slate-600">
+              Registramos <strong>{result.name}</strong>. Te enviamos un código de 6 dígitos a <strong>{result.verifyEmail}</strong>:
+              inicia sesión con tu correo y contraseña y escríbelo para entrar a tu panel.
+            </p>
+            ) : (
             <p className="mt-3 text-sm leading-6 text-slate-600">
               Recibimos la solicitud de <strong>{result.name}</strong>. SIRID la revisará y te llamará al teléfono que registraste.
               Inicia sesión más tarde para ver si ya fue aprobada.
             </p>
+            )}
             {result.existingAccount && (
               <p className="mt-3 text-sm leading-6 text-slate-600">
                 Usamos tu cuenta de GymGo existente: entra con el mismo correo y contraseña.
