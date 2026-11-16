@@ -164,6 +164,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Mexico_City',
                 },
             });
+            // A new account confirms its email first; the session comes with the right code.
+            if (data.verificationRequired) {
+                const verified = await GymGo.verifyEmail(document.getElementById('registroCard'), data.email, {
+                    intro: data.emailSent === false ? 'No pudimos enviar el código. Pide uno nuevo abajo; irá a' : undefined,
+                });
+                showDone(verified);
+                return;
+            }
             // A rejected application sent again goes back to SIRID's review and has no session yet.
             if (!data.token) {
                 notify('info', data.message || 'Recibimos tu solicitud.');

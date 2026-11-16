@@ -516,24 +516,26 @@
                     <div class="footer-form">
                         <h3 class="mb-2">Contáctanos</h3>
                         <p class="small mb-3">¿Dudas sobre la plataforma? Envíanos un mensaje.</p>
-                        <form id="contactForm" action="mailto:project.gymgo@gmail.com?subject=Solicitud%20de%20Demo%20GymGo" method="post" enctype="text/plain" data-validate class="needs-validation" novalidate>
+                        <form id="contactForm" data-contact-kind="contact" class="needs-validation" novalidate>
+                            <div class="status-msg mb-3" data-contact-status role="status" aria-live="polite"></div>
+                            <div class="visually-hidden" aria-hidden="true"><label>No llenes este campo <input name="website" tabindex="-1" autocomplete="off"></label></div>
                             <div class="mb-3">
                                 <label class="form-label" for="user_name">Nombre</label>
-                                <input type="text" class="form-control gg-input" id="user_name" name="user_name" placeholder="Tu nombre" autocomplete="name" required>
+                                <input type="text" class="form-control gg-input" id="user_name" name="user_name" data-field="name" maxlength="100" placeholder="Tu nombre" autocomplete="name" required>
                                 <div class="invalid-feedback">Escribe tu nombre.</div>
                             </div>
                             <div class="mb-3">
                                 <label class="form-label" for="user_email">Correo</label>
-                                <input type="email" class="form-control gg-input" id="user_email" name="user_email" placeholder="tu@correo.com" autocomplete="email" required>
+                                <input type="email" class="form-control gg-input" id="user_email" name="user_email" data-field="email" maxlength="254" placeholder="tu@correo.com" autocomplete="email" required>
                                 <div class="invalid-feedback">Escribe un correo válido.</div>
                             </div>
                             <div class="mb-3">
                                 <label class="form-label" for="message">Mensaje</label>
-                                <textarea class="form-control gg-input" id="message" name="message" rows="3" placeholder="Cuéntanos sobre tu gimnasio..." required></textarea>
+                                <textarea class="form-control gg-input" id="message" name="message" data-field="message" maxlength="4000" rows="3" placeholder="Cuéntanos sobre tu gimnasio..." required></textarea>
                                 <div class="invalid-feedback">Escribe tu mensaje.</div>
                             </div>
                             <div class="d-grid gap-2">
-                                <button type="submit" class="btn-gg btn-gg-primary" id="btn-correo"><i class="bi bi-envelope"></i>Enviar por correo</button>
+                                <button type="submit" class="btn-gg btn-gg-primary" id="btn-correo"><i class="bi bi-envelope"></i>Enviar mensaje</button>
                                 <button type="button" class="btn-gg btn-gg-ghost" onclick="enviarWhatsApp()"><i class="bi bi-whatsapp"></i>Enviar por WhatsApp</button>
                             </div>
                         </form>
@@ -631,31 +633,7 @@
     <script src="./assets/js/gymgo.js"></script>
     <script src="./assets/js/planes.js"></script>
     <script src="./assets/js/main.js"></script>
+    <script src="./assets/js/contacto.js"></script>
 
-    <script type="text/javascript">
-        // 1. INICIALIZAR EMAILJS (desactivado: el formulario usa el respaldo mailto: del atributo action)
-        (function() {
-            if (typeof emailjs !== 'undefined') emailjs.init("9Bl9zpYGGTk8prZ0z");
-        })();
-
-        // 2. FUNCIÓN PARA ENVIAR CORREO (EmailJS) — se conserva tal como estaba; hoy retorna antes de enviar.
-        document.getElementById('contactForm').addEventListener('submit', function(event) {
-            return;
-            event.preventDefault();
-            const btn = document.getElementById('btn-correo');
-            btn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Enviando...';
-            const serviceID = 'service_4kbxym3';
-            const templateID = 'template_6ppilu2';
-            emailjs.sendForm(serviceID, templateID, this)
-                .then(function() {
-                    btn.innerHTML = '<i class="bi bi-check-circle me-2"></i>Mensaje Enviado';
-                    document.getElementById('contactForm').reset();
-                }, function(error) {
-                    btn.innerHTML = '<i class="bi bi-x-circle me-2"></i>Error al enviar';
-                    console.log('Error de EmailJS:', error);
-                });
-        });
-        // 3. El envío por WhatsApp (enviarWhatsApp) vive en assets/js/main.js.
-    </script>
 </body>
 </html>
