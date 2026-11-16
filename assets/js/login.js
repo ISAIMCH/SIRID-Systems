@@ -15,6 +15,19 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('signupLink').href = `registro.html${safeReturn.slice('pagos.html'.length)}`;
     }
 
+    function enter(data) {
+        const worksInGym = Boolean(data.subscription) || (data.gyms || []).some((gym) => (gym.roles || []).some((role) => role !== 'Cliente'));
+        if (safeReturn) {
+            location.href = safeReturn;
+        } else if (worksInGym || data.user?.isPlatformAdmin) {
+            notify('success', `Hola, ${data.user?.name || ''}. Abriendo tu panel…`);
+            location.href = GymGo.dashboardUrl();
+        } else {
+            notify('info', 'Tu cuenta es de cliente: entrena y consulta tu membresía desde la app GymGo.');
+            window.siridLoading(submit, false);
+        }
+    }
+
     form.addEventListener('submit', async (event) => {
         event.preventDefault();
         if (!form.checkValidity()) {
@@ -31,17 +44,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: { email: document.getElementById('email').value.trim().toLowerCase(), password: document.getElementById('password').value },
             });
             GymGo.saveSession(data);
-            const worksInGym = Boolean(data.subscription) || (data.gyms || []).some((gym) => (gym.roles || []).some((role) => role !== 'Cliente'));
-            if (safeReturn) {
-                location.href = safeReturn;
-            } else if (worksInGym || data.user?.isPlatformAdmin) {
-                notify('success', `Hola, ${data.user?.name || ''}. Abriendo tu panel…`);
-                location.href = GymGo.dashboardUrl();
-            } else {
-                notify('info', 'Tu cuenta es de cliente: entrena y consulta tu membresía desde la app GymGo.');
-                window.siridLoading(submit, false);
-            }
+            enter(data);
         } catch (error) {
+            // Signed up but never confirmed the email: confirm it here and continue.
+            if (error.code === 'email_not_verified') {
+                enter(await GymGo.verifyEmail(form.closest('.login-card'), error.details?.email || document.getElementById('email').value.trim().toLowerCase()));
+                return;
+            }
             notify('error', error.status === 400 ? 'Correo o contraseña incorrectos.' : error.message);
             window.siridLoading(submit, false);
         }

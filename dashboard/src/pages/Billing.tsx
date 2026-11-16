@@ -260,10 +260,10 @@ function Billing() {
 
           <PlanHero data={data} onPortal={handlePortal} portalBusy={portalBusy} />
 
-          {subscription.pendingPayment?.voucherUrl && (
+          {(subscription.pendingPayment?.voucherUrl || subscription.pendingPayment?.simulated) && (
             <div className="flex flex-col gap-3 rounded-card border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 sm:flex-row sm:items-center sm:justify-between">
               <p className="flex items-center gap-2"><Store size={18} aria-hidden /> Tienes una ficha OXXO pendiente{subscription.pendingPayment.expiresAt ? `, vence el ${formatLongDate(subscription.pendingPayment.expiresAt)}` : ''}.</p>
-              <a className="inline-flex items-center gap-1.5 font-semibold underline-offset-2 hover:underline" href={subscription.pendingPayment.voucherUrl} target="_blank" rel="noopener noreferrer">Ver ficha <ExternalLink size={14} aria-hidden /></a>
+              <a className="inline-flex items-center gap-1.5 font-semibold underline-offset-2 hover:underline" href={subscription.pendingPayment.voucherUrl ?? checkoutUrl(subscription.pendingPayment.planCode)} target="_blank" rel="noopener noreferrer">Ver ficha <ExternalLink size={14} aria-hidden /></a>
             </div>
           )}
 

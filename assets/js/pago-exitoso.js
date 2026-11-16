@@ -24,7 +24,8 @@
     function showActive({ organization, subscription: s }) {
         paint('ok', '¡Pago confirmado!', `${GymGo.escape(organization?.name || 'Tu gimnasio')} ya tiene el plan ${GymGo.escape(s.planName)} activo.`, [
             ['Plan', `${s.planName} · ${s.interval === 'year' ? 'anual' : 'mensual'}`],
-            ['Método', METHOD_LABELS[s.method] || s.method],
+            // A simulated card pays one period, it doesn't renew.
+            ['Método', s.method === 'card' && !s.renews ? 'Tarjeta' : METHOD_LABELS[s.method] || s.method],
             [s.renews ? 'Próxima renovación' : 'Pagado hasta', GymGo.date(s.currentPeriodEnd)],
             ['Sucursales incluidas', String(s.gymLimit)],
         ], `${dashboardButton()}<a class="btn-gg btn-gg-outline" href="pagos.html">Ver mis pagos</a>`);

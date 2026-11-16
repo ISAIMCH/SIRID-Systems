@@ -138,3 +138,50 @@ body.payments-page { min-height: 100vh; padding-bottom: 3rem; background: var(--
 .result-facts div { display: flex; justify-content: space-between; gap: 1rem; font-size: .95rem; color: var(--gg-600); }
 .result-facts b { color: var(--gg-950); text-align: right; }
 .result-actions { display: grid; gap: .6rem; }
+
+/* Pagos simulados: formulario de tarjeta */
+.sim-card-form { margin-bottom: 1rem; }
+.card-number-field > .gg-input { padding-right: 6.5rem; }
+.card-brand { position: absolute; right: 1rem; top: 50%; transform: translateY(-50%); color: var(--gg-600); font-size: .85rem; font-weight: 700; pointer-events: none; }
+
+/* Pagos simulados: ficha OXXO */
+.oxxo-voucher { margin-bottom: 1rem; padding: 1.25rem; border: 2px dashed var(--gg-300); border-radius: var(--gg-r-md); background: var(--gg-white); }
+.oxxo-voucher-head { display: flex; align-items: center; gap: .75rem; margin-bottom: 1rem; color: var(--gg-700); font-weight: 600; }
+.oxxo-logo { padding: .2rem .6rem; border-radius: 6px; background: #d71920; color: #ffe000; font-weight: 800; letter-spacing: .04em; }
+.oxxo-voucher-amount { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: .5rem; margin-bottom: 1rem; }
+.oxxo-voucher-amount span { color: var(--gg-600); }
+.oxxo-voucher-amount strong { color: var(--gg-950); font-size: 1.6rem; }
+.oxxo-barcode { display: block; width: 100%; height: 64px; fill: var(--gg-950); }
+.oxxo-reference { margin: .5rem 0 1rem; text-align: center; font-family: ui-monospace, Consolas, monospace; font-size: 1.15rem; font-weight: 700; letter-spacing: .12em; color: var(--gg-950); overflow-wrap: anywhere; }
+.oxxo-facts { display: grid; gap: .4rem; margin: 0 0 1rem; }
+.oxxo-facts div { display: flex; justify-content: space-between; gap: 1rem; font-size: .92rem; }
+.oxxo-facts dt { color: var(--gg-600); font-weight: 500; }
+.oxxo-facts dd { margin: 0; color: var(--gg-950); font-weight: 600; text-align: right; }
+.oxxo-steps { margin: 0 0 1rem; padding-left: 1.2rem; color: var(--gg-700); font-size: .9rem; }
+.oxxo-actions { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+.oxxo-actions .btn-d { flex: 1 1 220px; }
+
+/* Pagos simulados: ventana de PayPal */
+.paypal-sim { border: 0; border-radius: var(--gg-r-md); overflow: hidden; }
+.paypal-sim-head { display: flex; align-items: center; gap: .75rem; padding: 1rem 1.25rem; border-bottom: 1px solid var(--gg-200); }
+.paypal-logo { display: inline-flex; align-items: center; gap: .35rem; color: #003087; font-size: 1.35rem; font-weight: 800; font-style: italic; }
+.paypal-logo .bi { color: #009cde; font-style: normal; }
+.paypal-sim-badge { padding: .15rem .55rem; border-radius: 999px; background: var(--gg-warning-soft); color: var(--gg-warning); font-size: .75rem; font-weight: 700; }
+.paypal-sim-head .btn-close { margin-left: auto; }
+.paypal-sim-body { padding: 1.25rem; }
+.paypal-sim-title { margin-bottom: 1rem; font-size: 1.3rem; color: var(--gg-950); }
+.paypal-sim-note { margin: .75rem 0 0; color: var(--gg-600); font-size: .82rem; text-align: center; }
+.paypal-sim-hello { color: var(--gg-700); }
+.paypal-sim-charge { display: grid; gap: .5rem; margin-bottom: 1rem; padding: 1rem; border-radius: var(--gg-r-sm); background: var(--gg-50); }
+.paypal-sim-charge div { display: flex; justify-content: space-between; gap: 1rem; font-size: .92rem; }
+.paypal-sim-charge span { color: var(--gg-600); }
+.paypal-sim-charge b { color: var(--gg-950); text-align: right; }
+.paypal-sim-charge .total { padding-top: .5rem; border-top: 1px solid var(--gg-200); font-size: 1.05rem; }
+
+/* Imprimir solo la ficha OXXO */
+@media print {
+    body.payments-page * { visibility: hidden; }
+    body.payments-page #oxxoVoucher, body.payments-page #oxxoVoucher * { visibility: visible; }
+    body.payments-page #oxxoVoucher { position: absolute; inset: 0 0 auto 0; border-color: #999; }
+    body.payments-page .oxxo-actions { display: none; }
+}

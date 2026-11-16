@@ -128,6 +128,28 @@ export function login(credentials: LoginCredentials) {
   }, { withGym: false })
 }
 
+// Accounts that signed up on their own confirm their email with a 6-digit code before getting a session.
+// Returns the email to confirm when the error says so, otherwise null.
+export function emailNotVerified(error: unknown): string | null {
+  if (!(error instanceof ApiError) || error.status !== 403) return null
+  const data = error.response.data as { code?: string; email?: string }
+  return data.code === 'email_not_verified' ? data.email ?? '' : null
+}
+
+export function verifyEmail(email: string, code: string) {
+  return apiClient<LoginResponse>('/auth/verify-email', {
+    method: 'POST',
+    body: JSON.stringify({ email, code }),
+  }, { withGym: false, sessionOn401: 'keep' })
+}
+
+export function resendVerificationCode(email: string) {
+  return apiClient<{ sent: boolean }>('/auth/verify-email/resend', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  }, { withGym: false, sessionOn401: 'keep' })
+}
+
 // The organization an API error says is blocked (403 with code organization_*), or null.
 export function blockedOrganization(error: unknown): OrganizationNotice | null {
   if (!(error instanceof ApiError) || error.status !== 403) return null
@@ -149,7 +171,7 @@ export interface OwnerSignupPayload {
 }
 
 export function signupOwner(payload: OwnerSignupPayload) {
-  return apiClient<{ organization: { id: string; name: string; status: OrganizationStatus }; existingAccount: boolean; message: string }>(
+  return apiClient<{ organization: { id: string; name: string; status: OrganizationStatus }; existingAccount: boolean; message: string; verificationRequired?: boolean; email?: string }>(
     '/organizations/signup',
     { method: 'POST', body: JSON.stringify(payload) },
     { withGym: false, sessionOn401: 'keep' },
@@ -1371,7 +1393,7 @@ export interface OrganizationSubscription {
   daysLeft: number | null
   gymLimit: number | null
   features: PlanFeature[] | null
-  pendingPayment: { method: 'oxxo'; planCode: string; interval: string; voucherUrl: string | null; expiresAt: string | null } | null
+  pendingPayment: { method: 'oxxo'; planCode: string; interval: string; voucherUrl: string | null; expiresAt: string | null; simulated?: boolean; amount?: number | null } | null
   hasStripeCustomer: boolean
 }
 

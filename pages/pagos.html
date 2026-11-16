@@ -98,10 +98,36 @@
               <span class="method-icon"><i class="bi bi-credit-card-2-front"></i></span>
               <div>
                 <h3>Tarjeta de crédito o débito</h3>
-                <p class="small text-muted mb-0">Te llevamos a la página segura de Stripe. Tu plan se renueva cada periodo con la misma tarjeta y puedes cancelarlo desde tu panel.</p>
-                <p class="test-hint d-none" data-test-hint>Modo prueba: usa la tarjeta <b>4242 4242 4242 4242</b>, cualquier fecha futura y cualquier CVC.</p>
+                <p class="small text-muted mb-0" data-stripe-only>Te llevamos a la página segura de Stripe. Tu plan se renueva cada periodo con la misma tarjeta y puedes cancelarlo desde tu panel.</p>
+                <p class="small text-muted mb-0 d-none" data-sim-only>Pagas un periodo y tu plan se activa al instante. GymGo solo guarda la marca y los últimos 4 dígitos.</p>
+                <p class="test-hint d-none" data-test-hint data-stripe-only>Modo prueba: usa la tarjeta <b>4242 4242 4242 4242</b>, cualquier fecha futura y cualquier CVC.</p>
+                <p class="test-hint d-none" data-sim-only>Simulación: <b>4242 4242 4242 4242</b> se aprueba; <b>4000 0000 0000 0002</b> se rechaza y <b>4000 0000 0000 9995</b> no tiene fondos. Cualquier fecha futura y CVC.</p>
               </div>
             </div>
+            <form id="simCardForm" class="sim-card-form d-none" novalidate autocomplete="off">
+              <div class="row g-3 mb-3">
+                <div class="col-12">
+                  <label class="form-label" for="cardHolder">Nombre en la tarjeta</label>
+                  <input id="cardHolder" class="form-control gg-input" maxlength="100" autocomplete="cc-name" required>
+                </div>
+                <div class="col-12">
+                  <label class="form-label" for="cardNumber">Número de tarjeta</label>
+                  <div class="input-icon card-number-field">
+                    <i class="bi bi-credit-card" aria-hidden="true"></i>
+                    <input id="cardNumber" class="form-control gg-input" inputmode="numeric" maxlength="23" placeholder="0000 0000 0000 0000" autocomplete="cc-number" required>
+                    <span class="card-brand" id="cardBrand" aria-live="polite"></span>
+                  </div>
+                </div>
+                <div class="col-6">
+                  <label class="form-label" for="cardExp">Vencimiento</label>
+                  <input id="cardExp" class="form-control gg-input" inputmode="numeric" maxlength="5" placeholder="MM/AA" autocomplete="cc-exp" required>
+                </div>
+                <div class="col-6">
+                  <label class="form-label" for="cardCvc">CVC</label>
+                  <input id="cardCvc" class="form-control gg-input" inputmode="numeric" maxlength="4" placeholder="123" autocomplete="cc-csc" required>
+                </div>
+              </div>
+            </form>
             <button type="button" id="payCard" class="btn btn-d w-100" data-method="card"><i class="bi bi-lock"></i><span>Pagar con tarjeta</span></button>
           </div>
           <div class="tab-pane fade" id="t-oxxo" role="tabpanel">
@@ -109,10 +135,12 @@
               <span class="method-icon"><i class="bi bi-upc-scan"></i></span>
               <div>
                 <h3>Paga en efectivo en OXXO</h3>
-                <p class="small text-muted mb-0">Stripe genera una ficha con referencia. Pagas un periodo; tu plan se activa cuando OXXO confirma el pago (hasta 1 día hábil). No se renueva solo.</p>
+                <p class="small text-muted mb-0" data-stripe-only>Stripe genera una ficha con referencia. Pagas un periodo; tu plan se activa cuando OXXO confirma el pago (hasta 1 día hábil). No se renueva solo.</p>
+                <p class="small text-muted mb-0 d-none" data-sim-only>Generamos una ficha con referencia que vence en 3 días. Pagas un periodo; tu plan se activa cuando se confirma el pago en tienda. No se renueva solo.</p>
                 <ul class="method-steps"><li>Genera tu ficha</li><li>Paga en cualquier OXXO</li><li>Tu plan se activa</li></ul>
               </div>
             </div>
+            <div id="oxxoVoucher" class="oxxo-voucher d-none" aria-live="polite"></div>
             <button type="button" id="payOxxo" class="btn btn-d w-100" data-method="oxxo"><i class="bi bi-upc"></i><span>Generar ficha OXXO</span></button>
           </div>
           <div class="tab-pane fade" id="t-paypal" role="tabpanel">
@@ -120,7 +148,8 @@
               <span class="method-icon"><i class="bi bi-paypal"></i></span>
               <div>
                 <h3>Paga con tu cuenta PayPal</h3>
-                <p class="small text-muted mb-0">Simulación para la demostración: no se conecta a PayPal ni se cobra nada. Activa una prueba de 5 días del plan elegido, una vez por gimnasio.</p>
+                <p class="small text-muted mb-0" data-stripe-only>Simulación para la demostración: no se conecta a PayPal ni se cobra nada. Activa una prueba de 5 días del plan elegido, una vez por gimnasio.</p>
+                <p class="small text-muted mb-0 d-none" data-sim-only>Inicia sesión en PayPal, revisa el cargo y confirma. Pagas un periodo y tu plan se activa al instante.</p>
               </div>
             </div>
             <div id="paypalButtons" class="paypal-slot"></div>
@@ -142,7 +171,8 @@
         <div id="summaryTotals" class="summary-totals"></div>
         <ul class="summary-facts">
           <li><i class="bi bi-receipt"></i><span>Precios en pesos mexicanos (MXN). El IVA del 16% está incluido en el total.</span></li>
-          <li><i class="bi bi-shield-lock"></i><span>Los datos de tu tarjeta los recibe Stripe o PayPal; GymGo nunca los ve.</span></li>
+          <li data-stripe-only><i class="bi bi-shield-lock"></i><span>Los datos de tu tarjeta los recibe Stripe o PayPal; GymGo nunca los ve.</span></li>
+          <li class="d-none" data-sim-only><i class="bi bi-cone-striped"></i><span>Pagos simulados para la demostración: no se hace ningún cargo real y GymGo no guarda el número de tu tarjeta.</span></li>
           <li><i class="bi bi-building"></i><span>Vendedor: SIRID Systems · GymGo<br><a href="mailto:project.gymgo@gmail.com">project.gymgo@gmail.com</a></span></li>
         </ul>
         <p class="summary-legal">Al pagar aceptas los <a href="terminos.html" target="_blank" rel="noopener">términos y condiciones</a> y el <a href="politica-privacidad.html" target="_blank" rel="noopener">aviso de privacidad</a>.</p>
@@ -150,6 +180,42 @@
     </aside>
   </div>
 </main>
+
+<!-- PayPal simulado: inicio de sesión y confirmación del cargo, sin conectarse a PayPal -->
+<div class="modal fade" id="paypalModal" tabindex="-1" aria-labelledby="paypalModalTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content paypal-sim">
+      <div class="paypal-sim-head">
+        <span class="paypal-logo" id="paypalModalTitle"><i class="bi bi-paypal" aria-hidden="true"></i>PayPal</span>
+        <span class="paypal-sim-badge">Simulación</span>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="paypal-sim-body">
+        <div id="ppStatus" class="status-msg mb-3" role="alert" aria-live="assertive"></div>
+        <form id="ppLogin" novalidate>
+          <h2 class="paypal-sim-title">Paga con PayPal</h2>
+          <label class="form-label" for="ppEmail">Correo electrónico</label>
+          <input id="ppEmail" class="form-control gg-input mb-3" type="email" maxlength="254" autocomplete="off" required>
+          <label class="form-label" for="ppPassword">Contraseña</label>
+          <input id="ppPassword" class="form-control gg-input mb-3" type="password" maxlength="72" autocomplete="off" required>
+          <button type="submit" class="paypal-demo-btn w-100">Iniciar sesión</button>
+          <p class="paypal-sim-note">Simulación: escribe cualquier correo y contraseña. La contraseña no se envía a ningún lado.</p>
+        </form>
+        <div id="ppReview" class="d-none">
+          <p class="paypal-sim-hello">Hola, <b id="ppPayer"></b></p>
+          <div class="paypal-sim-charge">
+            <div><span>Pagar a</span><b>SIRID Systems · GymGo</b></div>
+            <div><span>Concepto</span><b id="ppConcept"></b></div>
+            <div><span>Pagar con</span><b>Saldo de PayPal</b></div>
+            <div class="total"><span>Total</span><b id="ppTotal"></b></div>
+          </div>
+          <button type="button" class="paypal-demo-btn w-100" id="ppPay">Pagar ahora</button>
+          <button type="button" class="btn btn-link w-100 mt-1" id="ppSwitch">Usar otra cuenta</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script src="../assets/js/config.js"></script>
