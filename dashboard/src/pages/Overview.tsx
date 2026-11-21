@@ -682,7 +682,7 @@ function Overview() {
               <ul className="space-y-2">
                 {[
                   { label: 'Pagos por confirmar', value: metrics.pendingPayments, icon: Receipt, to: '/payments' },
-                  { label: `Productos con stock bajo (≤ ${LOW_STOCK_THRESHOLD})`, value: metrics.lowStock, icon: PackageX, to: '/inventory' },
+                  { label: `Productos con stock bajo (≤ ${LOW_STOCK_THRESHOLD})`, value: metrics.lowStock, icon: PackageX, to: '/inventory?stock=bajo' },
                   { label: 'Cuentas por activar', value: metrics.pendingActivation, icon: KeyRound, to: '/users' },
                 ].map(({ label, value, icon: Icon, to }) => {
                   const content = (

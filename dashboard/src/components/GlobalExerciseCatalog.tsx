@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
-import { AlertTriangle, Dumbbell, Lock, Search, X } from 'lucide-react'
+import { AlertTriangle, BookOpen, Dumbbell, Lock, Search } from 'lucide-react'
 import { getCatalogExercise, getExerciseCatalog } from '../services/api'
 import type { CatalogExercise, CatalogExerciseDetail, ExerciseCatalogPage } from '../services/api'
 import { EQUIPMENT_CATEGORIES, MUSCLE_GROUPS } from '../utils/exerciseCatalog'
-
-const inputClassName = 'w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100'
+import Panel from './ui/Panel'
+import Modal from './ui/Modal'
+import Badge, { type BadgeTone } from './ui/Badge'
+import EmptyState from './ui/EmptyState'
+import { errorAlert, fieldClass, secondaryButton } from './ui/styles'
 
 function ExerciseDetailDialog({ exercise, onClose }: { exercise: CatalogExercise; onClose: () => void }) {
   const [detail, setDetail] = useState<CatalogExerciseDetail | null>(null)
@@ -19,36 +22,40 @@ function ExerciseDetailDialog({ exercise, onClose }: { exercise: CatalogExercise
   }, [exercise._id])
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="catalog-exercise-title">
-      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-sm font-medium uppercase tracking-[0.2em] text-emerald-700">Catálogo global</p>
-            <h2 className="mt-2 text-2xl font-semibold text-slate-900" id="catalog-exercise-title">{exercise.name}</h2>
+    <Modal eyebrow="Catálogo global" title={exercise.name} onClose={onClose} size="xl">
+      <div className="grid gap-6 sm:grid-cols-[220px_1fr]">
+        {exercise.gifUrl
+          ? <img className="aspect-square w-full rounded-xl bg-slate-50 object-contain ring-1 ring-slate-200" src={exercise.gifUrl} alt={`Animación de ${exercise.name}`} />
+          : <div className="grid aspect-square w-full place-items-center rounded-xl bg-slate-50 text-slate-300"><Dumbbell size={40} aria-hidden /></div>}
+        <div>
+          <div className="flex flex-wrap gap-1.5">
+            <Badge tone="brand">{exercise.muscleGroup}</Badge>
+            {detail?.secondaryMuscles.map((muscle) => <Badge key={muscle}>{muscle}</Badge>)}
+            <Badge tone="info">{exercise.equipment || 'Sin equipo'}</Badge>
           </div>
-          <button className="text-slate-400 hover:text-slate-700" type="button" aria-label="Cerrar" onClick={onClose}><X size={22} /></button>
-        </div>
-        <div className="mt-5 grid gap-6 sm:grid-cols-[220px_1fr]">
-          {exercise.gifUrl
-            ? <img className="aspect-square w-full rounded-xl bg-slate-50 object-contain" src={exercise.gifUrl} alt={`Animación de ${exercise.name}`} />
-            : <div className="flex aspect-square w-full items-center justify-center rounded-xl bg-slate-50 text-slate-300"><Dumbbell size={40} /></div>}
-          <div>
-            <div className="flex flex-wrap gap-2">
-              <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700">{exercise.muscleGroup}</span>
-              {detail?.secondaryMuscles.map((muscle) => <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600" key={muscle}>{muscle}</span>)}
-              <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700">{exercise.equipment || 'Sin equipo'}</span>
+          <h3 className="mt-5 text-sm font-semibold text-ink">Cómo hacerlo</h3>
+          {error && <p className={`${errorAlert} mt-2`} role="alert">{error}</p>}
+          {!detail && !error && (
+            <div className="mt-3 space-y-2" aria-busy="true" aria-label="Cargando instrucciones">
+              {Array.from({ length: 3 }).map((_, index) => <div className="skeleton h-4 w-full" key={index} />)}
             </div>
-            <h3 className="mt-5 text-sm font-semibold text-slate-900">Cómo hacerlo</h3>
-            {error && <p className="mt-2 text-sm text-red-700" role="alert">{error}</p>}
-            {!detail && !error && <p className="mt-2 text-sm text-slate-500">Cargando instrucciones...</p>}
-            {detail && (detail.steps.length
-              ? <ol className="mt-2 list-decimal space-y-2 pl-5 text-sm text-slate-700">{detail.steps.map((step, index) => <li key={index}>{step}</li>)}</ol>
-              : <p className="mt-2 text-sm text-slate-500">Este ejercicio no tiene instrucciones paso a paso.</p>)}
-            {detail?.attribution && <p className="mt-4 text-xs text-slate-400">{detail.attribution}</p>}
-          </div>
+          )}
+          {detail && (detail.steps.length
+            ? (
+              <ol className="mt-3 space-y-2.5 text-sm text-slate-700">
+                {detail.steps.map((step, index) => (
+                  <li className="flex gap-3" key={index}>
+                    <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-slate-100 text-xs font-semibold text-slate-600 tabular">{index + 1}</span>
+                    <span className="pt-0.5">{step}</span>
+                  </li>
+                ))}
+              </ol>
+            )
+            : <p className="mt-2 text-sm text-slate-500">Este ejercicio no tiene instrucciones paso a paso.</p>)}
+          {detail?.attribution && <p className="mt-4 text-xs text-slate-400">{detail.attribution}</p>}
         </div>
       </div>
-    </div>
+    </Modal>
   )
 }
 
@@ -104,85 +111,99 @@ export default function GlobalExerciseCatalog() {
   const unlocked = new Set(result?.unlockedCategories ?? [])
   const outOfService = new Set(result?.outOfServiceCategories ?? [])
 
+  function statusOf(equipment: string): { label: string; tone: BadgeTone; icon?: typeof Lock } {
+    if (!unlocked.has(equipment)) return { label: 'Falta equipo', tone: 'neutral', icon: Lock }
+    if (outOfService.has(equipment)) return { label: 'En mantenimiento', tone: 'warning', icon: AlertTriangle }
+    return { label: 'Disponible', tone: 'success' }
+  }
+
   return (
-    <div className="mt-6 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
-      <div className="border-b border-gray-100 p-5">
-        <h2 className="text-base font-semibold text-slate-900">Catálogo global de SIRID</h2>
-        <p className="mt-1 text-sm text-slate-500">Tus coaches ven los ejercicios del equipo registrado en el gimnasio. Para desbloquear más, registra equipo de esa categoría.</p>
-        <div className="mt-4 flex flex-wrap gap-2">
+    <Panel
+      className="mt-6"
+      title="Catálogo global de SIRID"
+      icon={BookOpen}
+      description="Tus coaches ven los ejercicios del equipo registrado en el gimnasio. Para desbloquear más, registra equipo de esa categoría."
+    >
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Categorías de equipo</p>
+        <div className="mt-2 flex flex-wrap gap-1.5">
           {EQUIPMENT_CATEGORIES.map((item) => {
             const isUnlocked = unlocked.has(item)
             const isOut = outOfService.has(item)
-            const tone = isOut ? 'border-amber-200 bg-amber-50 text-amber-800' : isUnlocked ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-slate-50 text-slate-400'
             return (
-              <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium ${tone}`} key={item} title={isOut ? 'Todo el equipo de esta categoría está fuera de servicio' : isUnlocked ? 'Desbloqueada' : 'Sin equipo registrado'}>
-                {isOut ? <AlertTriangle size={12} aria-hidden="true" /> : !isUnlocked ? <Lock size={12} aria-hidden="true" /> : null}
-                {item}
+              <span key={item} title={isOut ? 'Todo el equipo de esta categoría está fuera de servicio' : isUnlocked ? 'Desbloqueada' : 'Sin equipo registrado'}>
+                <Badge tone={isOut ? 'warning' : isUnlocked ? 'success' : 'neutral'} icon={isOut ? AlertTriangle : isUnlocked ? undefined : Lock}>{item}</Badge>
               </span>
             )
           })}
         </div>
-        <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_180px_200px_auto] sm:items-center">
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={17} aria-hidden="true" />
-            <input className={`${inputClassName} pl-9`} type="search" placeholder="Buscar en el catálogo..." aria-label="Buscar en el catálogo" value={query} onChange={(event) => setQuery(event.target.value)} />
-          </div>
-          <select className={inputClassName} aria-label="Grupo muscular" value={muscleGroup} onChange={(event) => setMuscleGroup(event.target.value)}>
-            <option value="">Todos los músculos</option>
-            {MUSCLE_GROUPS.map((group) => <option key={group} value={group}>{group}</option>)}
-          </select>
-          <select className={inputClassName} aria-label="Categoría de equipo" value={category} onChange={(event) => setCategory(event.target.value)}>
-            <option value="">Todo el equipo</option>
-            {EQUIPMENT_CATEGORIES.map((item) => <option key={item} value={item}>{item}</option>)}
-          </select>
-          <label className="inline-flex items-center gap-2 text-sm text-slate-600">
-            <input type="checkbox" checked={showLocked} onChange={(event) => setShowLocked(event.target.checked)} />
-            Ver bloqueados
-          </label>
-        </div>
       </div>
-      {error && <div className="border-b border-red-100 bg-red-50 px-6 py-4 text-sm text-red-700" role="alert">{error}</div>}
-      <div className="overflow-x-auto">
-        <table className="min-w-full text-left text-sm">
-          <thead className="border-b border-gray-100 bg-gray-50/80 text-xs uppercase tracking-wider text-slate-500">
-            <tr><th className="px-5 py-4 font-medium sm:px-6">Ejercicio</th><th className="px-5 py-4 font-medium sm:px-6">Grupo muscular</th><th className="px-5 py-4 font-medium sm:px-6">Equipo</th><th className="px-5 py-4 font-medium sm:px-6">Estado</th></tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100 text-slate-700">
+
+      <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_11rem_12rem_auto] lg:items-center">
+        <label className="relative block sm:col-span-2 lg:col-span-1">
+          <span className="sr-only">Buscar en el catálogo</span>
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} aria-hidden />
+          <input className={`${fieldClass} pl-10`} type="search" placeholder="Buscar en el catálogo" value={query} onChange={(event) => setQuery(event.target.value)} />
+        </label>
+        <select className={fieldClass} aria-label="Grupo muscular" value={muscleGroup} onChange={(event) => setMuscleGroup(event.target.value)}>
+          <option value="">Todos los músculos</option>
+          {MUSCLE_GROUPS.map((group) => <option key={group} value={group}>{group}</option>)}
+        </select>
+        <select className={fieldClass} aria-label="Categoría de equipo" value={category} onChange={(event) => setCategory(event.target.value)}>
+          <option value="">Todo el equipo</option>
+          {EQUIPMENT_CATEGORIES.map((item) => <option key={item} value={item}>{item}</option>)}
+        </select>
+        <label className="inline-flex min-h-[40px] cursor-pointer items-center gap-2 whitespace-nowrap text-sm text-slate-600">
+          <input className="h-4 w-4 rounded border-slate-300" type="checkbox" checked={showLocked} onChange={(event) => setShowLocked(event.target.checked)} />
+          Ver bloqueados
+        </label>
+      </div>
+
+      {error && <p className={`${errorAlert} mt-4`} role="alert">{error}</p>}
+
+      <div className="mt-5">
+        {isLoading && exercises.length === 0 ? (
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" aria-busy="true" aria-label="Cargando catálogo">
+            {Array.from({ length: 6 }).map((_, index) => <div className="skeleton h-20 w-full rounded-xl" key={index} />)}
+          </div>
+        ) : !exercises.length ? (
+          !error && <EmptyState icon={Dumbbell} title="Sin ejercicios con estos filtros">Cambia la búsqueda, el músculo o la categoría de equipo, o activa «Ver bloqueados».</EmptyState>
+        ) : (
+          <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {exercises.map((exercise) => {
               const equipment = exercise.equipment || 'Sin equipo'
+              const status = statusOf(equipment)
+              const thumbnail = exercise.imageUrl || exercise.gifUrl
               return (
-                <tr className="cursor-pointer hover:bg-slate-50" key={exercise._id} onClick={() => setSelected(exercise)}>
-                  <td className="px-5 py-3 sm:px-6">
-                    <div className="flex items-center gap-3">
-                      {exercise.imageUrl || exercise.gifUrl
-                        ? <img className="h-10 w-10 shrink-0 rounded-full bg-slate-100 object-cover" src={exercise.imageUrl || exercise.gifUrl || ''} alt="" loading="lazy" />
-                        : <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-400"><Dumbbell size={18} /></span>}
-                      <button className="text-left font-medium text-slate-900 hover:text-green-700" type="button">{exercise.name}</button>
+                <li key={exercise._id}>
+                  <button
+                    className="group flex w-full items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 text-left transition duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-lift"
+                    type="button"
+                    onClick={() => setSelected(exercise)}
+                  >
+                    {thumbnail
+                      ? <img className="h-14 w-14 shrink-0 rounded-lg bg-slate-50 object-cover ring-1 ring-slate-200" src={thumbnail} alt="" loading="lazy" />
+                      : <span className="grid h-14 w-14 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-400"><Dumbbell size={20} aria-hidden /></span>}
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-semibold text-ink group-hover:text-brand-text">{exercise.name}</p>
+                      <p className="truncate text-xs text-slate-500">{exercise.muscleGroup} · {equipment}</p>
+                      <div className="mt-1.5"><Badge tone={status.tone} icon={status.icon}>{status.label}</Badge></div>
                     </div>
-                  </td>
-                  <td className="whitespace-nowrap px-5 py-3 sm:px-6"><span className="inline-flex rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700">{exercise.muscleGroup}</span></td>
-                  <td className="whitespace-nowrap px-5 py-3 sm:px-6"><span className="inline-flex rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700">{equipment}</span></td>
-                  <td className="whitespace-nowrap px-5 py-3 text-xs sm:px-6">
-                    {!unlocked.has(equipment)
-                      ? <span className="inline-flex items-center gap-1 text-slate-400"><Lock size={12} />Falta equipo</span>
-                      : outOfService.has(equipment)
-                        ? <span className="inline-flex items-center gap-1 text-amber-700"><AlertTriangle size={12} />Equipo en mantenimiento</span>
-                        : <span className="text-emerald-700">Disponible</span>}
-                  </td>
-                </tr>
+                  </button>
+                </li>
               )
             })}
-            {!isLoading && !exercises.length && <tr><td className="px-6 py-10 text-center text-sm text-slate-500" colSpan={4}>No hay ejercicios con estos filtros.</td></tr>}
-          </tbody>
-        </table>
+          </ul>
+        )}
       </div>
-      <div className="flex items-center justify-between gap-3 border-t border-gray-100 px-5 py-4 text-sm text-slate-500 sm:px-6">
-        <span>{result ? `${exercises.length} de ${result.total} ejercicios` : ''}</span>
-        {isLoading
+
+      <div className="mt-5 flex items-center justify-between gap-3 border-t border-slate-100 pt-4 text-sm text-slate-500">
+        <span className="tabular">{result ? `${exercises.length} de ${result.total} ejercicios` : ''}</span>
+        {isLoading && exercises.length > 0
           ? <span>Cargando...</span>
-          : result?.hasMore && <button className="rounded-lg border border-slate-200 px-4 py-2 font-medium text-slate-700 hover:bg-slate-50" type="button" onClick={() => void load(result.page + 1)}>Cargar más</button>}
+          : result?.hasMore && <button className={secondaryButton} type="button" onClick={() => void load(result.page + 1)}>Cargar más</button>}
       </div>
       {selected && <ExerciseDetailDialog exercise={selected} onClose={() => setSelected(null)} />}
-    </div>
+    </Panel>
   )
 }

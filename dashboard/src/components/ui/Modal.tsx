@@ -6,11 +6,11 @@ interface ModalProps {
   eyebrow?: string
   title: ReactNode
   onClose: () => void
-  size?: 'md' | 'lg' | 'xl'
+  size?: 'md' | 'lg' | 'xl' | '2xl'
   children: ReactNode
 }
 
-const SIZES = { md: 'max-w-md', lg: 'max-w-lg', xl: 'max-w-2xl' }
+const SIZES = { md: 'max-w-md', lg: 'max-w-lg', xl: 'max-w-2xl', '2xl': 'max-w-4xl' }
 
 // Centered dialog over a dimmed page. Escape closes it; a click outside does not, so a half-filled form is not lost.
 // It renders in <body>: the page wrapper's fade-in animation is a stacking context that would keep it under the sidebar.
