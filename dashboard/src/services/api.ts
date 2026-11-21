@@ -298,41 +298,47 @@ export interface RoutineRelation {
   email?: string
 }
 
+// Shapes of the API's routine schema (api/src/controllers/routine.controller.js).
 export interface RoutineExercise {
-  exerciseId: string
-  targetReps?: number | null
-  targetWeight?: number | null
-  targetDuration?: number | null
-  targetDistance?: number | null
-  targetLevel?: number | null
-  name?: string
-  muscleGroup?: string
-  equipment?: string | null
+  _id?: string
+  name: string
+  muscleGroup: string
+  equipment?: string
+  // Inventory equipment; populated with its name and type on some reads.
+  equipmentId?: string | { _id: string; name?: string; type?: string } | null
+  catalogExerciseId?: string
   videoUrl?: string
-  isCardio?: boolean
-  reps?: number | null
-  weight?: number | null
-  time?: number | null
+  bodyweight?: boolean
+  metricType?: 'strength' | 'cardio'
+  reps?: string
+  suggestedWeight?: number
+  targetDurationMinutes?: number
+  targetDistanceKm?: number
+  targetLevel?: number
+  order: number
 }
 
 export interface RoutineBlock {
-  dayOfWeek: number
-  type: 'single' | 'superset' | 'circuit'
+  _id?: string
+  // 0 = Monday ... 6 = Sunday.
+  day: number
+  blockType: 'single' | 'superset' | 'circuit'
   sets: number
   restSeconds: number
+  order: number
   exercises: RoutineExercise[]
-  order?: number
-  structure?: 'Individual' | 'Superset' | 'Circuito'
-  blockSets?: number
-  restTime?: number
-  scheduleDays?: string[]
 }
+
+export type RoutineLevel = 'principiante' | 'intermedio' | 'avanzado'
 
 export interface RoutineDefinition {
   title: string
-  objective: string
-  level: string
+  goal?: string
+  description?: string
+  level: RoutineLevel
   durationWeeks: number
+  daysPerWeek: number
+  scheduleDays: number[]
   blocks: RoutineBlock[]
 }
 
