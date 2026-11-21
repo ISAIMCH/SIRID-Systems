@@ -22,7 +22,6 @@ const Gyms = lazy(() => import('./pages/Gyms'))
 const Documents = lazy(() => import('./pages/Documents'))
 const Platform = lazy(() => import('./pages/Platform'))
 const PlatformExercises = lazy(() => import('./pages/PlatformExercises'))
-const Maintenance = lazy(() => import('./pages/Maintenance'))
 const Billing = lazy(() => import('./pages/Billing'))
 const Cashier = lazy(() => import('./pages/Cashier'))
 const Movements = lazy(() => import('./pages/Movements'))
@@ -120,7 +119,7 @@ function App() {
                 <Route path="access" element={<Access />} />
                 <Route path="documents" element={<Documents />} />
                 <Route path="equipment" element={<Equipment />} />
-                <Route path="maintenance" element={<Maintenance />} />
+                <Route path="maintenance" element={<Navigate to="/equipment?vista=reportes" replace />} />
                 <Route path="exercises" element={<Exercises />} />
                 <Route path="inventory" element={<Inventory />} />
                 <Route path="promotions" element={<Promotions />} />
