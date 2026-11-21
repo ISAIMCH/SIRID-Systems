@@ -1,9 +1,16 @@
 import { useEffect, useState } from 'react'
-import { FileCheck, Pencil, Plus, Tag, Trash2 } from 'lucide-react'
+import { CalendarClock, FileCheck, ImagePlus, Megaphone, Pencil, Plus, ShoppingBag, Tag, Ticket, Trash2 } from 'lucide-react'
 import { createPromotion, deletePromotion, getPlans, getProducts, getPromotions, updatePromotion } from '../services/api'
 import type { Plan, Product, Promotion, PromotionTarget } from '../types'
 import { useIsOwner } from '../utils/access'
 import { isValidImageValue } from '../utils/imageValidation'
+import PageHeader from '../components/ui/PageHeader'
+import Panel from '../components/ui/Panel'
+import Modal from '../components/ui/Modal'
+import Badge, { type BadgeTone } from '../components/ui/Badge'
+import EmptyState from '../components/ui/EmptyState'
+import Segmented from '../components/ui/Segmented'
+import { errorAlert, fieldClass, hintClass, iconButton, labelClass, primaryButton, secondaryButton } from '../components/ui/styles'
 
 type PromotionsResponse = Promotion[] | { data?: unknown; promotions?: unknown }
 type ProductsResponse = Product[] | { data?: unknown; products?: unknown }
@@ -87,11 +94,11 @@ function formatDate(value?: string) {
 }
 
 // The API says whether each promotion applies now; older responses without `state` fall back to the flags.
-const STATE_STYLES = {
-  active: { label: 'Vigente', className: 'bg-green-100 text-green-800' },
-  inactive: { label: 'Inactiva', className: 'bg-slate-100 text-slate-600' },
-  expired: { label: 'Vencida', className: 'bg-amber-100 text-amber-800' },
-} as const
+const STATE_STYLES: Record<'active' | 'inactive' | 'expired', { label: string; tone: BadgeTone }> = {
+  active: { label: 'Vigente', tone: 'success' },
+  inactive: { label: 'Inactiva', tone: 'neutral' },
+  expired: { label: 'Vencida', tone: 'warning' },
+}
 
 function promotionStateOf(promotion: Promotion): keyof typeof STATE_STYLES {
   if (promotion.state) return promotion.state
@@ -103,23 +110,15 @@ function toDateInputValue(value?: string) {
   return value ? value.slice(0, 10) : ''
 }
 
-function PromotionSkeleton() {
-  return (
-    <div className="space-y-4 p-6" aria-label="Cargando promociones" aria-busy="true">
-      {Array.from({ length: 5 }).map((_, index) => (
-        <div className="grid grid-cols-6 gap-6" key={index}>
-          {Array.from({ length: 6 }).map((__, columnIndex) => (
-            <div className="h-4 animate-pulse rounded bg-slate-200" key={columnIndex} />
-          ))}
-        </div>
-      ))}
-    </div>
-  )
+function validityText(promotion: Promotion) {
+  if (promotion.validUntilDate) return `Hasta el ${formatDate(`${promotion.validUntilDate}T12:00:00`)}`
+  return promotion.validUntil ? `Hasta el ${formatDate(promotion.validUntil)}` : 'Sin fecha de fin'
 }
 
+type StateFilter = 'all' | keyof typeof STATE_STYLES
+
 function Promotions() {
-  // Recepcion reads promotions to apply them in sales; only Admins manage them.
-  // Promotions are the organization's catalog: only the owner manages them.
+  // Promotions are the organization's catalog: only the owner manages them; Recepcion reads them to apply them in Caja.
   const canManage = useIsOwner()
   const [promotions, setPromotions] = useState<Promotion[]>([])
   const [products, setProducts] = useState<Product[]>([])
@@ -131,6 +130,7 @@ function Promotions() {
   const [form, setForm] = useState<PromotionFormState>(emptyPromotionForm)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [modalError, setModalError] = useState<string | null>(null)
+  const [stateFilter, setStateFilter] = useState<StateFilter>('all')
 
   useEffect(() => {
     let isMounted = true
@@ -144,11 +144,7 @@ function Promotions() {
         }
       } catch (requestError) {
         if (isMounted) {
-          setError(
-            requestError instanceof Error
-              ? requestError.message
-              : 'No se pudieron cargar las promociones.',
-          )
+          setError(requestError instanceof Error ? requestError.message : 'No se pudieron cargar las promociones.')
         }
       } finally {
         if (isMounted) setIsLoading(false)
@@ -173,11 +169,7 @@ function Promotions() {
         }
       } catch (requestError) {
         if (isMounted) {
-          setError(
-            requestError instanceof Error
-              ? requestError.message
-              : 'No se pudieron cargar los productos y planes.',
-          )
+          setError(requestError instanceof Error ? requestError.message : 'No se pudieron cargar los productos y planes.')
         }
       }
     }
@@ -276,9 +268,7 @@ function Promotions() {
       setForm(emptyPromotionForm)
       setIsModalOpen(false)
     } catch (requestError) {
-      setModalError(
-        requestError instanceof Error ? requestError.message : 'No se pudo guardar la promoción.',
-      )
+      setModalError(requestError instanceof Error ? requestError.message : 'No se pudo guardar la promoción.')
     } finally {
       setIsSubmitting(false)
     }
@@ -301,356 +291,211 @@ function Promotions() {
     }
   }
 
+  const countFor = (filter: StateFilter) => filter === 'all' ? promotions.length : promotions.filter((promotion) => promotionStateOf(promotion) === filter).length
+  const visiblePromotions = stateFilter === 'all' ? promotions : promotions.filter((promotion) => promotionStateOf(promotion) === stateFilter)
+  const filterOptions = ([['all', 'Todas'], ['active', 'Vigentes'], ['inactive', 'Inactivas'], ['expired', 'Vencidas']] as const)
+    .map(([value, label]) => [value, `${label} ${countFor(value)}`] as const)
+
+  const toggleId = (list: string[], id: string, checked: boolean) => checked ? [...list, id] : list.filter((item) => item !== id)
+  const options = form.appliesTo === 'store'
+    ? products.map((product) => ({ id: product._id || product.id || '', name: product.name }))
+    : plans.map((plan) => ({ id: plan._id || plan.id || '', name: plan.name || plan.nombre || 'Plan sin nombre' }))
+  const selectedIds = form.appliesTo === 'store' ? form.applicableProducts : form.applicablePlans
+
   return (
-    <section className="min-h-screen bg-canvas px-8 py-10">
-      <p className="text-sm font-medium uppercase tracking-[0.25em] text-slate-500">Marketing</p>
-      <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-4xl font-semibold tracking-tight text-slate-900">Promociones</h1>
-          <p className="mt-3 text-slate-500">Crea y administra las ofertas comerciales del gimnasio.</p>
-        </div>
-        {canManage && (
-          <button
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-brand px-4 py-2 font-medium text-ink transition hover:bg-brand-hover"
-            type="button"
-            onClick={openCreateModal}
-          >
-            <Plus size={18} aria-hidden="true" />
-            Nueva Promoción
+    <section className="min-h-screen bg-canvas px-4 py-8 sm:px-8 sm:py-10">
+      <PageHeader
+        eyebrow="Comercial"
+        title="Promociones"
+        description={canManage ? 'Descuentos para productos de la tienda o planes de membresía. Caja los aplica al cobrar.' : 'Descuentos vigentes que Caja aplica al cobrar.'}
+        actions={canManage && (
+          <button className={primaryButton} type="button" onClick={openCreateModal}>
+            <Plus size={18} aria-hidden /> Nueva promoción
           </button>
         )}
-      </div>
+      />
 
-      <div className="mt-8 overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
-        {error && (
-          <div className="border-b border-red-100 bg-red-50 px-6 py-4 text-sm text-red-700" role="alert">
-            {error}
-          </div>
-        )}
+      <Panel className="mt-6" title="Catálogo de promociones" icon={Megaphone} description={isLoading ? undefined : `${promotions.length} ${promotions.length === 1 ? 'promoción' : 'promociones'}`}>
+        {error && <p className={`${errorAlert} mb-4`} role="alert">{error}</p>}
 
-        {isLoading ? (
-          <PromotionSkeleton />
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-left text-sm">
-              <thead className="border-b border-slate-100 bg-slate-50/80 text-xs uppercase tracking-wider text-slate-500">
-                <tr>
-                  <th className="px-6 py-4 font-medium">Título</th>
-                  <th className="px-6 py-4 font-medium">Aplica a</th>
-                  <th className="px-6 py-4 font-medium">Descuento</th>
-                  <th className="px-6 py-4 font-medium">Vigencia</th>
-                  <th className="px-6 py-4 font-medium">Estado</th>
-                  <th className="px-6 py-4 font-medium" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-slate-700">
-                {promotions.length > 0 ? (
-                  promotions.map((promotion, index) => {
-                    const promotionId = promotion._id || promotion.id || `promotion-${index}`
-                    return (
-                      <tr className="transition-colors hover:bg-slate-50" key={promotionId}>
-                        <td className="whitespace-nowrap px-6 py-4">
-                          <div className="flex items-center gap-3">
-                            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
-                              <Tag size={17} aria-hidden="true" />
-                            </span>
-                            <div>
-                              <p className="font-medium text-slate-900">{promotion.title || 'Sin título'}</p>
-                              {promotion.description && (
-                                <p className="mt-1 max-w-xs truncate text-xs text-slate-500">{promotion.description}</p>
-                              )}
-                              {promotion.requiredDocument === 'student_id' && (
-                                <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-700">
-                                  <FileCheck size={12} aria-hidden="true" />
-                                  Requiere credencial de estudiante
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </td>
-                        <td className="whitespace-nowrap px-6 py-4 text-slate-500">
-                          {TARGET_LABELS[promotion.appliesTo ?? 'store']}
-                        </td>
-                        <td className="px-6 py-4 font-medium text-slate-700">
-                          {Number(promotion.discountPercentage)}%
-                        </td>
-                        <td className="px-6 py-4 text-slate-500">
-                          {promotion.validUntilDate ? formatDate(`${promotion.validUntilDate}T12:00:00`) : formatDate(promotion.validUntil ?? undefined)}
-                          {promotion.validUntilDate && <p className="text-xs text-slate-400">Hasta el final del día</p>}
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${STATE_STYLES[promotionStateOf(promotion)].className}`}>
-                            {STATE_STYLES[promotionStateOf(promotion)].label}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          {canManage && (
-                            <div className="inline-flex items-center gap-3">
-                              <button
-                                className="cursor-pointer text-slate-400 transition hover:text-green-600"
-                                type="button"
-                                aria-label={`Editar ${promotion.title || 'promoción'}`}
-                                title="Editar"
-                                onClick={() => openEditModal(promotion)}
-                              >
-                                <Pencil size={17} aria-hidden="true" />
-                              </button>
-                              <button
-                                className="cursor-pointer text-slate-400 transition hover:text-red-600"
-                                type="button"
-                                aria-label={`Eliminar ${promotion.title || 'promoción'}`}
-                                title="Eliminar"
-                                onClick={() => handleDelete(promotion)}
-                              >
-                                <Trash2 size={17} aria-hidden="true" />
-                              </button>
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    )
-                  })
-                ) : (
-                  <tr>
-                    <td className="px-6 py-10 text-center text-sm text-slate-500" colSpan={6}>
-                      No hay promociones registradas.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+        <div className="-mx-1 overflow-x-auto px-1 pb-1">
+          <Segmented label="Estado" value={stateFilter} options={filterOptions} onChange={setStateFilter} />
+        </div>
+
+        <div className="mt-4">
+          {isLoading ? (
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3" aria-busy="true" aria-label="Cargando promociones">
+              {Array.from({ length: 3 }).map((_, index) => <div className="skeleton h-56 w-full rounded-card" key={index} />)}
+            </div>
+          ) : visiblePromotions.length === 0 ? (
+            <EmptyState icon={Ticket} title={promotions.length === 0 ? 'Aún no hay promociones' : 'Sin promociones en esta vista'}>
+              {promotions.length === 0
+                ? (canManage ? 'Crea un descuento para la tienda o para un plan de membresía.' : 'Cuando el dueño cree promociones aparecerán aquí.')
+                : 'Cambia el filtro para ver otras promociones.'}
+            </EmptyState>
+          ) : (
+            <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {visiblePromotions.map((promotion, index) => {
+                const state = STATE_STYLES[promotionStateOf(promotion)]
+                const isMembership = (promotion.appliesTo ?? 'store') === 'membership'
+                const TargetIcon = isMembership ? Ticket : ShoppingBag
+                return (
+                  <li
+                    className={`group flex flex-col overflow-hidden rounded-card border border-slate-200 bg-white transition duration-200 hover:-translate-y-0.5 hover:shadow-lift ${promotionStateOf(promotion) === 'active' ? '' : 'opacity-80'}`}
+                    key={promotion._id || promotion.id || `promotion-${index}`}
+                  >
+                    <div className="relative h-28 bg-ink">
+                      {promotion.imageUrl
+                        ? <img className="h-full w-full object-cover opacity-80" src={promotion.imageUrl} alt="" />
+                        : <div className="h-full w-full bg-[radial-gradient(circle_at_85%_20%,rgba(16,255,133,0.35),transparent_55%)]" aria-hidden="true" />}
+                      <span className="absolute bottom-3 left-4 font-display text-4xl font-bold leading-none text-white drop-shadow tabular">
+                        −{Number(promotion.discountPercentage)}%
+                      </span>
+                      <span className="absolute right-3 top-3"><Badge tone={state.tone}>{state.label}</Badge></span>
+                    </div>
+                    <div className="flex flex-1 flex-col p-4">
+                      <p className="font-semibold text-ink">{promotion.title || 'Sin título'}</p>
+                      {promotion.description && <p className="mt-1 line-clamp-2 text-sm text-slate-500">{promotion.description}</p>}
+                      <div className="mt-3 space-y-1.5 text-xs text-slate-500">
+                        <p className="flex items-center gap-1.5"><TargetIcon size={14} aria-hidden /> {TARGET_LABELS[promotion.appliesTo ?? 'store']}</p>
+                        <p className="flex items-center gap-1.5"><CalendarClock size={14} aria-hidden /> {validityText(promotion)}</p>
+                        {promotion.requiredDocument === 'student_id' && (
+                          <p className="flex items-center gap-1.5 text-sky-700"><FileCheck size={14} aria-hidden /> Requiere credencial de estudiante</p>
+                        )}
+                      </div>
+                      {canManage && (
+                        <div className="mt-auto flex justify-end gap-1 border-t border-slate-100 pt-3">
+                          <button className={`${iconButton} hover:text-brand-text`} type="button" aria-label={`Editar ${promotion.title || 'promoción'}`} title="Editar" onClick={() => openEditModal(promotion)}>
+                            <Pencil size={17} aria-hidden />
+                          </button>
+                          <button className={`${iconButton} hover:bg-red-50 hover:text-red-600`} type="button" aria-label={`Retirar ${promotion.title || 'promoción'}`} title="Retirar" onClick={() => void handleDelete(promotion)}>
+                            <Trash2 size={17} aria-hidden />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </div>
+      </Panel>
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4 backdrop-blur-sm">
-          <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
-            <div className="flex items-start justify-between gap-4">
+        <Modal eyebrow="Promociones" title={editingPromotion ? 'Editar promoción' : 'Nueva promoción'} onClose={closeModal} size="xl">
+          <form className="space-y-5" onSubmit={handleSubmit}>
+            <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_9rem]">
               <div>
-                <p className="text-sm font-medium uppercase tracking-[0.2em] text-emerald-700">Marketing</p>
-                <h2 className="mt-2 text-2xl font-semibold text-slate-900">
-                  {editingPromotion ? 'Editar Promoción' : 'Nueva Promoción'}
-                </h2>
+                <label className={labelClass} htmlFor="promotion-title">Título</label>
+                <input className={fieldClass} id="promotion-title" type="text" value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} required />
               </div>
-              <button
-                className="text-2xl leading-none text-slate-400 transition hover:text-slate-700"
-                type="button"
-                aria-label="Cerrar modal"
-                onClick={closeModal}
-              >
-                ×
-              </button>
+              <div>
+                <label className={labelClass} htmlFor="promotion-discount">Descuento (%)</label>
+                <input className={fieldClass} id="promotion-discount" type="number" min="0" max="100" step="0.01" value={form.discountPercentage} onChange={(event) => setForm({ ...form, discountPercentage: event.target.value })} required />
+              </div>
             </div>
 
-            <form className="mt-6 space-y-5" onSubmit={handleSubmit}>
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="promotion-title">
-                  Título
-                </label>
-                <input
-                  className="w-full rounded-lg border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
-                  id="promotion-title"
-                  type="text"
-                  value={form.title}
-                  onChange={(event) => setForm({ ...form, title: event.target.value })}
-                  required
-                />
-              </div>
+            <div>
+              <label className={labelClass} htmlFor="promotion-description">Descripción</label>
+              <textarea className={`${fieldClass} min-h-24 resize-y`} id="promotion-description" value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} rows={3} required />
+            </div>
 
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="promotion-description">
-                  Descripción
-                </label>
-                <textarea
-                  className="min-h-24 w-full resize-y rounded-lg border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
-                  id="promotion-description"
-                  value={form.description}
-                  onChange={(event) => setForm({ ...form, description: event.target.value })}
-                  rows={3}
-                  required
-                />
-              </div>
+            <fieldset>
+              <legend className={labelClass}>Aplica para</legend>
+              <Segmented
+                label="Aplica para"
+                value={form.appliesTo}
+                options={[['store', 'Productos de tienda'], ['membership', 'Planes de membresía']] as const}
+                onChange={(appliesTo) => setForm({ ...form, appliesTo })}
+              />
+              {form.appliesTo === 'membership' && <p className={hintClass}>Solo cambia el precio al cobrar en Caja; las reglas de acceso viven en el plan.</p>}
+            </fieldset>
 
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="promotion-discount">
-                  Descuento (%)
-                </label>
-                <input
-                  className="w-full rounded-lg border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
-                  id="promotion-discount"
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="0.01"
-                  value={form.discountPercentage}
-                  onChange={(event) => setForm({ ...form, discountPercentage: event.target.value })}
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="promotion-target-type">
-                  Aplica para
-                </label>
-                <select
-                  className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
-                  id="promotion-target-type"
-                  value={form.appliesTo}
-                  onChange={(event) => setForm({ ...form, appliesTo: event.target.value as PromotionTarget })}
-                >
-                  {Object.entries(TARGET_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                </select>
-                {form.appliesTo === 'membership' && (
-                  <p className="mt-2 text-xs text-slate-500">
-                    Solo cambia el precio al cobrar en Pagos; las reglas de acceso viven en el plan.
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <p className="mb-1 block text-sm font-medium text-slate-700">
-                  {form.appliesTo === 'store' ? 'Productos aplicables' : 'Planes aplicables'} (Opcional)
-                </p>
-                <p className="mb-3 text-xs text-slate-500">
-                  Si lo dejas en blanco, la promoción aplicará a {form.appliesTo === 'store' ? 'todos los productos en la Venta Directa' : 'todos los planes'}.
-                </p>
-                <div className="max-h-48 space-y-2 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50 p-3">
-                  {form.appliesTo === 'store' ? (
-                    products.length > 0 ? products.map((product) => {
-                      const productId = product._id || product.id || ''
-                      return (
-                        <label className="flex items-center gap-3 rounded-md bg-white px-3 py-2 text-sm text-slate-700" key={productId}>
-                          <input
-                            className="h-4 w-4 accent-green-500"
-                            type="checkbox"
-                            checked={form.applicableProducts.includes(productId)}
-                            onChange={(event) => {
-                              const selected = form.applicableProducts
-                              const applicableProducts = event.target.checked ? [...selected, productId] : selected.filter((id) => id !== productId)
-                              setForm({ ...form, applicableProducts })
-                            }}
-                            disabled={!productId}
-                          />
-                          <span>{product.name}</span>
-                        </label>
-                      )
-                    }) : (
-                      <p className="text-sm text-slate-500">No hay productos disponibles.</p>
-                    )
-                  ) : plans.length > 0 ? plans.map((plan) => {
-                    const planId = plan._id || plan.id || ''
+            <div>
+              <p className={labelClass}>
+                {form.appliesTo === 'store' ? 'Productos' : 'Planes'} <span className="font-normal text-slate-400">(opcional)</span>
+              </p>
+              <p className="-mt-1 mb-2 text-xs text-slate-500">
+                Si no eliges ninguno, aplica a {form.appliesTo === 'store' ? 'todos los productos' : 'todos los planes'}.
+              </p>
+              {options.length > 0 ? (
+                <div className="flex max-h-44 flex-wrap gap-2 overflow-y-auto rounded-xl border border-slate-200 p-3">
+                  {options.map((option) => {
+                    const isChecked = selectedIds.includes(option.id)
                     return (
-                      <label className="flex items-center gap-3 rounded-md bg-white px-3 py-2 text-sm text-slate-700" key={planId}>
+                      <label
+                        className={`inline-flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand/40 ${isChecked ? 'border-brand-text/30 bg-brand-soft font-medium text-brand-ink' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}
+                        key={option.id || option.name}
+                      >
                         <input
-                          className="h-4 w-4 accent-green-500"
+                          className="sr-only"
                           type="checkbox"
-                          checked={form.applicablePlans.includes(planId)}
-                          onChange={(event) => {
-                            const selected = form.applicablePlans
-                            const applicablePlans = event.target.checked ? [...selected, planId] : selected.filter((id) => id !== planId)
-                            setForm({ ...form, applicablePlans })
-                          }}
-                          disabled={!planId}
+                          checked={isChecked}
+                          disabled={!option.id}
+                          onChange={(event) => setForm(form.appliesTo === 'store'
+                            ? { ...form, applicableProducts: toggleId(form.applicableProducts, option.id, event.target.checked) }
+                            : { ...form, applicablePlans: toggleId(form.applicablePlans, option.id, event.target.checked) })}
                         />
-                        <span>{plan.name || plan.nombre || 'Plan sin nombre'}</span>
+                        {isChecked && <Tag size={13} aria-hidden />}
+                        {option.name}
                       </label>
                     )
-                  }) : (
-                    <p className="text-sm text-slate-500">No hay planes disponibles.</p>
-                  )}
+                  })}
                 </div>
-              </div>
+              ) : (
+                <p className="rounded-xl border border-dashed border-slate-200 px-4 py-3 text-sm text-slate-500">
+                  {form.appliesTo === 'store' ? 'No hay productos disponibles.' : 'No hay planes disponibles.'}
+                </p>
+              )}
+            </div>
 
+            <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="promotion-required-document">
-                  Documento requerido
-                </label>
-                <select
-                  className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
-                  id="promotion-required-document"
-                  value={form.requiredDocument}
-                  onChange={(event) => setForm({ ...form, requiredDocument: event.target.value as PromotionFormState['requiredDocument'] })}
-                >
+                <label className={labelClass} htmlFor="promotion-required-document">Documento requerido</label>
+                <select className={fieldClass} id="promotion-required-document" value={form.requiredDocument} onChange={(event) => setForm({ ...form, requiredDocument: event.target.value as PromotionFormState['requiredDocument'] })}>
                   <option value="">Ninguno</option>
                   <option value="student_id">Credencial de estudiante</option>
                 </select>
-                {form.requiredDocument && (
-                  <p className="mt-2 text-xs text-slate-500">
-                    El descuento solo se aplica si el cliente tiene ese documento verificado y vigente en Documentos.
-                  </p>
-                )}
+                {form.requiredDocument && <p className={hintClass}>Solo se aplica si el cliente tiene ese documento verificado y vigente en Documentos.</p>}
               </div>
-
               <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="promotion-valid-until">
-                  Válida hasta
+                <label className={labelClass} htmlFor="promotion-valid-until">Válida hasta</label>
+                <input className={fieldClass} id="promotion-valid-until" type="date" value={form.validUntil} onChange={(event) => setForm({ ...form, validUntil: event.target.value })} />
+              </div>
+            </div>
+
+            <div>
+              <p className={labelClass}>Imagen</p>
+              <div className="flex items-center gap-4">
+                {form.imageUrl
+                  ? <img className="h-16 w-16 shrink-0 rounded-xl object-cover ring-1 ring-slate-200" src={form.imageUrl} alt="Vista previa de la promoción" />
+                  : <span className="grid h-16 w-16 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-400"><ImagePlus size={22} aria-hidden /></span>}
+                <label className={`${secondaryButton} cursor-pointer`} htmlFor="promotion-image-file">
+                  {form.imageUrl ? 'Cambiar imagen' : 'Subir imagen'}
+                  <input className="sr-only" id="promotion-image-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={handleImageChange} />
                 </label>
-                <input
-                  className="w-full rounded-lg border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
-                  id="promotion-valid-until"
-                  type="date"
-                  value={form.validUntil}
-                  onChange={(event) => setForm({ ...form, validUntil: event.target.value })}
-                />
               </div>
+            </div>
 
-              <div>
-                {form.imageUrl && (
-                  <img
-                    className="mb-3 h-24 w-24 rounded-lg object-cover"
-                    src={form.imageUrl}
-                    alt="Vista previa de la promoción"
-                  />
-                )}
-                <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="promotion-image-file">
-                  Imagen de la promoción
-                </label>
-                <input
-                  className="w-full rounded-lg border border-slate-200 px-4 py-3 text-slate-900 outline-none transition file:mr-4 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-medium file:text-slate-700 hover:file:bg-slate-200"
-                  id="promotion-image-file"
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp,image/gif"
-                  onChange={handleImageChange}
-                />
-              </div>
+            <label className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 px-4 py-3">
+              <span>
+                <span className="block text-sm font-medium text-ink">Promoción activa</span>
+                <span className="block text-xs text-slate-500">Desactívala para pausarla sin borrarla.</span>
+              </span>
+              <input className="h-5 w-5 accent-brand-text" type="checkbox" checked={form.isActive} onChange={(event) => setForm({ ...form, isActive: event.target.checked })} />
+            </label>
 
-              <label className="flex items-center gap-3 text-sm font-medium text-slate-700">
-                <input
-                  className="h-4 w-4 accent-green-500"
-                  type="checkbox"
-                  checked={form.isActive}
-                  onChange={(event) => setForm({ ...form, isActive: event.target.checked })}
-                />
-                Promoción activa
-              </label>
+            {modalError && <p className={errorAlert} role="alert">{modalError}</p>}
 
-              {modalError && (
-                <p className="border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
-                  {modalError}
-                </p>
-              )}
-
-              <div className="flex justify-end gap-3 pt-2">
-                <button
-                  className="rounded-lg px-4 py-2 font-medium text-slate-600 transition hover:bg-slate-100 disabled:opacity-50"
-                  type="button"
-                  onClick={closeModal}
-                  disabled={isSubmitting}
-                >
-                  Cancelar
-                </button>
-                <button
-                  className="rounded-lg bg-brand px-4 py-2 font-medium text-ink transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
-                  type="submit"
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting ? 'Guardando...' : editingPromotion ? 'Actualizar' : 'Guardar'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+            <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
+              <button className={secondaryButton} type="button" onClick={closeModal} disabled={isSubmitting}>Cancelar</button>
+              <button className={primaryButton} type="submit" disabled={isSubmitting}>
+                {isSubmitting ? 'Guardando...' : editingPromotion ? 'Guardar cambios' : 'Crear promoción'}
+              </button>
+            </div>
+          </form>
+        </Modal>
       )}
     </section>
   )

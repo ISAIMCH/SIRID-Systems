@@ -13,7 +13,7 @@ function Segmented<T extends string>({ label, value, options, onChange }: Segmen
         const isActive = optionValue === value
         return (
           <button
-            className={`min-h-[32px] rounded-lg px-3 font-medium transition-all duration-200 ${
+            className={`min-h-[32px] whitespace-nowrap rounded-lg px-3 font-medium transition-all duration-200 ${
               isActive ? 'bg-white text-ink shadow-sm' : 'text-slate-500 hover:text-ink'
             }`}
             type="button"

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Download, Eye, Trash2, Upload } from 'lucide-react'
+import { Check, CircleCheck, Download, Eye, FileText, FolderOpen, ScrollText, Search, ShieldAlert, Trash2, Upload, X } from 'lucide-react'
 import {
   deleteDocument,
   getDocumentLogs,
@@ -15,6 +15,13 @@ import { socket } from '../services/socket'
 import type { User } from '../types'
 import { useAuth } from '../store/useAuth'
 import { useStaffRoles } from '../utils/access'
+import PageHeader from '../components/ui/PageHeader'
+import Panel from '../components/ui/Panel'
+import Modal from '../components/ui/Modal'
+import Badge, { type BadgeTone } from '../components/ui/Badge'
+import EmptyState from '../components/ui/EmptyState'
+import Segmented from '../components/ui/Segmented'
+import { dangerButton, errorAlert, fieldClass, hintClass, iconButton, labelClass, primaryButton, secondaryButton, successAlert, tableHeadClass, tdClass, thClass } from '../components/ui/styles'
 
 const CATEGORY_LABELS: Record<DocumentCategory, string> = {
   cv: 'Currículum',
@@ -30,10 +37,10 @@ const CATEGORY_LABELS: Record<DocumentCategory, string> = {
 // The hiring file asks for one of each; 'other' is optional.
 const STAFF_CATEGORIES: DocumentCategory[] = ['cv', 'identification', 'fiscal', 'certification', 'availability', 'evaluation']
 
-const STATUS_STYLES: Record<DocumentStatus, { label: string; className: string }> = {
-  pending: { label: 'Pendiente', className: 'bg-yellow-100 text-yellow-800' },
-  verified: { label: 'Verificado', className: 'bg-green-100 text-green-800' },
-  rejected: { label: 'Rechazado', className: 'bg-red-100 text-red-800' },
+const STATUS_STYLES: Record<DocumentStatus, { label: string; tone: BadgeTone }> = {
+  pending: { label: 'Pendiente', tone: 'warning' },
+  verified: { label: 'Verificado', tone: 'success' },
+  rejected: { label: 'Rechazado', tone: 'danger' },
 }
 
 const ACTION_LABELS: Record<DocumentAction, string> = {
@@ -46,10 +53,10 @@ const ACTION_LABELS: Record<DocumentAction, string> = {
   purge: 'Destruyó',
 }
 
+const ACTION_TONES: Partial<Record<DocumentAction, BadgeTone>> = { verify: 'success', reject: 'danger', delete: 'danger', purge: 'danger', upload: 'info' }
+
 const MAX_FILE_SIZE = 10 * 1024 * 1024
 const ACCEPTED_FILES = 'application/pdf,image/jpeg,image/png'
-
-const inputClass = 'w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100'
 
 function personName(person: DocumentPerson | string | null) {
   if (!person || typeof person === 'string') return '—'
@@ -89,11 +96,7 @@ async function openDocument(document: GymDocument, download = false) {
 
 function StatusBadge({ document }: { document: GymDocument }) {
   const style = STATUS_STYLES[document.status]
-  return (
-    <span className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${style.className}`} title={document.rejectionReason || undefined}>
-      {style.label}
-    </span>
-  )
+  return <span title={document.rejectionReason || undefined}><Badge tone={style.tone}>{style.label}</Badge></span>
 }
 
 interface ReviewModalProps {
@@ -124,54 +127,46 @@ function ReviewModal({ document, decision, onClose, onDone }: ReviewModalProps) 
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-900/50 px-4 py-8 backdrop-blur-sm">
-      <form className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl" onSubmit={handleSubmit}>
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <p className="text-sm font-medium uppercase tracking-[0.2em] text-emerald-700">{CATEGORY_LABELS[document.category]}</p>
-            <h2 className="mt-2 text-2xl font-semibold text-slate-900">{isVerify ? 'Verificar documento' : 'Rechazar documento'}</h2>
-            <p className="mt-1 truncate text-sm text-slate-500">{personName(document.owner)} · {document.originalName}</p>
+    <Modal eyebrow={CATEGORY_LABELS[document.category]} title={isVerify ? 'Verificar documento' : 'Rechazar documento'} onClose={() => { if (!isSubmitting) onClose() }}>
+      <form className="space-y-4" onSubmit={handleSubmit}>
+        <div className="flex items-center gap-3 rounded-xl bg-slate-50 px-4 py-3">
+          <FileText className="shrink-0 text-slate-400" size={20} aria-hidden />
+          <div className="min-w-0 text-sm">
+            <p className="font-medium text-ink">{personName(document.owner)}</p>
+            <p className="truncate text-slate-500" title={document.originalName}>{document.originalName}</p>
           </div>
-          <button className="text-2xl leading-none text-slate-400 transition hover:text-slate-700" type="button" aria-label="Cerrar modal" onClick={onClose}>×</button>
         </div>
-
-        <div className="mt-6 space-y-4">
-          {isVerify ? (
-            <div>
-              <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="review-valid-until">Vigente hasta (opcional)</label>
-              <input className={inputClass} id="review-valid-until" type="date" value={validUntil} onChange={(event) => setValidUntil(event.target.value)} />
-              <p className="mt-2 text-xs text-slate-500">Por ejemplo, el fin del ciclo escolar en una credencial. Después de esa fecha deja de desbloquear promociones.</p>
-            </div>
-          ) : (
-            <div>
-              <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="review-reason">Motivo</label>
-              <textarea
-                className={inputClass}
-                id="review-reason"
-                rows={3}
-                maxLength={300}
-                placeholder="Ej. La foto está borrosa o el documento está vencido."
-                value={reason}
-                onChange={(event) => setReason(event.target.value)}
-                required
-              />
-              <p className="mt-2 text-xs text-slate-500">El titular verá este motivo para volver a subirlo.</p>
-            </div>
-          )}
-          {error && <p className="text-sm text-red-600" role="alert">{error}</p>}
-          <div className="flex justify-end gap-3 pt-2">
-            <button className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100" type="button" onClick={onClose}>Cancelar</button>
-            <button
-              className={`rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-50 ${isVerify ? 'bg-ink' : 'bg-red-600'}`}
-              type="submit"
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? 'Guardando...' : isVerify ? 'Verificar' : 'Rechazar'}
-            </button>
+        {isVerify ? (
+          <div>
+            <label className={labelClass} htmlFor="review-valid-until">Vigente hasta (opcional)</label>
+            <input className={fieldClass} id="review-valid-until" type="date" value={validUntil} onChange={(event) => setValidUntil(event.target.value)} />
+            <p className={hintClass}>Por ejemplo, el fin del ciclo escolar en una credencial. Después de esa fecha deja de desbloquear promociones.</p>
           </div>
+        ) : (
+          <div>
+            <label className={labelClass} htmlFor="review-reason">Motivo</label>
+            <textarea
+              className={fieldClass}
+              id="review-reason"
+              rows={3}
+              maxLength={300}
+              placeholder="Ej. La foto está borrosa o el documento está vencido."
+              value={reason}
+              onChange={(event) => setReason(event.target.value)}
+              required
+            />
+            <p className={hintClass}>El titular verá este motivo para volver a subirlo.</p>
+          </div>
+        )}
+        {error && <p className={errorAlert} role="alert">{error}</p>}
+        <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
+          <button className={secondaryButton} type="button" onClick={onClose} disabled={isSubmitting}>Cancelar</button>
+          <button className={isVerify ? primaryButton : dangerButton} type="submit" disabled={isSubmitting}>
+            {isSubmitting ? 'Guardando...' : isVerify ? 'Verificar' : 'Rechazar'}
+          </button>
         </div>
       </form>
-    </div>
+    </Modal>
   )
 }
 
@@ -205,23 +200,29 @@ function DocumentActions({ document, canReview, canDelete, onReview, onDeleted, 
     }
   }
 
-  const linkClass = 'text-sm font-medium transition'
+  const pill = 'inline-flex min-h-[32px] items-center gap-1 rounded-lg px-2.5 text-xs font-semibold transition'
   return (
-    <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-2">
-      <button className={`${linkClass} inline-flex items-center gap-1 text-slate-600 hover:text-slate-900`} type="button" onClick={() => void handleOpen(false)}>
-        <Eye size={15} aria-hidden="true" /> Ver
+    <div className="flex flex-wrap items-center justify-end gap-1">
+      <button className={iconButton} type="button" aria-label={`Ver ${document.originalName}`} title="Ver" onClick={() => void handleOpen(false)}>
+        <Eye size={17} aria-hidden />
       </button>
-      <button className={`${linkClass} inline-flex items-center gap-1 text-slate-600 hover:text-slate-900`} type="button" onClick={() => void handleOpen(true)}>
-        <Download size={15} aria-hidden="true" /> Descargar
+      <button className={iconButton} type="button" aria-label={`Descargar ${document.originalName}`} title="Descargar" onClick={() => void handleOpen(true)}>
+        <Download size={17} aria-hidden />
       </button>
+      {canDelete && (
+        <button className={`${iconButton} hover:bg-red-50 hover:text-red-600`} type="button" aria-label={`Eliminar ${document.originalName}`} title="Eliminar" onClick={() => void handleDelete()}>
+          <Trash2 size={17} aria-hidden />
+        </button>
+      )}
       {canReview && document.status !== 'verified' && (
-        <button className={`${linkClass} text-green-700 hover:text-green-900`} type="button" onClick={() => onReview(document, 'verified')}>Verificar</button>
+        <button className={`${pill} bg-brand-soft text-brand-text hover:bg-brand/30`} type="button" onClick={() => onReview(document, 'verified')}>
+          <Check size={14} aria-hidden /> Verificar
+        </button>
       )}
       {canReview && document.status !== 'rejected' && (
-        <button className={`${linkClass} text-red-600 hover:text-red-800`} type="button" onClick={() => onReview(document, 'rejected')}>Rechazar</button>
-      )}
-      {canDelete && (
-        <button className={`${linkClass} text-slate-400 hover:text-red-700`} type="button" onClick={() => void handleDelete()}>Eliminar</button>
+        <button className={`${pill} bg-red-50 text-red-700 hover:bg-red-100`} type="button" onClick={() => onReview(document, 'rejected')}>
+          <X size={14} aria-hidden /> Rechazar
+        </button>
       )}
     </div>
   )
@@ -289,63 +290,54 @@ function PurgeModal({ onClose, onDone }: { onClose: () => void; onDone: (message
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-900/50 px-4 py-8 backdrop-blur-sm">
-      <form className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl" onSubmit={handleSubmit}>
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-sm font-medium uppercase tracking-[0.2em] text-red-700">Solicitud del titular</p>
-            <h2 className="mt-2 text-2xl font-semibold text-slate-900">Destruir documentos</h2>
-          </div>
-          <button className="text-2xl leading-none text-slate-400 transition hover:text-slate-700" type="button" aria-label="Cerrar modal" onClick={onClose}>×</button>
+    <Modal eyebrow="Solicitud del titular" title="Destruir documentos" onClose={() => { if (!isSubmitting) onClose() }}>
+      <form className="space-y-4" onSubmit={handleSubmit}>
+        <p className="flex gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          <ShieldAlert className="mt-0.5 shrink-0" size={18} aria-hidden />
+          Se borran para siempre todos los archivos de la persona en esta organización, incluidos los que ya se habían eliminado de la vista. No se puede deshacer. La bitácora conserva quién lo hizo y cuándo.
+        </p>
+        <div>
+          <label className={labelClass} htmlFor="purge-person">Cliente</label>
+          <select className={fieldClass} id="purge-person" value={selectedId} onChange={(event) => { setSelectedId(event.target.value); setConfirmation('') }} disabled={isLoading} required>
+            <option value="">{isLoading ? 'Cargando...' : 'Selecciona un cliente'}</option>
+            {people.map((person) => (
+              <option key={person.id} value={person.id}>{personName(person)}{person.email ? ` · ${person.email}` : ''}</option>
+            ))}
+          </select>
         </div>
-
-        <div className="mt-6 space-y-4">
-          <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-            Se borran para siempre todos los archivos de la persona en esta organización, incluidos los que ya se habían eliminado de la vista. No se puede deshacer. La bitácora conserva quién lo hizo y cuándo.
-          </p>
+        {selected && (
           <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="purge-person">Cliente</label>
-            <select className={inputClass} id="purge-person" value={selectedId} onChange={(event) => { setSelectedId(event.target.value); setConfirmation('') }} disabled={isLoading} required>
-              <option value="">{isLoading ? 'Cargando...' : 'Selecciona un cliente'}</option>
-              {people.map((person) => (
-                <option key={person.id} value={person.id}>{personName(person)}{person.email ? ` · ${person.email}` : ''}</option>
-              ))}
-            </select>
+            <label className={labelClass} htmlFor="purge-confirmation">
+              Escribe <span className="font-mono font-semibold">{PURGE_CONFIRMATION}</span> para confirmar
+            </label>
+            <input className={fieldClass} id="purge-confirmation" autoComplete="off" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} />
           </div>
-          {selected && (
-            <div>
-              <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="purge-confirmation">
-                Escribe <span className="font-mono font-semibold">{PURGE_CONFIRMATION}</span> para confirmar
-              </label>
-              <input className={inputClass} id="purge-confirmation" autoComplete="off" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} />
-            </div>
-          )}
-          {error && <p className="text-sm text-red-600" role="alert">{error}</p>}
-          <div className="flex justify-end gap-3 pt-2">
-            <button className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100" type="button" onClick={onClose}>Cancelar</button>
-            <button
-              className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-              type="submit"
-              disabled={!selected || confirmation.trim() !== PURGE_CONFIRMATION || isSubmitting}
-            >
-              {isSubmitting ? 'Destruyendo...' : 'Destruir documentos'}
-            </button>
-          </div>
+        )}
+        {error && <p className={errorAlert} role="alert">{error}</p>}
+        <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
+          <button className={secondaryButton} type="button" onClick={onClose} disabled={isSubmitting}>Cancelar</button>
+          <button className={dangerButton} type="submit" disabled={!selected || confirmation.trim() !== PURGE_CONFIRMATION || isSubmitting}>
+            {isSubmitting ? 'Destruyendo...' : 'Destruir documentos'}
+          </button>
         </div>
       </form>
-    </div>
+    </Modal>
   )
 }
 
+const CLIENT_FILTERS = [['pending', 'Por revisar'], ['verified', 'Verificados'], ['rejected', 'Rechazados'], ['all', 'Todos']] as const
+type ClientFilter = (typeof CLIENT_FILTERS)[number][0]
+
 // Reception and managers check what clients upload from the app; a verified document unlocks its promotions.
 function ClientDocuments({ canDelete, canPurge }: { canDelete: boolean; canPurge: boolean }) {
-  const [status, setStatus] = useState<DocumentStatus | ''>('pending')
+  const [filter, setFilter] = useState<ClientFilter>('pending')
   const [documents, setDocuments] = useState<GymDocument[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [reviewTarget, setReviewTarget] = useState<ReviewTarget | null>(null)
   const [isPurgeOpen, setIsPurgeOpen] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
+  const status: DocumentStatus | '' = filter === 'all' ? '' : filter
 
   const refresh = useCallback(() => {
     getDocuments({ kind: 'client', ...(status ? { status } : {}) })
@@ -357,88 +349,100 @@ function ClientDocuments({ canDelete, canPurge }: { canDelete: boolean; canPurge
   useEffect(refresh, [refresh])
   useDocumentEvents(refresh)
 
+  const actions = (document: GymDocument) => (
+    <DocumentActions
+      document={document}
+      canReview
+      canDelete={canDelete}
+      onReview={(target, decision) => setReviewTarget({ document: target, decision })}
+      onDeleted={refresh}
+      onError={setError}
+    />
+  )
+  const validity = (document: GymDocument) => document.status === 'verified' ? (document.validUntil ? `Vigente hasta ${formatDate(document.validUntil)}` : 'Sin vencimiento') : null
+
   return (
-    <div>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <p className="text-slate-500">Credenciales y comprobantes que los clientes suben desde la app.</p>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          {canPurge && (
-            <button
-              className="inline-flex items-center justify-center gap-2 rounded-lg border border-red-200 bg-white px-4 py-3 text-sm font-medium text-red-700 transition hover:bg-red-50"
-              type="button"
-              onClick={() => { setNotice(null); setIsPurgeOpen(true) }}
-            >
-              <Trash2 size={16} aria-hidden="true" /> Destruir documentos
-            </button>
-          )}
-          <div className="sm:w-56">
-            <label className="sr-only" htmlFor="client-status">Estado</label>
-            <select className={inputClass} id="client-status" value={status} onChange={(event) => { setIsLoading(true); setStatus(event.target.value as DocumentStatus | '') }}>
-              <option value="pending">Por revisar</option>
-              <option value="verified">Verificados</option>
-              <option value="rejected">Rechazados</option>
-              <option value="">Todos</option>
-            </select>
-          </div>
-        </div>
+    <Panel
+      title="Documentos de clientes"
+      icon={FolderOpen}
+      description="Credenciales y comprobantes que los clientes suben desde la app."
+      actions={canPurge && (
+        <button className={`${secondaryButton} border-red-200 text-red-700 hover:border-red-300 hover:bg-red-50`} type="button" onClick={() => { setNotice(null); setIsPurgeOpen(true) }}>
+          <Trash2 size={16} aria-hidden /> Destruir documentos
+        </button>
+      )}
+    >
+      <div className="-mx-1 overflow-x-auto px-1 pb-1">
+        <Segmented label="Estado" value={filter} options={CLIENT_FILTERS} onChange={(next) => { setIsLoading(true); setFilter(next) }} />
       </div>
 
-      {notice && <div className="mt-6 rounded-lg border border-green-100 bg-green-50 px-4 py-3 text-sm text-green-800" role="status">{notice}</div>}
+      {notice && <p className={`${successAlert} mt-4`} role="status">{notice}</p>}
+      {error && <p className={`${errorAlert} mt-4`} role="alert">{error}</p>}
 
-      {error && <div className="mt-6 rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">{error}</div>}
-
-      <div className="mt-6 overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
+      <div className="mt-4">
         {isLoading ? (
-          <div className="space-y-4 p-6" aria-label="Cargando documentos" aria-busy="true">
-            {Array.from({ length: 4 }).map((_, index) => <div className="h-4 animate-pulse rounded bg-slate-200" key={index} />)}
+          <div className="space-y-3" aria-busy="true" aria-label="Cargando documentos">
+            {Array.from({ length: 4 }).map((_, index) => <div className="skeleton h-14 w-full" key={index} />)}
           </div>
+        ) : documents.length === 0 ? (
+          <EmptyState icon={filter === 'pending' ? CircleCheck : FolderOpen} title={filter === 'pending' ? 'Todo revisado' : 'Sin documentos'}>
+            {filter === 'pending' ? 'Cuando un cliente suba un documento desde la app aparecerá aquí para revisarlo.' : 'No hay documentos con este estado.'}
+          </EmptyState>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-left text-sm">
-              <thead className="border-b border-slate-100 bg-slate-50/80 text-xs uppercase tracking-wider text-slate-500">
-                <tr>
-                  <th className="px-6 py-4 font-medium">Cliente</th>
-                  <th className="px-6 py-4 font-medium">Documento</th>
-                  <th className="px-6 py-4 font-medium">Subido</th>
-                  <th className="px-6 py-4 font-medium">Estado</th>
-                  <th className="px-6 py-4 font-medium">Vigencia</th>
-                  <th className="px-6 py-4" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-slate-700">
-                {documents.length ? documents.map((document) => (
-                  <tr className="transition-colors hover:bg-slate-50" key={document.id}>
-                    <td className="whitespace-nowrap px-6 py-4">
-                      <p className="font-medium text-slate-900">{personName(document.owner)}</p>
-                      {typeof document.owner === 'object' && document.owner?.email && <p className="text-xs text-slate-500">{document.owner.email}</p>}
-                    </td>
-                    <td className="px-6 py-4">
-                      <p className="text-slate-900">{CATEGORY_LABELS[document.category]}</p>
-                      <p className="max-w-56 truncate text-xs text-slate-500" title={document.originalName}>{document.originalName}</p>
-                    </td>
-                    <td className="whitespace-nowrap px-6 py-4 text-slate-500">{formatDate(document.createdAt)}</td>
-                    <td className="px-6 py-4">
-                      <StatusBadge document={document} />
-                      {document.status === 'rejected' && document.rejectionReason && <p className="mt-1 max-w-48 text-xs text-slate-500">{document.rejectionReason}</p>}
-                    </td>
-                    <td className="whitespace-nowrap px-6 py-4 text-slate-500">{document.status === 'verified' ? (document.validUntil ? formatDate(document.validUntil) : 'Sin vencimiento') : '—'}</td>
-                    <td className="px-6 py-4">
-                      <DocumentActions
-                        document={document}
-                        canReview
-                        canDelete={canDelete}
-                        onReview={(target, decision) => setReviewTarget({ document: target, decision })}
-                        onDeleted={refresh}
-                        onError={setError}
-                      />
-                    </td>
+          <>
+            <ul className="space-y-3 md:hidden">
+              {documents.map((document) => (
+                <li className="rounded-xl border border-slate-200 p-4" key={document.id}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold text-ink">{personName(document.owner)}</p>
+                      <p className="text-sm text-slate-600">{CATEGORY_LABELS[document.category]}</p>
+                      <p className="truncate text-xs text-slate-500">{document.originalName} · {formatDate(document.createdAt)}</p>
+                    </div>
+                    <StatusBadge document={document} />
+                  </div>
+                  {document.status === 'rejected' && document.rejectionReason && <p className="mt-2 text-xs text-slate-500">Motivo: {document.rejectionReason}</p>}
+                  {validity(document) && <p className="mt-2 text-xs text-slate-500">{validity(document)}</p>}
+                  <div className="mt-3 border-t border-slate-100 pt-3">{actions(document)}</div>
+                </li>
+              ))}
+            </ul>
+
+            <div className="-mx-5 hidden overflow-x-auto sm:-mx-6 md:block">
+              <table className="min-w-full text-left text-sm">
+                <thead className={tableHeadClass}>
+                  <tr>
+                    <th className={thClass}>Cliente</th>
+                    <th className={thClass}>Documento</th>
+                    <th className={thClass}>Subido</th>
+                    <th className={thClass}>Estado</th>
+                    <th className={thClass}><span className="sr-only">Acciones</span></th>
                   </tr>
-                )) : (
-                  <tr><td className="px-6 py-10 text-center text-sm text-slate-500" colSpan={6}>{status === 'pending' ? 'No hay documentos por revisar.' : 'No hay documentos.'}</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-slate-700">
+                  {documents.map((document) => (
+                    <tr className="align-top transition-colors hover:bg-slate-50/70" key={document.id}>
+                      <td className={`${tdClass} whitespace-nowrap`}>
+                        <p className="font-semibold text-ink">{personName(document.owner)}</p>
+                        {typeof document.owner === 'object' && document.owner?.email && <p className="text-xs text-slate-500">{document.owner.email}</p>}
+                      </td>
+                      <td className={tdClass}>
+                        <p className="text-ink">{CATEGORY_LABELS[document.category]}</p>
+                        <p className="max-w-56 truncate text-xs text-slate-500" title={document.originalName}>{document.originalName}</p>
+                      </td>
+                      <td className={`${tdClass} whitespace-nowrap text-slate-500`}>{formatDate(document.createdAt)}</td>
+                      <td className={tdClass}>
+                        <StatusBadge document={document} />
+                        {document.status === 'rejected' && document.rejectionReason && <p className="mt-1 max-w-48 text-xs text-slate-500">{document.rejectionReason}</p>}
+                        {validity(document) && <p className="mt-1 text-xs text-slate-500">{validity(document)}</p>}
+                      </td>
+                      <td className={tdClass}>{actions(document)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
 
@@ -457,7 +461,7 @@ function ClientDocuments({ canDelete, canPurge }: { canDelete: boolean; canPurge
           onDone={(message) => { setIsPurgeOpen(false); setNotice(message); refresh() }}
         />
       )}
-    </div>
+    </Panel>
   )
 }
 
@@ -500,13 +504,18 @@ function UploadButton({ ownerId, category, onUploaded, onError }: UploadButtonPr
   }
 
   return (
-    <label
-      className={`inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:border-green-400 hover:text-green-800 ${isUploading ? 'pointer-events-none opacity-50' : ''}`}
-      htmlFor={inputId}
-    >
-      <Upload size={15} aria-hidden="true" /> {isUploading ? 'Subiendo...' : 'Subir'}
+    <label className={`${secondaryButton} min-h-[36px] shrink-0 cursor-pointer px-3 py-1.5 ${isUploading ? 'pointer-events-none opacity-50' : ''}`} htmlFor={inputId}>
+      <Upload size={15} aria-hidden /> {isUploading ? 'Subiendo...' : 'Subir'}
       <input className="sr-only" id={inputId} type="file" accept={ACCEPTED_FILES} onChange={(event) => void handleChange(event)} disabled={isUploading} />
     </label>
+  )
+}
+
+function ProgressBar({ value, max }: { value: number; max: number }) {
+  return (
+    <div className="h-1.5 overflow-hidden rounded-full bg-slate-200/70" aria-hidden="true">
+      <div className={`h-full rounded-full ${value >= max ? 'bg-brand-press' : 'bg-amber-400'}`} style={{ width: `${max ? (value / max) * 100 : 0}%` }} />
+    </div>
   )
 }
 
@@ -562,77 +571,107 @@ function StaffDocuments() {
   const isOwnFile = selectedId === session?.user.id
 
   if (isLoading) {
-    return <div className="h-64 animate-pulse rounded-xl bg-slate-200" aria-label="Cargando expedientes" aria-busy="true" />
+    return <div className="skeleton h-64 w-full rounded-card" aria-label="Cargando expedientes" aria-busy="true" />
   }
 
   return (
-    <div>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <p className="text-slate-500">CV, identificación, datos fiscales, certificaciones, disponibilidad y evaluación de cada empleado.</p>
-        <div className="sm:w-72">
-          <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="staff-member">Empleado</label>
-          <select className={inputClass} id="staff-member" value={selectedId} onChange={(event) => setSelectedId(event.target.value)}>
-            {staff.length === 0 && <option value="">Sin personal</option>}
-            {staff.map((user) => (
-              <option key={userId(user)} value={userId(user)}>{userName(user)} · {progress(userId(user))}/{STAFF_CATEGORIES.length}</option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      {error && <div className="mt-6 rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">{error}</div>}
-
-      {selected && (
-        <div className="mt-6 overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
-          <div className="flex flex-col gap-1 border-b border-slate-100 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-xl font-semibold text-slate-900">{userName(selected)}</h2>
-              <p className="text-sm text-slate-500">{selected.email}</p>
-            </div>
-            <p className="text-sm font-medium text-slate-600">{progress(selectedId)} de {STAFF_CATEGORIES.length} documentos verificados</p>
+    <div className="space-y-4">
+      {error && <p className={errorAlert} role="alert">{error}</p>}
+      {staff.length === 0 ? (
+        <Panel title="Expediente del personal" icon={FolderOpen}>
+          <EmptyState icon={FolderOpen} title="Sin personal">Agrega trabajadores en Usuarios para armar su expediente.</EmptyState>
+        </Panel>
+      ) : (
+        <div className="grid gap-6 lg:grid-cols-[18rem_minmax(0,1fr)]">
+          {/* Phones pick the employee from a list box; wider screens get the full roster with progress. */}
+          <div className="lg:hidden">
+            <label className={labelClass} htmlFor="staff-member">Empleado</label>
+            <select className={fieldClass} id="staff-member" value={selectedId} onChange={(event) => setSelectedId(event.target.value)}>
+              {staff.map((user) => (
+                <option key={userId(user)} value={userId(user)}>{userName(user)} · {progress(userId(user))}/{STAFF_CATEGORIES.length}</option>
+              ))}
+            </select>
           </div>
-          <ul className="divide-y divide-slate-100">
-            {[...STAFF_CATEGORIES, 'other' as const].map((category) => {
-              const files = selectedDocuments.filter((document) => document.category === category)
-              return (
-                <li className="px-6 py-4" key={category}>
-                  <div className="flex items-center justify-between gap-4">
-                    <p className="font-medium text-slate-900">
-                      {CATEGORY_LABELS[category]}
-                      {category === 'other' && <span className="ml-2 text-xs font-normal text-slate-400">opcional</span>}
-                    </p>
-                    <UploadButton ownerId={selectedId} category={category} onUploaded={refresh} onError={setError} />
-                  </div>
-                  {files.length > 0 ? (
-                    <ul className="mt-3 space-y-3">
-                      {files.map((document) => (
-                        <li className="flex flex-col gap-2 rounded-lg bg-slate-50 px-4 py-3 lg:flex-row lg:items-center lg:justify-between" key={document.id}>
-                          <div className="min-w-0">
-                            <p className="truncate text-sm text-slate-900" title={document.originalName}>{document.originalName}</p>
-                            <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                              <StatusBadge document={document} />
-                              <span>Subido {formatDate(document.createdAt)} por {personName(document.uploadedBy)}</span>
-                              {document.status === 'rejected' && document.rejectionReason && <span>· {document.rejectionReason}</span>}
-                            </p>
-                          </div>
-                          <DocumentActions
-                            document={document}
-                            canReview={!isOwnFile}
-                            canDelete={!isOwnFile}
-                            onReview={(target, decision) => setReviewTarget({ document: target, decision })}
-                            onDeleted={refresh}
-                            onError={setError}
-                          />
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    category !== 'other' && <p className="mt-1 text-sm text-slate-400">Falta este documento.</p>
-                  )}
-                </li>
-              )
-            })}
-          </ul>
+          <Panel className="hidden h-fit lg:block" title="Personal" description={`${staff.length} empleado${staff.length === 1 ? '' : 's'}`}>
+            <ul className="-mx-2 space-y-1">
+              {staff.map((user) => {
+                const id = userId(user)
+                const done = progress(id)
+                const isActive = id === selectedId
+                return (
+                  <li key={id}>
+                    <button
+                      className={`w-full rounded-xl px-3 py-2.5 text-left transition ${isActive ? 'bg-slate-100' : 'hover:bg-slate-50'}`}
+                      type="button"
+                      aria-pressed={isActive}
+                      onClick={() => setSelectedId(id)}
+                    >
+                      <span className="flex items-center justify-between gap-2">
+                        <span className={`truncate text-sm ${isActive ? 'font-semibold text-ink' : 'text-slate-700'}`}>{userName(user)}</span>
+                        <span className="shrink-0 text-xs text-slate-500 tabular">{done}/{STAFF_CATEGORIES.length}</span>
+                      </span>
+                      <span className="mt-1.5 block"><ProgressBar value={done} max={STAFF_CATEGORIES.length} /></span>
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          </Panel>
+
+          {selected && (
+            <Panel
+              title={userName(selected)}
+              description={selected.email}
+              actions={<Badge tone={progress(selectedId) >= STAFF_CATEGORIES.length ? 'success' : 'warning'}>{progress(selectedId)} de {STAFF_CATEGORIES.length} verificados</Badge>}
+            >
+              <ul className="-my-3 divide-y divide-slate-100">
+                {[...STAFF_CATEGORIES, 'other' as const].map((category) => {
+                  const files = selectedDocuments.filter((document) => document.category === category)
+                  const isVerified = files.some((document) => document.status === 'verified')
+                  return (
+                    <li className="py-4" key={category}>
+                      <div className="flex items-center justify-between gap-4">
+                        <p className="flex items-center gap-2.5 font-medium text-ink">
+                          <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-full ${isVerified ? 'bg-brand text-brand-ink' : 'border border-dashed border-slate-300 text-transparent'}`} aria-hidden="true">
+                            <Check size={14} />
+                          </span>
+                          {CATEGORY_LABELS[category]}
+                          {category === 'other' && <span className="text-xs font-normal text-slate-400">opcional</span>}
+                        </p>
+                        <UploadButton ownerId={selectedId} category={category} onUploaded={refresh} onError={setError} />
+                      </div>
+                      {files.length > 0 ? (
+                        <ul className="mt-3 space-y-2 pl-8">
+                          {files.map((document) => (
+                            <li className="flex flex-col gap-2 rounded-xl bg-slate-50 px-4 py-3 lg:flex-row lg:items-center lg:justify-between" key={document.id}>
+                              <div className="min-w-0">
+                                <p className="truncate text-sm text-ink" title={document.originalName}>{document.originalName}</p>
+                                <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                                  <StatusBadge document={document} />
+                                  <span>Subido {formatDate(document.createdAt)} por {personName(document.uploadedBy)}</span>
+                                  {document.status === 'rejected' && document.rejectionReason && <span>· {document.rejectionReason}</span>}
+                                </p>
+                              </div>
+                              <DocumentActions
+                                document={document}
+                                canReview={!isOwnFile}
+                                canDelete={!isOwnFile}
+                                onReview={(target, decision) => setReviewTarget({ document: target, decision })}
+                                onDeleted={refresh}
+                                onError={setError}
+                              />
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        category !== 'other' && <p className="mt-1 pl-8 text-sm text-slate-400">Falta este documento.</p>
+                      )}
+                    </li>
+                  )
+                })}
+              </ul>
+            </Panel>
+          )}
         </div>
       )}
 
@@ -671,67 +710,67 @@ function AccessLog() {
     && (!term || [personName(log.actor), personName(log.owner), log.document?.originalName ?? ''].some((text) => text.toLowerCase().includes(term))))
 
   return (
-    <div>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <p className="text-slate-500">Quién consultó, descargó, revisó o eliminó cada documento. Los registros no se pueden editar.</p>
-        <div className="flex flex-col gap-3 sm:flex-row">
-          <label className="sr-only" htmlFor="log-search">Buscar</label>
-          <input className={`${inputClass} sm:w-56`} id="log-search" placeholder="Buscar persona o archivo" value={search} onChange={(event) => setSearch(event.target.value)} />
-          <label className="sr-only" htmlFor="log-action">Acción</label>
-          <select className={`${inputClass} sm:w-44`} id="log-action" value={action} onChange={(event) => setAction(event.target.value as DocumentAction | '')}>
-            <option value="">Todas las acciones</option>
-            {Object.entries(ACTION_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-          </select>
-        </div>
+    <Panel title="Bitácora de documentos" icon={ScrollText} description="Quién consultó, descargó, revisó o eliminó cada documento. Los registros no se pueden editar.">
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <label className="relative block w-full sm:max-w-xs">
+          <span className="sr-only">Buscar</span>
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} aria-hidden />
+          <input className={`${fieldClass} pl-10`} type="search" placeholder="Buscar persona o archivo" value={search} onChange={(event) => setSearch(event.target.value)} />
+        </label>
+        <label className="sr-only" htmlFor="log-action">Acción</label>
+        <select className={`${fieldClass} sm:w-52`} id="log-action" value={action} onChange={(event) => setAction(event.target.value as DocumentAction | '')}>
+          <option value="">Todas las acciones</option>
+          {Object.entries(ACTION_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+        </select>
       </div>
 
-      {error && <div className="mt-6 rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">{error}</div>}
+      {error && <p className={`${errorAlert} mt-4`} role="alert">{error}</p>}
 
-      <div className="mt-6 overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
+      <div className="mt-4">
         {isLoading ? (
-          <div className="space-y-4 p-6" aria-label="Cargando bitácora" aria-busy="true">
-            {Array.from({ length: 5 }).map((_, index) => <div className="h-4 animate-pulse rounded bg-slate-200" key={index} />)}
+          <div className="space-y-3" aria-busy="true" aria-label="Cargando bitácora">
+            {Array.from({ length: 5 }).map((_, index) => <div className="skeleton h-12 w-full" key={index} />)}
           </div>
+        ) : visibleLogs.length === 0 ? (
+          <EmptyState icon={ScrollText} title="Sin movimientos">No hay movimientos con estos filtros.</EmptyState>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="-mx-5 overflow-x-auto sm:-mx-6">
             <table className="min-w-full text-left text-sm">
-              <thead className="border-b border-slate-100 bg-slate-50/80 text-xs uppercase tracking-wider text-slate-500">
+              <thead className={tableHeadClass}>
                 <tr>
-                  <th className="px-6 py-4 font-medium">Fecha</th>
-                  <th className="px-6 py-4 font-medium">Persona</th>
-                  <th className="px-6 py-4 font-medium">Acción</th>
-                  <th className="px-6 py-4 font-medium">Documento</th>
-                  <th className="px-6 py-4 font-medium">Titular</th>
-                  <th className="px-6 py-4 font-medium">IP</th>
+                  <th className={thClass}>Fecha</th>
+                  <th className={thClass}>Persona</th>
+                  <th className={thClass}>Acción</th>
+                  <th className={thClass}>Documento</th>
+                  <th className={thClass}>Titular</th>
+                  <th className={thClass}>IP</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-700">
-                {visibleLogs.length ? visibleLogs.map((log) => (
-                  <tr className="transition-colors hover:bg-slate-50" key={log.id}>
-                    <td className="whitespace-nowrap px-6 py-4 text-slate-500">{formatDate(log.createdAt, true)}</td>
-                    <td className="whitespace-nowrap px-6 py-4 font-medium text-slate-900">{personName(log.actor)}</td>
-                    <td className="whitespace-nowrap px-6 py-4">{ACTION_LABELS[log.action]}</td>
-                    <td className="px-6 py-4">
+                {visibleLogs.map((log) => (
+                  <tr className="transition-colors hover:bg-slate-50/70" key={log.id}>
+                    <td className={`${tdClass} whitespace-nowrap text-slate-500 tabular`}>{formatDate(log.createdAt, true)}</td>
+                    <td className={`${tdClass} whitespace-nowrap font-semibold text-ink`}>{personName(log.actor)}</td>
+                    <td className={tdClass}><Badge tone={ACTION_TONES[log.action] ?? 'neutral'}>{ACTION_LABELS[log.action]}</Badge></td>
+                    <td className={tdClass}>
                       {log.document ? (
                         <>
-                          <p className="text-slate-900">{CATEGORY_LABELS[log.document.category]}</p>
+                          <p className="text-ink">{CATEGORY_LABELS[log.document.category]}</p>
                           <p className="max-w-56 truncate text-xs text-slate-500" title={log.document.originalName}>{log.document.originalName}</p>
                         </>
                       ) : '—'}
                     </td>
-                    <td className="whitespace-nowrap px-6 py-4">{personName(log.owner)}</td>
-                    <td className="whitespace-nowrap px-6 py-4 font-mono text-xs text-slate-500">{log.ip || '—'}</td>
+                    <td className={`${tdClass} whitespace-nowrap`}>{personName(log.owner)}</td>
+                    <td className={`${tdClass} whitespace-nowrap font-mono text-xs text-slate-500`}>{log.ip || '—'}</td>
                   </tr>
-                )) : (
-                  <tr><td className="px-6 py-10 text-center text-sm text-slate-500" colSpan={6}>No hay movimientos registrados.</td></tr>
-                )}
+                ))}
               </tbody>
             </table>
           </div>
         )}
       </div>
-      {logs.length >= 500 && <p className="mt-3 text-xs text-slate-500">Se muestran los 500 movimientos más recientes.</p>}
-    </div>
+      {logs.length >= 500 && <p className={hintClass}>Se muestran los 500 movimientos más recientes.</p>}
+    </Panel>
   )
 }
 
@@ -742,36 +781,28 @@ function Documents() {
   const isAdmin = useStaffRoles().has('Admin')
   // The log and hiring files of other managers are for the owner; platform admins act as owners.
   const isOwner = Boolean(session?.user.isPlatformAdmin) || organizationGyms.some((gym) => gym.roles.includes('Propietario'))
-  const tabs: Array<{ id: Tab; label: string }> = [
-    { id: 'clientes', label: 'Clientes' },
-    ...(isAdmin ? [{ id: 'personal' as const, label: 'Expediente del personal' }] : []),
-    ...(isOwner ? [{ id: 'bitacora' as const, label: 'Bitácora' }] : []),
+  const tabs: Array<readonly [Tab, string]> = [
+    ['clientes', 'Clientes'],
+    ...(isAdmin ? [['personal', 'Expediente del personal'] as const] : []),
+    ...(isOwner ? [['bitacora', 'Bitácora'] as const] : []),
   ]
   const [activeTab, setActiveTab] = useState<Tab>('clientes')
 
   return (
-    <section className="min-h-screen bg-canvas px-4 py-10 sm:px-8">
-      <p className="text-sm font-medium uppercase tracking-[0.25em] text-slate-500">Operación</p>
-      <h1 className="mt-3 text-4xl font-semibold tracking-tight text-slate-900">Documentos</h1>
+    <section className="min-h-screen bg-canvas px-4 py-8 sm:px-8 sm:py-10">
+      <PageHeader
+        eyebrow="Operación"
+        title="Documentos"
+        description="Revisa lo que suben los clientes, arma el expediente del personal y consulta quién accedió a cada archivo."
+      />
 
       {tabs.length > 1 && (
-        <div className="mt-6 flex gap-2 overflow-x-auto border-b border-slate-200" role="tablist">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              className={`whitespace-nowrap px-4 py-2 text-sm ${activeTab === tab.id ? 'border-b-2 border-green-500 font-semibold text-green-700' : 'text-slate-500 hover:text-slate-800'}`}
-              type="button"
-              role="tab"
-              aria-selected={activeTab === tab.id}
-              onClick={() => setActiveTab(tab.id)}
-            >
-              {tab.label}
-            </button>
-          ))}
+        <div className="mt-6 overflow-x-auto pb-1">
+          <Segmented label="Sección" value={activeTab} options={tabs} onChange={setActiveTab} />
         </div>
       )}
 
-      <div className="mt-6">
+      <div className="mt-4">
         {activeTab === 'clientes' && <ClientDocuments canDelete={isAdmin} canPurge={isOwner} />}
         {activeTab === 'personal' && isAdmin && <StaffDocuments />}
         {activeTab === 'bitacora' && isOwner && <AccessLog />}
