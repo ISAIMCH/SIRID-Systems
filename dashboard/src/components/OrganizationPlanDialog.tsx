@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from 'react'
-import { CalendarPlus, Gem, Infinity as InfinityIcon, X } from 'lucide-react'
+import { CalendarPlus, Gem, Infinity as InfinityIcon } from 'lucide-react'
 import { updateOrganizationSubscription, type OrganizationSubscriptionUpdate, type PlatformOrganization, type SaasPlan } from '../services/api'
+import Modal from './ui/Modal'
+import { errorAlert, fieldClass, labelClass, primaryButton, secondaryButton } from './ui/styles'
 
 type Mode = OrganizationSubscriptionUpdate['status']
 
@@ -9,8 +11,6 @@ const MODES: { value: Mode; label: string; description: string; icon: typeof Gem
   { value: 'active', label: 'Pagado hasta', description: 'Pagó fuera de la web (transferencia, efectivo) hasta una fecha.', icon: Gem },
   { value: 'manual', label: 'Plan manual', description: 'Vendido por SIRID (Cadena, IoT). No vence hasta que lo cambies.', icon: InfinityIcon },
 ]
-
-const inputClassName = 'w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100'
 
 // yyyy-mm-dd for <input type="date">, `days` from today.
 function dateInput(days: number) {
@@ -65,29 +65,22 @@ function OrganizationPlanDialog({ organization, plans, onClose, onDone }: Organi
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center overflow-y-auto bg-slate-900/50 px-4 py-8 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="plan-dialog-title">
-      <form className="w-full max-w-lg animate-pop-in rounded-card bg-white p-6 shadow-lift" onSubmit={handleSubmit}>
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h2 className="font-display text-2xl font-bold text-ink" id="plan-dialog-title">Plan de {organization.name}</h2>
-            <p className="mt-1 text-sm text-slate-500">El dueño y su equipo ven el cambio al instante.</p>
-          </div>
-          <button className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-slate-500 hover:bg-slate-100" type="button" aria-label="Cerrar" onClick={onClose}>
-            <X size={18} aria-hidden />
-          </button>
-        </div>
+    <Modal eyebrow="Plan GymGo" title={`Plan de ${organization.name}`} onClose={() => { if (!isSubmitting) onClose() }}>
+      <form className="space-y-5" onSubmit={handleSubmit}>
+        <p className="-mt-1 text-sm text-slate-500">El dueño y su equipo ven el cambio al instante.</p>
 
-        <fieldset className="mt-5 grid gap-2">
+        <fieldset className="grid gap-2">
           <legend className="sr-only">Tipo de cambio</legend>
           {MODES.map(({ value, label, description, icon: Icon }) => {
             const disabled = value === 'trialing' && !current.planCode
+            const isSelected = mode === value
             return (
               <label
                 key={value}
-                className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition ${mode === value ? 'border-brand bg-brand-soft ring-1 ring-brand/50' : 'border-slate-200 hover:border-slate-300'} ${disabled ? 'cursor-not-allowed opacity-50' : ''}`}
+                className={`flex items-start gap-3 rounded-xl border p-3 transition has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand/40 ${isSelected ? 'border-brand-text/30 bg-brand-soft' : 'border-slate-200 hover:border-slate-300'} ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
               >
-                <input className="sr-only" type="radio" name="mode" value={value} checked={mode === value} disabled={disabled} onChange={() => changeMode(value)} />
-                <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg ${mode === value ? 'bg-brand text-brand-ink' : 'bg-slate-100 text-slate-600'}`}>
+                <input className="sr-only" type="radio" name="mode" value={value} checked={isSelected} disabled={disabled} onChange={() => changeMode(value)} />
+                <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg ${isSelected ? 'bg-brand text-brand-ink' : 'bg-slate-100 text-slate-600'}`}>
                   <Icon size={18} aria-hidden />
                 </span>
                 <span>
@@ -99,26 +92,26 @@ function OrganizationPlanDialog({ organization, plans, onClose, onDone }: Organi
           })}
         </fieldset>
 
-        <div className="mt-5 grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2">
           {mode !== 'trialing' && (
-            <div className={mode === 'manual' ? 'sm:col-span-1' : ''}>
-              <label className="mb-1.5 block text-xs font-medium text-slate-500" htmlFor="plan-code">Plan</label>
-              <select className={inputClassName} id="plan-code" value={planCode} onChange={(event) => setPlanCode(event.target.value)} required>
+            <div>
+              <label className={labelClass} htmlFor="plan-code">Plan</label>
+              <select className={fieldClass} id="plan-code" value={planCode} onChange={(event) => setPlanCode(event.target.value)} required>
                 {plans.map((plan) => <option key={plan.code} value={plan.code}>{plan.name}</option>)}
               </select>
             </div>
           )}
           {mode !== 'manual' && (
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-slate-500" htmlFor="plan-until">{mode === 'trialing' ? 'Prueba hasta' : 'Pagado hasta'}</label>
-              <input className={inputClassName} id="plan-until" type="date" min={dateInput(1)} value={until} onChange={(event) => setUntil(event.target.value)} required />
+              <label className={labelClass} htmlFor="plan-until">{mode === 'trialing' ? 'Prueba hasta' : 'Pagado hasta'}</label>
+              <input className={fieldClass} id="plan-until" type="date" min={dateInput(1)} value={until} onChange={(event) => setUntil(event.target.value)} required />
             </div>
           )}
           {mode !== 'trialing' && (
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-slate-500" htmlFor="plan-gym-limit">Límite de sucursales</label>
+              <label className={labelClass} htmlFor="plan-gym-limit">Límite de sucursales</label>
               <input
-                className={inputClassName}
+                className={fieldClass}
                 id="plan-gym-limit"
                 type="number"
                 min={1}
@@ -131,15 +124,15 @@ function OrganizationPlanDialog({ organization, plans, onClose, onDone }: Organi
           )}
         </div>
 
-        {error && <p className="mt-4 text-sm text-red-600" role="alert">{error}</p>}
-        <div className="mt-6 flex justify-end gap-3">
-          <button className="rounded-full px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-100" type="button" onClick={onClose}>Cancelar</button>
-          <button className="rounded-full bg-ink px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-50" type="submit" disabled={isSubmitting || (mode !== 'trialing' && !planCode)}>
+        {error && <p className={errorAlert} role="alert">{error}</p>}
+        <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
+          <button className={secondaryButton} type="button" onClick={onClose} disabled={isSubmitting}>Cancelar</button>
+          <button className={primaryButton} type="submit" disabled={isSubmitting || (mode !== 'trialing' && !planCode)}>
             {isSubmitting ? 'Guardando…' : 'Guardar plan'}
           </button>
         </div>
       </form>
-    </div>
+    </Modal>
   )
 }
 

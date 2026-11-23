@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { Building2, Check, ChevronDown, Gem, Pause, Phone, Play, Search, X } from 'lucide-react'
+import { Building2, Check, ChevronDown, Gem, Hourglass, Layers, MapPin, Pause, Phone, Play, Search, ShieldOff, X } from 'lucide-react'
 import {
   getPlatformOrganization,
   getPlatformOrganizations,
@@ -12,20 +12,28 @@ import {
 } from '../services/api'
 import OrganizationPlanDialog from '../components/OrganizationPlanDialog'
 import { METHOD_LABELS, STATUS_LABELS } from '../utils/planFeatures'
+import PageHeader from '../components/ui/PageHeader'
+import Panel from '../components/ui/Panel'
+import Modal from '../components/ui/Modal'
+import Badge, { type BadgeTone } from '../components/ui/Badge'
+import EmptyState from '../components/ui/EmptyState'
+import KpiCard from '../components/ui/KpiCard'
+import Segmented from '../components/ui/Segmented'
+import { dangerButton, errorAlert, fieldClass, labelClass, primaryButton, secondaryButton } from '../components/ui/styles'
 
-const STATUS_TABS: { value: OrganizationStatus | ''; label: string }[] = [
-  { value: 'pending', label: 'Pendientes' },
-  { value: 'active', label: 'Activas' },
-  { value: 'suspended', label: 'Suspendidas' },
-  { value: 'rejected', label: 'Rechazadas' },
-  { value: '', label: 'Todas' },
-]
+const STATUS_TABS = [
+  ['pending', 'Pendientes'],
+  ['active', 'Activas'],
+  ['suspended', 'Suspendidas'],
+  ['rejected', 'Rechazadas'],
+  ['', 'Todas'],
+] as const satisfies ReadonlyArray<readonly [OrganizationStatus | '', string]>
 
-const STATUS_BADGE: Record<OrganizationStatus, { label: string; tone: string }> = {
-  pending: { label: 'En revisión', tone: 'bg-amber-50 text-amber-800 border-amber-200' },
-  active: { label: 'Activa', tone: 'bg-emerald-50 text-emerald-800 border-emerald-200' },
-  suspended: { label: 'Suspendida', tone: 'bg-red-50 text-red-800 border-red-200' },
-  rejected: { label: 'Rechazada', tone: 'bg-slate-100 text-slate-700 border-slate-200' },
+const STATUS_BADGE: Record<OrganizationStatus, { label: string; tone: BadgeTone }> = {
+  pending: { label: 'En revisión', tone: 'warning' },
+  active: { label: 'Activa', tone: 'success' },
+  suspended: { label: 'Suspendida', tone: 'danger' },
+  rejected: { label: 'Rechazada', tone: 'neutral' },
 }
 
 type StatusAction = Exclude<OrganizationStatus, 'pending'>
@@ -55,25 +63,22 @@ function PlanSummary({ subscription, plans }: { subscription: PlatformOrganizati
   }
   const planName = plans.find((plan) => plan.code === subscription.planCode)?.name ?? subscription.planCode
   const date = subscription.status === 'trialing'
-    ? `prueba hasta el ${formatDate(subscription.trialEndsAt)}`
+    ? `Prueba hasta el ${formatDate(subscription.trialEndsAt)}`
     : subscription.status === 'manual'
-      ? 'sin vencimiento'
+      ? 'Sin vencimiento'
       : subscription.currentPeriodEnd
-        ? `${subscription.renews ? 'se renueva el' : 'pagado hasta el'} ${formatDate(subscription.currentPeriodEnd)}`
+        ? `${subscription.renews ? 'Se renueva el' : 'Pagado hasta el'} ${formatDate(subscription.currentPeriodEnd)}`
         : ''
-  const tone = subscription.phase !== 'ok'
-    ? 'bg-red-50 text-red-800 border-red-200'
-    : subscription.status === 'trialing'
-      ? 'bg-amber-50 text-amber-800 border-amber-200'
-      : 'bg-brand-soft text-brand-text border-brand/40'
+  const tone: BadgeTone = subscription.phase !== 'ok' ? 'danger' : subscription.status === 'trialing' ? 'warning' : 'brand'
+  const details = [date, subscription.method ? METHOD_LABELS[subscription.method] : ''].filter(Boolean).join(' · ')
+  const lapse = subscription.phase === 'grace'
+    ? `En gracia hasta el ${formatDate(subscription.graceEndsAt)}`
+    : subscription.phase === 'expired' ? 'Pausada para su equipo' : ''
   return (
-    <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
-      <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-0.5 text-xs font-semibold ${tone}`}>
-        <Gem size={12} aria-hidden /> {planName} · {subscription.phase === 'ok' ? STATUS_LABELS[subscription.status] : 'Vencido'}
-      </span>
-      <span>{date}{subscription.method ? ` · ${METHOD_LABELS[subscription.method]}` : ''}</span>
-      {subscription.phase === 'grace' && <span className="font-medium text-red-700">· en gracia hasta el {formatDate(subscription.graceEndsAt)}</span>}
-      {subscription.phase === 'expired' && <span className="font-medium text-red-700">· pausada para su equipo</span>}
+    <div className="space-y-1.5">
+      <Badge tone={tone} icon={Gem}>{planName} · {subscription.phase === 'ok' ? STATUS_LABELS[subscription.status] : 'Vencido'}</Badge>
+      {details && <p className="text-sm text-slate-600">{details}</p>}
+      {lapse && <p className="text-sm font-medium text-red-700">{lapse}</p>}
     </div>
   )
 }
@@ -106,15 +111,14 @@ function StatusDialog({ action, onClose, onDone }: StatusDialogProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/50 px-4" role="dialog" aria-modal="true" aria-labelledby="status-dialog-title">
-      <form className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl" onSubmit={handleSubmit}>
-        <h2 className="text-xl font-semibold text-slate-900" id="status-dialog-title">{copy.label} {organization.name}</h2>
-        <p className="mt-2 text-sm text-slate-500">{copy.confirm}</p>
+    <Modal eyebrow="Organizaciones" title={`${copy.label} ${organization.name}`} onClose={() => { if (!isSubmitting) onClose() }} size="md">
+      <form className="space-y-5" onSubmit={handleSubmit}>
+        <p className="-mt-1 text-sm text-slate-500">{copy.confirm}</p>
         {needsReason && (
-          <div className="mt-5">
-            <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="status-reason">Motivo (lo verá el propietario)</label>
+          <div>
+            <label className={labelClass} htmlFor="status-reason">Motivo <span className="font-normal text-slate-400">(lo verá el propietario)</span></label>
             <textarea
-              className="w-full rounded-lg border border-slate-200 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
+              className={`${fieldClass} min-h-24 resize-y`}
               id="status-reason"
               rows={3}
               maxLength={500}
@@ -124,11 +128,11 @@ function StatusDialog({ action, onClose, onDone }: StatusDialogProps) {
             />
           </div>
         )}
-        {error && <p className="mt-3 text-sm text-red-600" role="alert">{error}</p>}
-        <div className="mt-6 flex justify-end gap-3">
-          <button className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100" type="button" onClick={onClose}>Cancelar</button>
+        {error && <p className={errorAlert} role="alert">{error}</p>}
+        <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
+          <button className={secondaryButton} type="button" onClick={onClose} disabled={isSubmitting}>Cancelar</button>
           <button
-            className={`rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-50 ${target === 'active' ? 'bg-ink hover:bg-slate-800' : 'bg-red-600 hover:bg-red-700'}`}
+            className={target === 'active' ? primaryButton : dangerButton}
             type="submit"
             disabled={isSubmitting || (needsReason && !reason.trim())}
           >
@@ -136,7 +140,7 @@ function StatusDialog({ action, onClose, onDone }: StatusDialogProps) {
           </button>
         </div>
       </form>
-    </div>
+    </Modal>
   )
 }
 
@@ -147,6 +151,8 @@ interface OrganizationCardProps {
   onChange: (organization: PlatformOrganization) => void
   onEditPlan: (organization: PlatformOrganization) => void
 }
+
+const sectionLabel = 'text-xs font-semibold uppercase tracking-[0.2em] text-slate-500'
 
 function OrganizationCard({ organization, plans, onAction, onChange, onEditPlan }: OrganizationCardProps) {
   // A card that renews by itself is cancelled in Stripe before SIRID changes the plan (the API refuses it).
@@ -189,86 +195,93 @@ function OrganizationCard({ organization, plans, onAction, onChange, onEditPlan 
   ]
 
   return (
-    <article className="rounded-xl border border-slate-100 bg-white p-6 shadow-sm">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-3">
-            <h2 className="text-xl font-semibold text-slate-900">{organization.name}</h2>
-            <span className={`rounded-full border px-3 py-0.5 text-xs font-medium ${badge.tone}`}>{badge.label}</span>
-          </div>
-          <p className="mt-1 text-sm text-slate-500">
-            {[organization.legalName, organization.rfc].filter(Boolean).join(' · ') || 'Sin datos fiscales'} · Solicitud del {formatDate(organization.createdAt)}
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {organization.allowedTransitions.map((target) => {
-            const copy = actionCopy(target as StatusAction, organization.status)
-            const Icon = copy.icon
-            return (
-              <button
-                key={target}
-                className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition ${target === 'active' ? 'bg-ink text-white hover:bg-slate-800' : 'border border-slate-200 bg-white text-slate-700 hover:border-red-300 hover:text-red-700'}`}
-                type="button"
-                onClick={() => onAction({ organization, target: target as StatusAction })}
-              >
-                <Icon size={16} aria-hidden="true" /> {copy.label}
-              </button>
-            )
-          })}
-        </div>
-      </div>
-
-      {organization.statusReason && (
-        <p className="mt-4 rounded-lg bg-slate-50 px-4 py-3 text-sm text-slate-700"><span className="font-medium">Motivo:</span> {organization.statusReason}</p>
-      )}
-
-      <div className="mt-5 flex flex-col gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0">
-          <p className="mb-1.5 text-xs font-medium uppercase tracking-[0.2em] text-slate-500">Plan GymGo</p>
-          <PlanSummary subscription={organization.subscription} plans={plans} />
-        </div>
-        <button
-          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-          type="button"
-          onClick={() => onEditPlan(organization)}
-          disabled={renewsWithCard || plans.length === 0}
-          title={renewsWithCard ? 'Paga con tarjeta y se renueva sola: cancélala en Stripe antes de cambiar el plan.' : undefined}
-        >
-          <Gem size={16} aria-hidden="true" /> Cambiar plan
-        </button>
-      </div>
-
-      <div className="mt-5 grid gap-4 border-t border-slate-100 pt-5 md:grid-cols-[1fr_auto]">
-        <div>
-          <p className="text-xs font-medium uppercase tracking-[0.2em] text-slate-500">Propietario</p>
-          {organization.owner ? (
-            <div className="mt-2 text-sm text-slate-700">
-              <p className="font-medium text-slate-900">{organization.owner.name} {organization.owner.lastName}</p>
-              <p className="break-all">{organization.owner.email}</p>
-              {organization.owner.phone && (
-                <a className="mt-1 inline-flex items-center gap-1 font-medium text-emerald-700 hover:underline" href={`tel:${organization.owner.phone}`}>
-                  <Phone size={14} aria-hidden="true" /> {organization.owner.phone}
-                </a>
-              )}
+    <article className="overflow-hidden rounded-card border border-slate-200/80 bg-white shadow-card">
+      <header className="flex flex-col gap-4 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-start sm:justify-between sm:px-6">
+        <div className="flex min-w-0 items-start gap-3">
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-ink text-brand" aria-hidden>
+            <Building2 size={20} />
+          </span>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="truncate font-display text-2xl font-bold tracking-tight text-ink">{organization.name}</h2>
+              <Badge tone={badge.tone}>{badge.label}</Badge>
             </div>
-          ) : <p className="mt-2 text-sm text-slate-500">Sin propietario registrado.</p>}
+            <p className="mt-0.5 text-sm text-slate-500">
+              {[organization.legalName, organization.rfc].filter(Boolean).join(' · ') || 'Sin datos fiscales'} · Solicitud del {formatDate(organization.createdAt)}
+            </p>
+          </div>
         </div>
-        <dl className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
+        {organization.allowedTransitions.length > 0 && (
+          <div className="flex shrink-0 flex-wrap gap-2">
+            {organization.allowedTransitions.map((target) => {
+              const copy = actionCopy(target as StatusAction, organization.status)
+              const Icon = copy.icon
+              return (
+                <button
+                  key={target}
+                  className={target === 'active' ? primaryButton : `${secondaryButton} hover:border-red-200 hover:bg-red-50 hover:text-red-700`}
+                  type="button"
+                  onClick={() => onAction({ organization, target: target as StatusAction })}
+                >
+                  <Icon size={16} aria-hidden /> {copy.label}
+                </button>
+              )
+            })}
+          </div>
+        )}
+      </header>
+
+      <div className="space-y-5 p-5 sm:p-6">
+        {organization.statusReason && (
+          <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700"><span className="font-semibold">Motivo:</span> {organization.statusReason}</p>
+        )}
+
+        <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           {counts.map((item) => (
-            <div key={item.label}>
+            <div className="rounded-xl bg-slate-50 px-4 py-3" key={item.label}>
               <dt className="text-xs text-slate-500">{item.label}</dt>
-              <dd className="text-lg font-semibold text-slate-900">{item.value}</dd>
+              <dd className="mt-1 font-display text-2xl font-bold leading-none text-ink tabular">{item.value}</dd>
             </div>
           ))}
         </dl>
+
+        <div className="grid gap-5 md:grid-cols-2">
+          <div className="min-w-0">
+            <p className={sectionLabel}>Plan GymGo</p>
+            <div className="mt-2"><PlanSummary subscription={organization.subscription} plans={plans} /></div>
+            <button
+              className={`${secondaryButton} mt-3`}
+              type="button"
+              onClick={() => onEditPlan(organization)}
+              disabled={renewsWithCard || plans.length === 0}
+              title={renewsWithCard ? 'Paga con tarjeta y se renueva sola: cancélala en Stripe antes de cambiar el plan.' : undefined}
+            >
+              <Gem size={16} aria-hidden /> Cambiar plan
+            </button>
+          </div>
+          <div className="min-w-0">
+            <p className={sectionLabel}>Propietario</p>
+            {organization.owner ? (
+              <div className="mt-2 text-sm text-slate-600">
+                <p className="font-semibold text-ink">{organization.owner.name} {organization.owner.lastName}</p>
+                <p className="break-all">{organization.owner.email}</p>
+                {organization.owner.phone && (
+                  <a className="mt-1 inline-flex items-center gap-1.5 font-medium text-brand-text hover:underline" href={`tel:${organization.owner.phone}`}>
+                    <Phone size={14} aria-hidden /> {organization.owner.phone}
+                  </a>
+                )}
+              </div>
+            ) : <p className="mt-2 text-sm text-slate-500">Sin propietario registrado.</p>}
+          </div>
+        </div>
       </div>
 
-      <div className="mt-5 flex flex-col gap-4 border-t border-slate-100 pt-5 sm:flex-row sm:items-end sm:justify-between">
-        <form className="flex items-end gap-3" onSubmit={saveLimit}>
+      <footer className="flex flex-col gap-4 border-t border-slate-100 bg-slate-50/60 px-5 py-4 sm:flex-row sm:items-end sm:justify-between sm:px-6">
+        <form className="flex items-end gap-2" onSubmit={saveLimit}>
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-500" htmlFor={`limit-${organization.id}`}>Límite de sucursales</label>
+            <label className={labelClass} htmlFor={`limit-${organization.id}`}>Límite de sucursales</label>
             <input
-              className="w-24 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100"
+              className={`${fieldClass.replace('w-full ', '')} w-24`}
               id={`limit-${organization.id}`}
               type="number"
               min={1}
@@ -278,34 +291,43 @@ function OrganizationCard({ organization, plans, onAction, onChange, onEditPlan 
               required
             />
           </div>
-          <button
-            className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
-            type="submit"
-            disabled={isSaving || Number(gymLimit) === organization.gymLimit}
-          >
+          <button className={secondaryButton} type="submit" disabled={isSaving || Number(gymLimit) === organization.gymLimit}>
             {isSaving ? 'Guardando...' : 'Guardar'}
           </button>
         </form>
-        <button className="inline-flex items-center gap-1 text-sm font-medium text-slate-600 hover:text-slate-900" type="button" onClick={() => void toggleGyms()} aria-expanded={isOpen}>
-          Ver sucursales <ChevronDown size={16} className={`transition-transform ${isOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
+        <button
+          className="inline-flex items-center gap-1.5 self-start rounded-lg px-2 py-1.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 hover:text-ink sm:self-auto"
+          type="button"
+          onClick={() => void toggleGyms()}
+          aria-expanded={isOpen}
+        >
+          Ver sucursales <ChevronDown size={16} className={`transition-transform ${isOpen ? 'rotate-180' : ''}`} aria-hidden />
         </button>
-      </div>
+      </footer>
 
-      {error && <p className="mt-3 text-sm text-red-600" role="alert">{error}</p>}
-
-      {isOpen && (
-        <ul className="mt-4 divide-y divide-slate-100 rounded-lg border border-slate-100">
-          {gyms === null
-            ? <li className="px-4 py-3 text-sm text-slate-500">Cargando...</li>
-            : gyms.length === 0
-              ? <li className="px-4 py-3 text-sm text-slate-500">Sin sucursales.</li>
-              : gyms.map((gym) => (
-                <li className="flex flex-col gap-1 px-4 py-3 text-sm sm:flex-row sm:justify-between" key={gym.id}>
-                  <span className="font-medium text-slate-900">{gym.name}{!gym.isActive && <span className="ml-2 text-xs text-slate-500">(inactiva)</span>}</span>
-                  <span className="text-slate-500">{gym.address || 'Sin dirección'}</span>
-                </li>
-              ))}
-        </ul>
+      {(error || isOpen) && (
+        <div className="space-y-3 border-t border-slate-100 px-5 py-4 sm:px-6">
+          {error && <p className={errorAlert} role="alert">{error}</p>}
+          {isOpen && (
+            gyms === null
+              ? <div className="skeleton h-12 w-full" aria-label="Cargando sucursales" aria-busy="true" />
+              : gyms.length === 0
+                ? <p className="text-sm text-slate-500">Sin sucursales.</p>
+                : (
+                  <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200">
+                    {gyms.map((gym) => (
+                      <li className="flex flex-col gap-1 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between" key={gym.id}>
+                        <span className="flex items-center gap-2 font-medium text-ink">
+                          {gym.name}
+                          {!gym.isActive && <Badge>Inactiva</Badge>}
+                        </span>
+                        <span className="inline-flex items-center gap-1.5 text-slate-500"><MapPin size={14} aria-hidden /> {gym.address || 'Sin dirección'}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )
+          )}
+        </div>
       )}
     </article>
   )
@@ -319,6 +341,7 @@ function Platform() {
   const [organizations, setOrganizations] = useState<PlatformOrganization[]>([])
   const [statusCounts, setStatusCounts] = useState<Partial<Record<OrganizationStatus, number>>>({})
   const [isLoading, setIsLoading] = useState(true)
+  const [hasLoaded, setHasLoaded] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null)
   const [plans, setPlans] = useState<SaasPlan[]>([])
@@ -343,7 +366,11 @@ function Platform() {
       .catch((requestError: unknown) => {
         if (isMounted) setError(requestError instanceof Error ? requestError.message : 'No se pudieron cargar las organizaciones.')
       })
-      .finally(() => { if (isMounted) setIsLoading(false) })
+      .finally(() => {
+        if (!isMounted) return
+        setIsLoading(false)
+        setHasLoaded(true)
+      })
     return () => { isMounted = false }
   }, [status, query, reloadKey])
 
@@ -365,60 +392,62 @@ function Platform() {
   }
 
   const totalCount = Object.values(statusCounts).reduce((sum, count) => sum + (count ?? 0), 0)
+  const countOf = (value: OrganizationStatus) => statusCounts[value] ?? 0
+  const tabOptions = STATUS_TABS.map(([value, label]) => {
+    const count = value ? statusCounts[value] : totalCount
+    return [value, count !== undefined && hasLoaded ? `${label} ${count}` : label] as const
+  })
+  const tabLabel = STATUS_TABS.find(([value]) => value === status)?.[1] ?? 'Todas'
 
   return (
-    <section className="min-h-screen bg-canvas px-4 py-10 sm:px-8">
-      <p className="text-sm font-medium uppercase tracking-[0.25em] text-slate-500">SIRID</p>
-      <h1 className="mt-3 text-4xl font-semibold tracking-tight text-slate-900">Organizaciones</h1>
-      <p className="mt-3 text-slate-500">Aprueba las solicitudes de nuevos gimnasios y administra su estado. Por privacidad solo ves conteos y el contacto del propietario.</p>
+    <section className="min-h-screen bg-canvas px-4 py-8 sm:px-8 sm:py-10">
+      <PageHeader
+        eyebrow="SIRID"
+        title="Organizaciones"
+        description="Aprueba las solicitudes de nuevos gimnasios y administra su estado. Por privacidad solo ves conteos y el contacto del propietario."
+      />
 
-      <div className="mt-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label="Estado">
-          {STATUS_TABS.map((tab) => {
-            const count = tab.value ? statusCounts[tab.value] : totalCount
-            return (
-              <button
-                key={tab.label}
-                className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium transition ${status === tab.value ? 'bg-ink text-white' : 'bg-white text-slate-600 hover:bg-slate-100'}`}
-                type="button"
-                role="tab"
-                aria-selected={status === tab.value}
-                onClick={() => changeStatus(tab.value)}
-              >
-                {tab.label}{count !== undefined ? ` (${count})` : ''}
-              </button>
-            )
-          })}
+      <div className="mt-6 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+        <KpiCard label="Por revisar" value={countOf('pending')} icon={Hourglass} tone={countOf('pending') > 0 ? 'warning' : 'default'} isLoading={!hasLoaded} hint={countOf('pending') > 0 ? 'Esperan tu aprobación' : 'Nada pendiente'} />
+        <KpiCard label="Activas" value={countOf('active')} icon={Building2} tone="brand" isLoading={!hasLoaded} hint="Operando con GymGo" />
+        <KpiCard label="Suspendidas" value={countOf('suspended')} icon={ShieldOff} isLoading={!hasLoaded} hint="Sin acceso hasta reactivarlas" />
+        <KpiCard label="Total" value={totalCount} icon={Layers} isLoading={!hasLoaded} hint={`${countOf('rejected')} rechazada${countOf('rejected') === 1 ? '' : 's'}`} />
+      </div>
+
+      <Panel className="mt-6" title={tabLabel === 'Todas' ? 'Todas las organizaciones' : tabLabel} icon={Building2}>
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="-mx-1 overflow-x-auto px-1 pb-1">
+            <Segmented label="Estado" value={status} options={tabOptions} onChange={changeStatus} />
+          </div>
+          <form className="relative w-full lg:w-72" onSubmit={(event) => { event.preventDefault(); changeQuery(search.trim()) }}>
+            <Search className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} aria-hidden />
+            <input
+              className={`${fieldClass} pl-10`}
+              type="search"
+              placeholder="Nombre, razón social o RFC"
+              aria-label="Buscar organización"
+              value={search}
+              onChange={(event) => { setSearch(event.target.value); if (!event.target.value) changeQuery('') }}
+            />
+          </form>
         </div>
-        <form className="relative w-full lg:w-72" onSubmit={(event) => { event.preventDefault(); changeQuery(search.trim()) }}>
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} aria-hidden="true" />
-          <input
-            className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm text-slate-900 outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100"
-            type="search"
-            placeholder="Nombre, razón social o RFC"
-            aria-label="Buscar organización"
-            value={search}
-            onChange={(event) => { setSearch(event.target.value); if (!event.target.value) changeQuery('') }}
-          />
-        </form>
-      </div>
 
-      {error && <div className="mt-6 rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">{error}</div>}
+        {error && <p className={`${errorAlert} mt-4`} role="alert">{error}</p>}
 
-      <div className="mt-6 space-y-4">
-        {isLoading
-          ? Array.from({ length: 2 }).map((_, index) => <div className="h-48 animate-pulse rounded-xl bg-slate-200" key={index} />)
-          : organizations.length
-            ? organizations.map((organization) => (
-              <OrganizationCard key={organization.id} organization={organization} plans={plans} onAction={setPendingAction} onChange={replace} onEditPlan={setPlanTarget} />
-            ))
-            : (
-              <div className="flex flex-col items-center rounded-xl border border-dashed border-slate-200 bg-white px-6 py-12 text-center">
-                <Building2 className="text-slate-300" size={32} aria-hidden="true" />
-                <p className="mt-3 text-sm text-slate-500">No hay organizaciones en esta vista.</p>
-              </div>
-            )}
-      </div>
+        <div className="mt-4 space-y-4">
+          {isLoading
+            ? Array.from({ length: 2 }).map((_, index) => <div className="skeleton h-64 w-full rounded-card" key={index} />)
+            : organizations.length
+              ? organizations.map((organization) => (
+                <OrganizationCard key={organization.id} organization={organization} plans={plans} onAction={setPendingAction} onChange={replace} onEditPlan={setPlanTarget} />
+              ))
+              : (
+                <EmptyState icon={Building2} title={query ? 'Ninguna organización coincide' : 'No hay organizaciones en esta vista'}>
+                  {query ? 'Revisa el nombre, la razón social o el RFC.' : status === 'pending' ? 'Cuando un gimnasio se registre aparecerá aquí para que lo apruebes.' : 'Cambia el filtro para ver otras organizaciones.'}
+                </EmptyState>
+              )}
+        </div>
+      </Panel>
 
       {pendingAction && (
         <StatusDialog
