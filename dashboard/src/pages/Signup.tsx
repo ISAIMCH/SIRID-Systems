@@ -1,9 +1,9 @@
 import { useState, type FormEvent, type ReactNode } from 'react'
-import { CheckCircle2 } from 'lucide-react'
+import { Building2, CheckCircle2, MapPin, UserRound, type LucideIcon } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import AuthShell from '../components/AuthShell'
+import { errorAlert, fieldClass, hintClass, labelClass, primaryButton } from '../components/ui/styles'
 import { ApiError, signupOwner, type OwnerSignupPayload } from '../services/api'
-
-const inputClass = 'w-full border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100'
 
 const EMPTY_FORM: Required<OwnerSignupPayload> = {
   name: '',
@@ -28,10 +28,19 @@ interface FieldProps {
 function Field({ id, label, hint, children }: FieldProps) {
   return (
     <div>
-      <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor={id}>{label}</label>
+      <label className={labelClass} htmlFor={id}>{label}</label>
       {children}
-      {hint && <p className="mt-1 text-xs text-slate-500">{hint}</p>}
+      {hint && <p className={hintClass}>{hint}</p>}
     </div>
+  )
+}
+
+function Legend({ icon: Icon, step, children }: { icon: LucideIcon; step: number; children: ReactNode }) {
+  return (
+    <legend className="mb-4 flex items-center gap-2.5 text-sm font-semibold text-ink">
+      <span className="grid h-7 w-7 place-items-center rounded-lg bg-brand-soft text-brand-text" aria-hidden="true"><Icon size={15} /></span>
+      <span><span className="text-slate-400">{step}.</span> {children}</span>
+    </legend>
   )
 }
 
@@ -74,108 +83,101 @@ function Signup() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-canvas px-4 py-12 sm:px-6">
-      <section className="w-full max-w-2xl border border-slate-100 bg-white p-6 shadow-xl shadow-slate-200/60 sm:p-10">
-        <p className="text-xl font-semibold tracking-tight text-ink">GymGo</p>
-        <p className="mt-1 text-xs font-medium uppercase tracking-[0.25em] text-emerald-700">Registro de gimnasios</p>
-
-        {result ? (
-          <div className="mt-8">
-            <CheckCircle2 className="text-emerald-600" size={40} aria-hidden="true" />
-            <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-900">{result.verifyEmail ? 'Confirma tu correo' : 'Solicitud enviada'}</h1>
-            {result.verifyEmail ? (
-            <p className="mt-3 text-sm leading-6 text-slate-600">
-              Registramos <strong>{result.name}</strong>. Te enviamos un código de 6 dígitos a <strong>{result.verifyEmail}</strong>:
+    <AuthShell eyebrow="Registro de gimnasios" width="2xl">
+      {result ? (
+        <div className="py-2 text-center sm:py-4">
+          <span className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-brand-soft text-brand-text" aria-hidden="true">
+            <CheckCircle2 size={30} />
+          </span>
+          <h1 className="mt-4 font-display text-2xl font-bold tracking-tight text-ink">{result.verifyEmail ? 'Confirma tu correo' : 'Solicitud enviada'}</h1>
+          {result.verifyEmail ? (
+            <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-slate-600">
+              Registramos <strong className="text-ink">{result.name}</strong>. Te enviamos un código de 6 dígitos a <strong className="text-ink">{result.verifyEmail}</strong>:
               inicia sesión con tu correo y contraseña y escríbelo para entrar a tu panel.
             </p>
-            ) : (
-            <p className="mt-3 text-sm leading-6 text-slate-600">
-              Recibimos la solicitud de <strong>{result.name}</strong>. SIRID la revisará y te llamará al teléfono que registraste.
+          ) : (
+            <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-slate-600">
+              Recibimos la solicitud de <strong className="text-ink">{result.name}</strong>. SIRID la revisará y te llamará al teléfono que registraste.
               Inicia sesión más tarde para ver si ya fue aprobada.
             </p>
-            )}
-            {result.existingAccount && (
-              <p className="mt-3 text-sm leading-6 text-slate-600">
-                Usamos tu cuenta de GymGo existente: entra con el mismo correo y contraseña.
-              </p>
-            )}
-            <Link className="mt-8 inline-block bg-brand px-6 py-3 font-semibold text-ink transition hover:bg-brand-hover" to="/login">
-              Ir a iniciar sesión
-            </Link>
-          </div>
-        ) : (
-          <>
-            <h1 className="mt-8 text-3xl font-semibold tracking-tight text-slate-900">Registra tu gimnasio</h1>
-            <p className="mt-2 text-sm text-slate-500">
-              SIRID revisa cada solicitud antes de activarla. ¿Ya usas GymGo? Usa el mismo correo y contraseña de tu cuenta.
+          )}
+          {result.existingAccount && (
+            <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-slate-600">
+              Usamos tu cuenta de GymGo existente: entra con el mismo correo y contraseña.
             </p>
+          )}
+          <Link className={`${primaryButton} mt-8 min-h-[44px] px-6`} to="/login">
+            Ir a iniciar sesión
+          </Link>
+        </div>
+      ) : (
+        <>
+          <h1 className="font-display text-2xl font-bold tracking-tight text-ink">Registra tu gimnasio</h1>
+          <p className="mt-1.5 text-sm leading-6 text-slate-500">
+            SIRID revisa cada solicitud antes de activarla. ¿Ya usas GymGo? Usa el mismo correo y contraseña de tu cuenta.
+          </p>
 
-            <form className="mt-8 space-y-8" onSubmit={handleSubmit}>
-              <fieldset className="grid gap-5 sm:grid-cols-2">
-                <legend className="mb-4 text-xs font-medium uppercase tracking-[0.2em] text-slate-500">Propietario</legend>
-                <Field id="name" label="Nombre">
-                  <input className={inputClass} id="name" autoComplete="given-name" value={form.name} onChange={update('name')} minLength={2} maxLength={100} required />
+          <form className="mt-6 space-y-8" onSubmit={handleSubmit}>
+            <fieldset className="grid gap-4 sm:grid-cols-2">
+              <Legend icon={UserRound} step={1}>Propietario</Legend>
+              <Field id="name" label="Nombre">
+                <input className={fieldClass} id="name" autoComplete="given-name" value={form.name} onChange={update('name')} minLength={2} maxLength={100} required />
+              </Field>
+              <Field id="lastName" label="Apellidos">
+                <input className={fieldClass} id="lastName" autoComplete="family-name" value={form.lastName} onChange={update('lastName')} maxLength={50} />
+              </Field>
+              <Field id="email" label="Correo electrónico">
+                <input className={fieldClass} id="email" type="email" autoComplete="email" value={form.email} onChange={update('email')} maxLength={254} required />
+              </Field>
+              <Field id="phone" label="Teléfono" hint="10 dígitos. SIRID te llamará a este número.">
+                <input className={fieldClass} id="phone" type="tel" autoComplete="tel" inputMode="tel" value={form.phone} onChange={update('phone')} required />
+              </Field>
+              <div className="sm:col-span-2">
+                <Field id="password" label="Contraseña" hint="Mínimo 10 caracteres. Si ya tienes cuenta, escribe tu contraseña actual.">
+                  <input className={fieldClass} id="password" type="password" autoComplete="new-password" value={form.password} onChange={update('password')} minLength={10} maxLength={72} required />
                 </Field>
-                <Field id="lastName" label="Apellidos">
-                  <input className={inputClass} id="lastName" autoComplete="family-name" value={form.lastName} onChange={update('lastName')} maxLength={50} />
-                </Field>
-                <Field id="email" label="Correo electrónico">
-                  <input className={inputClass} id="email" type="email" autoComplete="email" value={form.email} onChange={update('email')} maxLength={254} required />
-                </Field>
-                <Field id="phone" label="Teléfono" hint="10 dígitos. SIRID te llamará a este número.">
-                  <input className={inputClass} id="phone" type="tel" autoComplete="tel" inputMode="tel" value={form.phone} onChange={update('phone')} required />
-                </Field>
-                <div className="sm:col-span-2">
-                  <Field id="password" label="Contraseña" hint="Mínimo 10 caracteres. Si ya tienes cuenta, escribe tu contraseña actual.">
-                    <input className={inputClass} id="password" type="password" autoComplete="new-password" value={form.password} onChange={update('password')} minLength={10} maxLength={72} required />
-                  </Field>
-                </div>
-              </fieldset>
-
-              <fieldset className="grid gap-5 sm:grid-cols-2">
-                <legend className="mb-4 text-xs font-medium uppercase tracking-[0.2em] text-slate-500">Negocio</legend>
-                <div className="sm:col-span-2">
-                  <Field id="organizationName" label="Nombre comercial">
-                    <input className={inputClass} id="organizationName" placeholder="Ej. Fuerza Total" value={form.organizationName} onChange={update('organizationName')} minLength={2} maxLength={120} required />
-                  </Field>
-                </div>
-                <Field id="legalName" label="Razón social (opcional)">
-                  <input className={inputClass} id="legalName" value={form.legalName} onChange={update('legalName')} maxLength={200} />
-                </Field>
-                <Field id="rfc" label="RFC (opcional)">
-                  <input className={`${inputClass} uppercase`} id="rfc" value={form.rfc} onChange={update('rfc')} maxLength={13} />
-                </Field>
-              </fieldset>
-
-              <fieldset className="grid gap-5 sm:grid-cols-2">
-                <legend className="mb-4 text-xs font-medium uppercase tracking-[0.2em] text-slate-500">Primera sucursal</legend>
-                <Field id="gymName" label="Nombre de la sucursal">
-                  <input className={inputClass} id="gymName" placeholder="Ej. Centro" value={form.gymName} onChange={update('gymName')} minLength={2} maxLength={120} required />
-                </Field>
-                <Field id="gymAddress" label="Dirección (opcional)">
-                  <input className={inputClass} id="gymAddress" autoComplete="street-address" value={form.gymAddress} onChange={update('gymAddress')} maxLength={200} />
-                </Field>
-              </fieldset>
-
-              {error && (
-                <p className="border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">{error}</p>
-              )}
-
-              <div className="flex flex-col-reverse gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <Link className="text-center text-sm font-medium text-slate-500 hover:text-slate-800" to="/login">Ya tengo acceso</Link>
-                <button
-                  className="bg-brand px-6 py-3 font-semibold text-ink transition hover:bg-brand-hover active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
-                  type="submit"
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting ? 'Enviando...' : 'Enviar solicitud'}
-                </button>
               </div>
-            </form>
-          </>
-        )}
-      </section>
-    </main>
+            </fieldset>
+
+            <fieldset className="grid gap-4 sm:grid-cols-2">
+              <Legend icon={Building2} step={2}>Negocio</Legend>
+              <div className="sm:col-span-2">
+                <Field id="organizationName" label="Nombre comercial">
+                  <input className={fieldClass} id="organizationName" placeholder="Ej. Fuerza Total" value={form.organizationName} onChange={update('organizationName')} minLength={2} maxLength={120} required />
+                </Field>
+              </div>
+              <Field id="legalName" label="Razón social (opcional)">
+                <input className={fieldClass} id="legalName" value={form.legalName} onChange={update('legalName')} maxLength={200} />
+              </Field>
+              <Field id="rfc" label="RFC (opcional)">
+                <input className={`${fieldClass} uppercase`} id="rfc" value={form.rfc} onChange={update('rfc')} maxLength={13} />
+              </Field>
+            </fieldset>
+
+            <fieldset className="grid gap-4 sm:grid-cols-2">
+              <Legend icon={MapPin} step={3}>Primera sucursal</Legend>
+              <Field id="gymName" label="Nombre de la sucursal">
+                <input className={fieldClass} id="gymName" placeholder="Ej. Centro" value={form.gymName} onChange={update('gymName')} minLength={2} maxLength={120} required />
+              </Field>
+              <Field id="gymAddress" label="Dirección (opcional)">
+                <input className={fieldClass} id="gymAddress" autoComplete="street-address" value={form.gymAddress} onChange={update('gymAddress')} maxLength={200} />
+              </Field>
+            </fieldset>
+
+            {error && <p className={errorAlert} role="alert">{error}</p>}
+
+            <div className="flex flex-col-reverse gap-4 border-t border-slate-100 pt-5 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-center text-sm text-slate-500">
+                ¿Ya tienes acceso? <Link className="font-semibold text-brand-text hover:underline" to="/login">Inicia sesión</Link>
+              </p>
+              <button className={`${primaryButton} min-h-[44px] px-6`} type="submit" disabled={isSubmitting}>
+                {isSubmitting ? 'Enviando…' : 'Enviar solicitud'}
+              </button>
+            </div>
+          </form>
+        </>
+      )}
+    </AuthShell>
   )
 }
 
