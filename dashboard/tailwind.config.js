@@ -67,6 +67,10 @@ export default {
           from: { opacity: '0' },
           to: { opacity: '1' },
         },
+        'slide-in': {
+          from: { transform: 'translateX(24px)', opacity: '0' },
+          to: { transform: 'none', opacity: '1' },
+        },
       },
       animation: {
         'page-in': 'page-in 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both',
@@ -75,6 +79,7 @@ export default {
         grow: 'grow 520ms cubic-bezier(0.2, 0.8, 0.2, 1) both',
         'grow-x': 'grow-x 600ms cubic-bezier(0.2, 0.8, 0.2, 1) both',
         fade: 'fade 400ms ease-out both',
+        'slide-in': 'slide-in 240ms cubic-bezier(0.2, 0.8, 0.2, 1) both',
       },
     },
   },
