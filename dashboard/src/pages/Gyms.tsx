@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Clock, Copy, Pencil, Plus, Printer, RefreshCw, Users } from 'lucide-react'
+import { Building2, Check, Clock, Copy, KeyRound, MapPin, Pencil, Plus, Printer, QrCode, RefreshCw, ShieldOff, Users } from 'lucide-react'
 import QRCode from 'qrcode'
 import GymSelect from '../components/GymSelect'
 import {
@@ -15,6 +15,22 @@ import type { AccessDevice, Gym, GymLimits } from '../services/api'
 import { useAuth } from '../store/useAuth'
 import { useStaffRoles } from '../utils/access'
 import { targetGymField } from '../utils/targetGym'
+import PageHeader from '../components/ui/PageHeader'
+import Panel from '../components/ui/Panel'
+import Modal from '../components/ui/Modal'
+import Badge from '../components/ui/Badge'
+import EmptyState from '../components/ui/EmptyState'
+import {
+  errorAlert,
+  fieldClass,
+  hintClass,
+  labelClass,
+  primaryButton,
+  secondaryButton,
+  tableHeadClass,
+  tdClass,
+  thClass,
+} from '../components/ui/styles'
 
 // The app opens its join screen from this link; the printed QR holds it.
 function joinLink(code: string) {
@@ -79,6 +95,7 @@ interface GymCardProps {
 function GymCard({ gym, canManage, onRegenerate, onEdit, onError }: GymCardProps) {
   const qrDataUrl = useJoinQr(gym.joinCode)
   const [isRegenerating, setIsRegenerating] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   async function handleRegenerate() {
     if (!window.confirm(`El código actual de ${gym.name} dejará de funcionar y tendrás que volver a imprimir el QR. Los clientes que ya se unieron no se ven afectados. ¿Continuar?`)) return
@@ -99,51 +116,77 @@ function GymCard({ gym, canManage, onRegenerate, onEdit, onError }: GymCardProps
     }
   }
 
+  async function handleCopy() {
+    if (!gym.joinCode) return
+    try {
+      await navigator.clipboard.writeText(gym.joinCode)
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1800)
+    } catch {
+      onError('No se pudo copiar el código.')
+    }
+  }
+
   return (
-    <article className="flex flex-col gap-6 rounded-xl border border-slate-100 bg-white p-6 shadow-sm sm:flex-row">
-      <div className="flex h-40 w-40 shrink-0 items-center justify-center self-center rounded-lg border border-slate-100 bg-white sm:self-start">
-        {qrDataUrl
-          ? <img className="h-full w-full" src={qrDataUrl} alt={`QR para unirse a ${gym.name}`} />
-          : <span className="px-4 text-center text-xs text-slate-400">{gym.joinCode ? 'Generando QR...' : 'Sin código'}</span>}
-      </div>
-      <div className="min-w-0 flex-1">
-        <h2 className="text-xl font-semibold text-slate-900">{gym.name}</h2>
-        {gym.address && <p className="mt-1 text-sm text-slate-500">{gym.address}</p>}
-        <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-500">
-          <span className="inline-flex items-center gap-1.5"><Clock size={14} aria-hidden="true" /> {gym.timezone}</span>
-          <span className="inline-flex items-center gap-1.5"><Users size={14} aria-hidden="true" /> {gym.capacity ? `Aforo ${gym.capacity.toLocaleString('es-MX')}` : 'Sin aforo definido'}</span>
-        </p>
-        <p className="mt-5 text-xs font-medium uppercase tracking-[0.2em] text-slate-500">Código para unirse</p>
-        <p className="mt-1 font-mono text-3xl font-semibold tracking-[0.25em] text-slate-900">{gym.joinCode ?? '—'}</p>
-        <p className="mt-2 text-sm text-slate-500">El cliente lo escanea o lo escribe en la app. Para entrar sigue necesitando una membresía activa.</p>
-        <div className="mt-5 flex flex-wrap gap-3">
-          <button
-            className="inline-flex items-center gap-2 rounded-lg bg-ink px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800 disabled:opacity-50"
-            type="button"
-            onClick={handlePrint}
-            disabled={!qrDataUrl}
-          >
-            <Printer size={16} aria-hidden="true" /> Imprimir QR
+    <article className="flex flex-col overflow-hidden rounded-card border border-slate-200/80 bg-white shadow-card">
+      <header className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4 sm:px-6">
+        <div className="min-w-0">
+          <h2 className="truncate font-display text-2xl font-bold tracking-tight text-ink">{gym.name}</h2>
+          <p className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-500">
+            {gym.address && <span className="inline-flex items-center gap-1.5"><MapPin size={14} aria-hidden /> {gym.address}</span>}
+            <span className="inline-flex items-center gap-1.5"><Clock size={14} aria-hidden /> {gym.timezone}</span>
+            <span className="inline-flex items-center gap-1.5"><Users size={14} aria-hidden /> {gym.capacity ? `Aforo ${gym.capacity.toLocaleString('es-MX')}` : 'Sin aforo definido'}</span>
+          </p>
+        </div>
+        {canManage && (
+          <button className={`${secondaryButton} shrink-0 px-3`} type="button" onClick={() => onEdit(gym)} aria-label={`Editar ${gym.name}`}>
+            <Pencil size={16} aria-hidden /> <span className="hidden sm:inline">Editar</span>
           </button>
-          {canManage && (
-            <button
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-              type="button"
-              onClick={() => onEdit(gym)}
-            >
-              <Pencil size={16} aria-hidden="true" /> Editar
+        )}
+      </header>
+
+      <div className="flex flex-1 flex-col gap-5 p-5 sm:flex-row sm:p-6">
+        <div className="grid h-40 w-40 shrink-0 place-items-center self-center rounded-xl border border-slate-200 bg-white p-2 sm:self-start">
+          {qrDataUrl
+            ? <img className="h-full w-full" src={qrDataUrl} alt={`QR para unirse a ${gym.name}`} />
+            : gym.joinCode
+              ? <div className="skeleton h-full w-full" aria-label="Generando QR" />
+              : <span className="flex flex-col items-center gap-2 text-xs text-slate-400"><QrCode size={28} aria-hidden /> Sin código</span>}
+        </div>
+
+        <div className="flex min-w-0 flex-1 flex-col">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Código para unirse</p>
+          <div className="mt-2 flex items-center gap-2">
+            <p className="select-all font-mono text-3xl font-semibold tracking-[0.25em] text-ink tabular">{gym.joinCode ?? '—'}</p>
+            {gym.joinCode && (
+              <button
+                className="grid h-9 w-9 place-items-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-ink"
+                type="button"
+                aria-label={copied ? 'Código copiado' : 'Copiar código'}
+                title={copied ? 'Copiado' : 'Copiar'}
+                onClick={() => void handleCopy()}
+              >
+                {copied ? <Check size={17} className="text-brand-text" aria-hidden /> : <Copy size={17} aria-hidden />}
+              </button>
+            )}
+          </div>
+          <p className="mt-2 text-sm text-slate-500">El cliente lo escanea o lo escribe en la app. Para entrar sigue necesitando una membresía activa.</p>
+
+          <div className="mt-auto flex flex-wrap gap-2 pt-5">
+            <button className={primaryButton} type="button" onClick={handlePrint} disabled={!qrDataUrl}>
+              <Printer size={16} aria-hidden /> Imprimir QR
             </button>
-          )}
-          {canManage && (
-            <button
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-red-300 hover:text-red-700 disabled:opacity-50"
-              type="button"
-              onClick={() => void handleRegenerate()}
-              disabled={isRegenerating}
-            >
-              <RefreshCw size={16} aria-hidden="true" /> {isRegenerating ? 'Generando...' : 'Generar código nuevo'}
-            </button>
-          )}
+            {canManage && (
+              <button
+                className={`${secondaryButton} hover:border-red-200 hover:bg-red-50 hover:text-red-700`}
+                type="button"
+                onClick={() => void handleRegenerate()}
+                disabled={isRegenerating}
+              >
+                <RefreshCw size={16} className={isRegenerating ? 'animate-spin' : undefined} aria-hidden /> {isRegenerating ? 'Generando...' : 'Código nuevo'}
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </article>
@@ -190,6 +233,7 @@ function DevicesSection({ gyms, onError }: DevicesSectionProps) {
   }
 
   function closeModal() {
+    if (isSubmitting) return
     setIsModalOpen(false)
     setNewKey(null)
   }
@@ -229,124 +273,113 @@ function DevicesSection({ gyms, onError }: DevicesSectionProps) {
   }
 
   const gymName = (id: string) => gyms.find((gym) => gym.id === id)?.name ?? 'Sucursal'
+  const activeCount = devices.filter((device) => !device.revokedAt).length
 
   return (
-    <div className="mt-12">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h2 className="text-2xl font-semibold tracking-tight text-slate-900">Torniquetes</h2>
-          <p className="mt-2 text-slate-500">Cada torniquete tiene su propia llave y registra los accesos de su sucursal.</p>
-        </div>
-        <button
-          className="inline-flex items-center justify-center gap-2 rounded-lg bg-brand px-4 py-2 font-medium text-ink transition hover:bg-brand-hover"
-          type="button"
-          onClick={openModal}
-        >
-          <Plus size={18} aria-hidden="true" /> Nuevo torniquete
+    <Panel
+      className="mt-6"
+      title="Torniquetes"
+      icon={KeyRound}
+      description={isLoading ? 'Cada torniquete tiene su propia llave y registra los accesos de su sucursal.' : `${activeCount} activo${activeCount === 1 ? '' : 's'} · cada uno con su propia llave para registrar los accesos de su sucursal.`}
+      actions={(
+        <button className={secondaryButton} type="button" onClick={openModal}>
+          <Plus size={18} aria-hidden /> Nuevo torniquete
         </button>
-      </div>
-
-      <div className="mt-6 overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
-        {isLoading ? (
-          <div className="space-y-4 p-6" aria-label="Cargando torniquetes" aria-busy="true">
-            {Array.from({ length: 3 }).map((_, index) => <div className="h-4 animate-pulse rounded bg-slate-200" key={index} />)}
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-left text-sm">
-              <thead className="border-b border-slate-100 bg-slate-50/80 text-xs uppercase tracking-wider text-slate-500">
-                <tr>
-                  <th className="px-6 py-4 font-medium">Nombre</th>
-                  <th className="px-6 py-4 font-medium">Sucursal</th>
-                  <th className="px-6 py-4 font-medium">Llave</th>
-                  <th className="px-6 py-4 font-medium">Última conexión</th>
-                  <th className="px-6 py-4 font-medium">Estado</th>
-                  <th className="px-6 py-4" />
+      )}
+    >
+      {isLoading ? (
+        <div className="space-y-3" aria-label="Cargando torniquetes" aria-busy="true">
+          {Array.from({ length: 3 }).map((_, index) => <div className="skeleton h-12 w-full" key={index} />)}
+        </div>
+      ) : devices.length === 0 ? (
+        <EmptyState icon={KeyRound} title="Aún no hay torniquetes">
+          Registra uno para obtener la llave que configura el equipo de acceso.
+        </EmptyState>
+      ) : (
+        <div className="-mx-5 overflow-x-auto sm:-mx-6">
+          <table className="min-w-full text-left text-sm">
+            <thead className={tableHeadClass}>
+              <tr>
+                <th className={thClass}>Nombre</th>
+                <th className={thClass}>Sucursal</th>
+                <th className={thClass}>Llave</th>
+                <th className={thClass}>Última conexión</th>
+                <th className={thClass}>Estado</th>
+                <th className={thClass}><span className="sr-only">Acciones</span></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 text-slate-700">
+              {devices.map((device) => (
+                <tr className={`transition-colors hover:bg-slate-50 ${device.revokedAt ? 'text-slate-400' : ''}`} key={device.id}>
+                  <td className={`${tdClass} whitespace-nowrap font-medium ${device.revokedAt ? 'text-slate-500' : 'text-ink'}`}>{device.name}</td>
+                  <td className={`${tdClass} whitespace-nowrap`}>{gymName(device.gymId)}</td>
+                  <td className={`${tdClass} whitespace-nowrap font-mono text-xs text-slate-500`}>{device.keyPreview}…</td>
+                  <td className={`${tdClass} whitespace-nowrap text-slate-500 tabular`}>{formatDate(device.lastSeenAt)}</td>
+                  <td className={tdClass}>
+                    {device.revokedAt ? <Badge tone="danger">Revocado</Badge> : <Badge tone="success">Activo</Badge>}
+                  </td>
+                  <td className={`${tdClass} whitespace-nowrap text-right`}>
+                    {!device.revokedAt && (
+                      <button
+                        className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-slate-500 transition hover:bg-red-50 hover:text-red-700"
+                        type="button"
+                        onClick={() => void handleRevoke(device)}
+                      >
+                        <ShieldOff size={15} aria-hidden /> Revocar
+                      </button>
+                    )}
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-slate-700">
-                {devices.length ? devices.map((device) => (
-                  <tr className="transition-colors hover:bg-slate-50" key={device.id}>
-                    <td className="whitespace-nowrap px-6 py-4 font-medium text-slate-900">{device.name}</td>
-                    <td className="whitespace-nowrap px-6 py-4">{gymName(device.gymId)}</td>
-                    <td className="whitespace-nowrap px-6 py-4 font-mono text-xs text-slate-500">{device.keyPreview}…</td>
-                    <td className="whitespace-nowrap px-6 py-4 text-slate-500">{formatDate(device.lastSeenAt)}</td>
-                    <td className="px-6 py-4">
-                      <span className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${device.revokedAt ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
-                        {device.revokedAt ? 'Revocado' : 'Activo'}
-                      </span>
-                    </td>
-                    <td className="whitespace-nowrap px-6 py-4 text-right">
-                      {!device.revokedAt && (
-                        <button className="text-sm font-medium text-slate-500 transition hover:text-red-700" type="button" onClick={() => void handleRevoke(device)}>
-                          Revocar
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                )) : (
-                  <tr><td className="px-6 py-10 text-center text-sm text-slate-500" colSpan={6}>No hay torniquetes registrados.</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-900/50 px-4 py-8 backdrop-blur-sm">
-          <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-sm font-medium uppercase tracking-[0.2em] text-emerald-700">Acceso</p>
-                <h2 className="mt-2 text-2xl font-semibold text-slate-900">{newKey ? 'Llave del torniquete' : 'Nuevo torniquete'}</h2>
-              </div>
-              <button className="text-2xl leading-none text-slate-400 transition hover:text-slate-700" type="button" aria-label="Cerrar modal" onClick={closeModal}>×</button>
-            </div>
-
-            {newKey ? (
-              <div className="mt-6 space-y-4">
-                <p className="rounded-lg border border-yellow-200 bg-yellow-50 px-4 py-3 text-sm text-yellow-800">
-                  Copia esta llave y configúrala en el torniquete (encabezado <span className="font-mono">X-Device-Key</span>). No se volverá a mostrar; si se pierde, revoca el torniquete y registra uno nuevo.
-                </p>
-                <p className="break-all rounded-lg bg-slate-50 px-4 py-3 font-mono text-sm text-slate-900">{newKey}</p>
-                {modalError && <p className="text-sm text-red-600" role="alert">{modalError}</p>}
-                <div className="flex justify-end gap-3">
-                  <button className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50" type="button" onClick={() => void handleCopy()}>
-                    <Copy size={16} aria-hidden="true" /> {copied ? 'Copiada' : 'Copiar llave'}
-                  </button>
-                  <button className="rounded-lg bg-ink px-4 py-2 text-sm font-medium text-white" type="button" onClick={closeModal}>Listo</button>
-                </div>
-              </div>
-            ) : (
-              <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="device-name">Nombre</label>
-                  <input
-                    className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
-                    id="device-name"
-                    placeholder="Ej. Torniquete entrada principal"
-                    value={name}
-                    onChange={(event) => setName(event.target.value)}
-                    minLength={2}
-                    maxLength={80}
-                    required
-                  />
-                </div>
-                <GymSelect id="device-gym" label="Sucursal del torniquete" value={gymId} onChange={setGymId} />
-                {modalError && <p className="text-sm text-red-600" role="alert">{modalError}</p>}
-                <div className="flex justify-end gap-3 pt-2">
-                  <button className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100" type="button" onClick={closeModal}>Cancelar</button>
-                  <button className="rounded-lg bg-ink px-4 py-2 text-sm font-medium text-white disabled:opacity-50" type="submit" disabled={isSubmitting}>
-                    {isSubmitting ? 'Registrando...' : 'Registrar'}
-                  </button>
-                </div>
-              </form>
-            )}
-          </div>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
-    </div>
+
+      {isModalOpen && (
+        <Modal eyebrow="Acceso" title={newKey ? 'Llave del torniquete' : 'Nuevo torniquete'} onClose={closeModal}>
+          {newKey ? (
+            <div className="space-y-4">
+              <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                Copia esta llave y configúrala en el torniquete (encabezado <span className="font-mono">X-Device-Key</span>). No se volverá a mostrar; si se pierde, revoca el torniquete y registra uno nuevo.
+              </p>
+              <p className="select-all break-all rounded-xl bg-slate-50 px-4 py-3 font-mono text-sm text-ink ring-1 ring-inset ring-slate-200">{newKey}</p>
+              {modalError && <p className={errorAlert} role="alert">{modalError}</p>}
+              <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
+                <button className={secondaryButton} type="button" onClick={() => void handleCopy()}>
+                  {copied ? <Check size={16} aria-hidden /> : <Copy size={16} aria-hidden />} {copied ? 'Copiada' : 'Copiar llave'}
+                </button>
+                <button className={primaryButton} type="button" onClick={closeModal}>Listo</button>
+              </div>
+            </div>
+          ) : (
+            <form className="space-y-5" onSubmit={handleSubmit}>
+              <div>
+                <label className={labelClass} htmlFor="device-name">Nombre</label>
+                <input
+                  className={fieldClass}
+                  id="device-name"
+                  placeholder="Ej. Torniquete entrada principal"
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  minLength={2}
+                  maxLength={80}
+                  required
+                />
+              </div>
+              <GymSelect id="device-gym" label="Sucursal del torniquete" value={gymId} onChange={setGymId} />
+              {modalError && <p className={errorAlert} role="alert">{modalError}</p>}
+              <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
+                <button className={secondaryButton} type="button" onClick={closeModal} disabled={isSubmitting}>Cancelar</button>
+                <button className={primaryButton} type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? 'Registrando...' : 'Registrar'}
+                </button>
+              </div>
+            </form>
+          )}
+        </Modal>
+      )}
+    </Panel>
   )
 }
 
@@ -387,40 +420,37 @@ function GymDialog({ gym, onClose, onSaved }: GymDialogProps) {
     }
   }
 
-  const inputClass = 'w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100'
-
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center overflow-y-auto bg-slate-900/50 px-4 py-8" role="dialog" aria-modal="true" aria-labelledby="gym-dialog-title">
-      <form className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl" onSubmit={handleSubmit}>
-        <h2 className="text-xl font-semibold text-slate-900" id="gym-dialog-title">{gym ? `Editar ${gym.name}` : 'Nueva sucursal'}</h2>
-        {!gym && <p className="mt-2 text-sm text-slate-500">Tendrá su propio código para que los clientes se unan desde la app.</p>}
-        <div className="mt-6 space-y-4">
+    <Modal eyebrow="Sucursales" title={gym ? `Editar ${gym.name}` : 'Nueva sucursal'} onClose={() => { if (!isSubmitting) onClose() }}>
+      <form className="space-y-5" onSubmit={handleSubmit}>
+        {!gym && <p className="-mt-1 text-sm text-slate-500">Tendrá su propio código para que los clientes se unan desde la app.</p>}
+        <div>
+          <label className={labelClass} htmlFor="gym-name">Nombre</label>
+          <input
+            className={fieldClass}
+            id="gym-name"
+            placeholder="Ej. Sucursal Norte"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            minLength={2}
+            maxLength={120}
+            required
+          />
+        </div>
+        <div>
+          <label className={labelClass} htmlFor="gym-address">Dirección <span className="font-normal text-slate-400">(opcional)</span></label>
+          <input
+            className={fieldClass}
+            id="gym-address"
+            value={address}
+            onChange={(event) => setAddress(event.target.value)}
+            maxLength={200}
+          />
+        </div>
+        <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_10rem]">
           <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="gym-name">Nombre</label>
-            <input
-              className={inputClass}
-              id="gym-name"
-              placeholder="Ej. Sucursal Norte"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              minLength={2}
-              maxLength={120}
-              required
-            />
-          </div>
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="gym-address">Dirección (opcional)</label>
-            <input
-              className={inputClass}
-              id="gym-address"
-              value={address}
-              onChange={(event) => setAddress(event.target.value)}
-              maxLength={200}
-            />
-          </div>
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="gym-timezone">Zona horaria</label>
-            <select className={inputClass} id="gym-timezone" value={timezone} onChange={(event) => setTimezone(event.target.value)} aria-describedby="gym-timezone-hint">
+            <label className={labelClass} htmlFor="gym-timezone">Zona horaria</label>
+            <select className={fieldClass} id="gym-timezone" value={timezone} onChange={(event) => setTimezone(event.target.value)} aria-describedby="gym-timezone-hint">
               <optgroup label="México">
                 {MEXICO_TIMEZONES.map((zone) => <option key={zone} value={zone}>{zone.replace('America/', '').replace('_', ' ')} ({zone})</option>)}
               </optgroup>
@@ -428,19 +458,11 @@ function GymDialog({ gym, onClose, onSaved }: GymDialogProps) {
                 {OTHER_TIMEZONES.map((zone) => <option key={zone} value={zone}>{zone}</option>)}
               </optgroup>
             </select>
-            <p className="mt-1 text-xs text-slate-500" id="gym-timezone-hint">
-              Hora local ahora: {currentTime(timezone)}. Define los horarios de los planes, los días de asistencia y la bitácora de accesos.
-            </p>
-            {timezoneChanged && (
-              <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                Los horarios de acceso de los planes se evaluarán con la nueva zona desde que guardes.
-              </p>
-            )}
           </div>
           <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="gym-capacity">Aforo máximo (opcional)</label>
+            <label className={labelClass} htmlFor="gym-capacity">Aforo máximo</label>
             <input
-              className={inputClass}
+              className={fieldClass}
               id="gym-capacity"
               type="number"
               inputMode="numeric"
@@ -449,19 +471,30 @@ function GymDialog({ gym, onClose, onSaved }: GymDialogProps) {
               placeholder="Sin límite"
               value={capacity}
               onChange={(event) => setCapacity(event.target.value)}
+              aria-describedby="gym-capacity-hint"
             />
-            <p className="mt-1 text-xs text-slate-500">Personas dentro al mismo tiempo; el monitor de aforo avisa al acercarse.</p>
           </div>
         </div>
-        {error && <p className="mt-3 text-sm text-red-600" role="alert">{error}</p>}
-        <div className="mt-6 flex justify-end gap-3">
-          <button className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100" type="button" onClick={onClose}>Cancelar</button>
-          <button className="rounded-lg bg-ink px-4 py-2 text-sm font-medium text-white disabled:opacity-50" type="submit" disabled={isSubmitting}>
+        <div className="-mt-2 space-y-1">
+          <p className={hintClass} id="gym-timezone-hint">
+            Hora local ahora: <span className="font-medium text-slate-700 tabular">{currentTime(timezone)}</span>. Define los horarios de los planes, los días de asistencia y la bitácora de accesos.
+          </p>
+          <p className="text-xs text-slate-500" id="gym-capacity-hint">Aforo: personas dentro al mismo tiempo; el monitor de aforo avisa al acercarse.</p>
+        </div>
+        {timezoneChanged && (
+          <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            Los horarios de acceso de los planes se evaluarán con la nueva zona desde que guardes.
+          </p>
+        )}
+        {error && <p className={errorAlert} role="alert">{error}</p>}
+        <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
+          <button className={secondaryButton} type="button" onClick={onClose} disabled={isSubmitting}>Cancelar</button>
+          <button className={primaryButton} type="submit" disabled={isSubmitting}>
             {isSubmitting ? 'Guardando...' : gym ? 'Guardar cambios' : 'Abrir sucursal'}
           </button>
         </div>
       </form>
-    </div>
+    </Modal>
   )
 }
 
@@ -513,38 +546,46 @@ function Gyms() {
   }
 
   return (
-    <section className="min-h-screen bg-canvas px-4 py-10 sm:px-8">
-      <p className="text-sm font-medium uppercase tracking-[0.25em] text-slate-500">Operación</p>
-      <h1 className="mt-3 text-4xl font-semibold tracking-tight text-slate-900">Gimnasios</h1>
-      <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-slate-500">Códigos para que los clientes se unan desde la app{canManage ? ' y torniquetes de cada sucursal' : ''}.</p>
-        {isOwner && limits && (
-          <div className="flex shrink-0 items-center gap-3">
-            <span className="text-sm text-slate-500">{limits.activeGyms} de {limits.gymLimit} sucursales</span>
+    <section className="min-h-screen bg-canvas px-4 py-8 sm:px-8 sm:py-10">
+      <PageHeader
+        eyebrow="Operación"
+        title="Gimnasios"
+        description={`Códigos para que los clientes se unan desde la app${canManage ? ' y torniquetes de cada sucursal' : ''}.`}
+        actions={isOwner && limits && (
+          <>
+            <Badge tone={isAtLimit ? 'warning' : 'neutral'} icon={Building2}>{limits.activeGyms} de {limits.gymLimit} sucursales</Badge>
             <button
-              className="inline-flex items-center gap-2 rounded-lg bg-ink px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+              className={primaryButton}
               type="button"
               onClick={() => setDialog('new')}
               disabled={isAtLimit}
               title={isAtLimit ? 'Llegaste al límite de tu plan. Contacta a SIRID para ampliarlo.' : undefined}
             >
-              <Plus size={16} aria-hidden="true" /> Nueva sucursal
+              <Plus size={18} aria-hidden /> Nueva sucursal
             </button>
-          </div>
+          </>
         )}
-      </div>
+      />
       {isOwner && isAtLimit && (
-        <p className="mt-3 text-sm text-slate-500">Llegaste al límite de sucursales de tu plan. Contacta a SIRID para ampliarlo.</p>
+        <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          Llegaste al límite de sucursales de tu plan. Contacta a SIRID para ampliarlo.
+        </p>
       )}
 
-      {error && <div className="mt-6 rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">{error}</div>}
+      {error && <p className={`${errorAlert} mt-6`} role="alert">{error}</p>}
 
-      <div className="mt-8 grid gap-6 xl:grid-cols-2">
+      <div className="mt-6 grid gap-6 xl:grid-cols-2">
         {isLoading
-          ? Array.from({ length: 2 }).map((_, index) => <div className="h-52 animate-pulse rounded-xl bg-slate-200" key={index} />)
+          ? Array.from({ length: 2 }).map((_, index) => <div className="skeleton h-72 w-full rounded-card" key={index} />)
           : gyms.length
             ? gyms.map((gym) => <GymCard key={gym.id} gym={gym} canManage={canManage} onRegenerate={handleRegenerate} onEdit={setDialog} onError={setError} />)
-            : <p className="text-sm text-slate-500">No hay sucursales activas.</p>}
+            : (
+              <div className="rounded-card border border-slate-200/80 bg-white p-5 shadow-card xl:col-span-2">
+                <EmptyState icon={Building2} title="No hay sucursales activas">
+                  {isOwner ? 'Abre tu primera sucursal para obtener su código de registro.' : 'Cuando el propietario abra una sucursal aparecerá aquí.'}
+                </EmptyState>
+              </div>
+            )}
       </div>
 
       {canManage && !isLoading && <DevicesSection gyms={gyms} onError={setError} />}

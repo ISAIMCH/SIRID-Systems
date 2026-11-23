@@ -1,6 +1,20 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ChartColumn, History, KeyRound, Pencil } from 'lucide-react'
+import {
+  BadgeCheck,
+  ChartColumn,
+  Check,
+  Clock3,
+  History,
+  KeyRound,
+  Mail,
+  Pencil,
+  Search,
+  UserPlus,
+  UserRoundPlus,
+  Users as UsersIcon,
+  UserX,
+} from 'lucide-react'
 import { ApiError, createUser, getPlans, getUsers, regenerateActivationCode, updateUser } from '../services/api'
 import { socket } from '../services/socket'
 import type { UserPayload } from '../services/api'
@@ -10,6 +24,25 @@ import ClientHistoryPanel from '../components/ClientHistoryPanel'
 import ClientProgressPanel, { type ProgressClient } from '../components/ClientProgressPanel'
 import ClientEnrollmentModal, { type EnrollmentOutcome } from '../components/ClientEnrollmentModal'
 import StaffInvitationsPanel, { type InvitePrefill } from '../components/StaffInvitationsPanel'
+import PageHeader from '../components/ui/PageHeader'
+import Panel from '../components/ui/Panel'
+import Modal from '../components/ui/Modal'
+import Badge from '../components/ui/Badge'
+import EmptyState from '../components/ui/EmptyState'
+import KpiCard from '../components/ui/KpiCard'
+import Segmented from '../components/ui/Segmented'
+import {
+  errorAlert,
+  fieldClass,
+  hintClass,
+  iconButton,
+  labelClass,
+  primaryButton,
+  secondaryButton,
+  tableHeadClass,
+  tdClass,
+  thClass,
+} from '../components/ui/styles'
 import { ROLE_LABELS, STAFF_ROLES } from '../utils/roles'
 import { useAuth } from '../store/useAuth'
 import { targetGymField } from '../utils/targetGym'
@@ -19,15 +52,16 @@ import { formatMembershipDate, membershipBadge } from '../utils/membership'
 
 type UsersResponse = User[] | { data?: unknown; users?: unknown }
 type PlansResponse = Plan[] | { data?: unknown; plans?: unknown; planes?: unknown }
+type UsersTab = 'clientes' | 'staff' | 'invitaciones'
 
 const trainingDays = [
-  { label: 'L', value: 1 },
-  { label: 'M', value: 2 },
-  { label: 'X', value: 3 },
-  { label: 'J', value: 4 },
-  { label: 'V', value: 5 },
-  { label: 'S', value: 6 },
-  { label: 'D', value: 0 },
+  { label: 'L', name: 'Lunes', value: 1 },
+  { label: 'M', name: 'Martes', value: 2 },
+  { label: 'X', name: 'Miércoles', value: 3 },
+  { label: 'J', name: 'Jueves', value: 4 },
+  { label: 'V', name: 'Viernes', value: 5 },
+  { label: 'S', name: 'Sábado', value: 6 },
+  { label: 'D', name: 'Domingo', value: 0 },
 ]
 
 interface UserFormState {
@@ -65,7 +99,6 @@ const emptyUserForm: UserFormState = {
   observations: '',
 }
 
-
 // Same states as the API (utils/membership.js membershipState); 'expiring' ends within 7 days.
 const MEMBERSHIP_FILTERS: ReadonlyArray<readonly [MembershipState | 'pendingPayment', string]> = [
   ['active', 'Activa'],
@@ -76,20 +109,11 @@ const MEMBERSHIP_FILTERS: ReadonlyArray<readonly [MembershipState | 'pendingPaym
   ['none', 'Sin membresía'],
   ['pendingPayment', 'Con pago pendiente'],
 ]
-function UserSkeleton() {
-  return (
-    <div className="space-y-4 p-6" aria-label="Cargando usuarios" aria-busy="true">
-      {Array.from({ length: 5 }).map((_, index) => (
-        <div className="grid grid-cols-4 gap-6" key={index}>
-          <div className="h-4 animate-pulse rounded bg-slate-200" />
-          <div className="h-4 animate-pulse rounded bg-slate-200" />
-          <div className="h-4 animate-pulse rounded bg-slate-200" />
-          <div className="h-4 animate-pulse rounded bg-slate-200" />
-        </div>
-      ))}
-    </div>
-  )
-}
+
+// A selectable pill used for roles; mirrors the product/plan pickers in Promociones.
+const chipClass = (isChecked: boolean, isDisabled = false) => `inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand/40 ${
+  isChecked ? 'border-brand-text/30 bg-brand-soft font-medium text-brand-ink' : 'border-slate-200 text-slate-600 hover:border-slate-300'
+} ${isDisabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`
 
 function extractArray<T>(response: unknown, keys: string[]) {
   if (Array.isArray(response)) return response as T[]
@@ -118,6 +142,8 @@ function userDisplayName(user: User) {
     || [user.firstName, user.lastName].filter(Boolean).join(' ')
     || user.email
 }
+
+const initials = (name: string) => name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toLocaleUpperCase()).join('') || '?'
 
 // Responses from an API without `roles` only carry the legacy role.
 function userRoles(user: User): MemberRole[] {
@@ -175,7 +201,7 @@ function Users() {
   const [searchTerm, setSearchTerm] = useState('')
   // '' shows every client; 'pendingPayment' those waiting with a PIN request.
   const [membershipFilter, setMembershipFilter] = useState<MembershipState | 'pendingPayment' | ''>('')
-  const [activeTab, setActiveTab] = useState<'clientes' | 'staff' | 'invitaciones'>('clientes')
+  const [activeTab, setActiveTab] = useState<UsersTab>('clientes')
   // Opens the invite form; set from the header or when "Agregar trabajador" finds the email already has an account.
   const [invitePrefill, setInvitePrefill] = useState<InvitePrefill | null>(null)
   const [existingAccount, setExistingAccount] = useState<InvitePrefill | null>(null)
@@ -424,265 +450,237 @@ function Users() {
     || (membershipFilter === 'pendingPayment' ? user.hasPendingPayment === true : user.membershipState === membershipFilter)
   const allClients = users.filter(isClientUser)
   const clients = allClients.filter((user) => matchesSearch(user) && matchesMembership(user))
-  const staff = users.filter((user) => !isClientUser(user) && matchesSearch(user))
+  const allStaff = users.filter((user) => !isClientUser(user))
+  const staff = allStaff.filter(matchesSearch)
+  const countClients = (predicate: (user: User) => boolean) => allClients.filter(predicate).length
 
-  function renderUsersTable(groupUsers: User[], emptyMessage: string, showMembership: boolean) {
+  // Coach and Recepcion only see clients, so the tabs show only for managers.
+  const tab: UsersTab = isAdmin ? activeTab : 'clientes'
+  const showingClients = tab === 'clientes'
+  const tabOptions = [
+    ['clientes', `Clientes ${allClients.length}`],
+    ['staff', `Staff ${allStaff.length}`],
+    ['invitaciones', 'Invitaciones'],
+  ] as const
+  const rows = showingClients ? clients : staff
+  const isFiltered = Boolean(searchTerm.trim()) || (showingClients && Boolean(membershipFilter))
+
+  function rowActions(user: User, isStaff: boolean, isPendingActivation: boolean) {
+    const userId = recordId(user.id ?? user._id)
+    const name = userDisplayName(user) || (isStaff ? 'usuario' : 'cliente')
     return (
-      <table className="min-w-full text-left text-sm">
-        <thead className="border-b border-slate-100 bg-slate-50/80 text-xs uppercase tracking-wider text-slate-500">
-          <tr>
-            <th className="px-6 py-4 font-medium">Nombre</th>
-            <th className="px-6 py-4 font-medium">Email</th>
-            <th className="px-6 py-4 font-medium">Rol</th>
-            <th className="px-6 py-4 font-medium">Estado</th>
-            {showMembership && <th className="px-6 py-4 font-medium">Membresía</th>}
-            {showMembership && <th className="px-6 py-4 font-medium">Vence</th>}
-            <th className="px-6 py-4 font-medium" />
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-100 text-slate-700">
-          {groupUsers.length > 0 ? (
-            groupUsers.map((user, index) => {
+      <div className="flex justify-end gap-0.5">
+        {canEnroll && isPendingActivation && userId && (
+          <button
+            className={`${iconButton} hover:text-brand-text`}
+            type="button"
+            aria-label={`Código de activación nuevo para ${name}`}
+            title="Código de activación nuevo"
+            onClick={() => void handleNewActivationCode(user)}
+            disabled={regeneratingId === userId}
+          >
+            <KeyRound size={17} aria-hidden />
+          </button>
+        )}
+        {canFollowUp && !isStaff && userId && (
+          <button className={`${iconButton} hover:text-brand-text`} type="button" aria-label={`Seguimiento de ${name}`} title="Progreso y observaciones" onClick={() => openProgress(user)}>
+            <ChartColumn size={17} aria-hidden />
+          </button>
+        )}
+        {canSeeHistory && !isStaff && userId && (
+          <button
+            className={`${iconButton} hover:text-brand-text`}
+            type="button"
+            aria-label={`Historial de ${name}`}
+            title="Historial compartido"
+            onClick={() => setHistoryClient({ id: userId, name: userDisplayName(user) || 'Cliente' })}
+          >
+            <History size={17} aria-hidden />
+          </button>
+        )}
+        {isAdmin && canEditUser(user) && (
+          <button className={`${iconButton} hover:text-brand-text`} type="button" aria-label={`Editar ${name}`} title="Editar" onClick={() => openEditModal(user)}>
+            <Pencil size={17} aria-hidden />
+          </button>
+        )}
+      </div>
+    )
+  }
+
+  function renderUsersTable() {
+    if (rows.length === 0) {
+      return (
+        <EmptyState icon={showingClients ? UsersIcon : BadgeCheck} title={isFiltered ? 'Nadie coincide con la búsqueda' : showingClients ? 'Aún no hay clientes' : 'Aún no hay staff'}>
+          {isFiltered
+            ? 'Cambia la búsqueda o el filtro de membresía.'
+            : showingClients
+              ? (canEnroll ? 'Registra al primero con «Registrar cliente», o comparte el código del gimnasio para que se unan desde la app.' : 'Cuando recepción registre clientes aparecerán aquí.')
+              : 'Agrega un trabajador o invita a alguien que ya use GymGo.'}
+        </EmptyState>
+      )
+    }
+
+    return (
+      <div className="-mx-5 overflow-x-auto sm:-mx-6">
+        <table className="min-w-full text-left text-sm">
+          <thead className={tableHeadClass}>
+            <tr>
+              <th className={thClass}>{showingClients ? 'Cliente' : 'Nombre'}</th>
+              {!showingClients && <th className={thClass}>Roles</th>}
+              <th className={thClass}>Estado</th>
+              {showingClients && <th className={thClass}>Membresía</th>}
+              {showingClients && <th className={thClass}>Vence</th>}
+              <th className={thClass}><span className="sr-only">Acciones</span></th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100 text-slate-700">
+            {rows.map((user, index) => {
               const userId = user?.id || user?._id || user?.email || `user-${index}`
               const rowRoles = userRoles(user)
               const isStaff = !rowRoles.includes('Cliente')
               const isActive = user?.isActive === true
               const isPendingActivation = !isStaff && user.pendingActivation === true
               const badge = membershipBadge(user.membership)
+              const name = userDisplayName(user) || 'Sin nombre'
 
               return (
                 <tr className="transition-colors hover:bg-slate-50" key={userId}>
-                  <td className="whitespace-nowrap px-6 py-4 font-medium text-slate-900">
-                    {userDisplayName(user) || 'Sin nombre'}
-                  </td>
-                  <td className="whitespace-nowrap px-6 py-4 text-slate-500">
-                    {user?.email || 'Sin correo'}
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex flex-wrap gap-1.5">
-                      {rowRoles.map((role) => (
-                        <span
-                          className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${
-                            isStaff ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-600'
-                          }`}
-                          key={role}
-                        >
-                          {ROLE_LABELS[role] ?? role}
-                        </span>
-                      ))}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex flex-wrap gap-1.5">
-                      <span
-                        className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${
-                          isActive ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-600'
-                        }`}
-                      >
-                        {isActive ? 'Activo' : 'Inactivo'}
+                  <td className={tdClass}>
+                    <div className="flex min-w-[14rem] items-center gap-3">
+                      <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full text-xs font-semibold ${isStaff ? 'bg-ink text-brand' : 'bg-slate-100 text-slate-600'}`} aria-hidden>
+                        {initials(name)}
                       </span>
-                      {isPendingActivation && (
-                        <span
-                          className="inline-flex rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-800"
-                          title="Registrado en recepción; aún no activa su cuenta en la app."
-                        >
-                          Sin activar
-                        </span>
-                      )}
+                      <div className="min-w-0">
+                        <p className="truncate font-medium text-ink">{name}</p>
+                        <p className="truncate text-xs text-slate-500">{user?.email || 'Sin correo'}</p>
+                      </div>
                     </div>
                   </td>
-                  {showMembership && (
-                    <td className="px-6 py-4">
-                      <p className="whitespace-nowrap font-medium text-slate-900">{user.membership?.planName || 'Sin plan'}</p>
-                      <span className={`mt-1 inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${badge.tone}`}>{badge.label}</span>
+                  {!showingClients && (
+                    <td className={tdClass}>
+                      <div className="flex flex-wrap gap-1.5">
+                        {rowRoles.map((role) => <Badge tone={role === 'Propietario' || role === 'Gerente' ? 'brand' : 'neutral'} key={role}>{ROLE_LABELS[role] ?? role}</Badge>)}
+                      </div>
                     </td>
                   )}
-                  {showMembership && (
-                    <td className="whitespace-nowrap px-6 py-4 text-slate-500">{formatMembershipDate(user.membership?.expiresAt)}</td>
-                  )}
-                  <td className="whitespace-nowrap px-6 py-4 text-right">
-                    {canEnroll && isPendingActivation && recordId(user.id ?? user._id) && (
-                      <button
-                        className="mr-3 cursor-pointer text-slate-400 transition hover:text-green-600 disabled:opacity-50"
-                        type="button"
-                        aria-label={`Código de activación nuevo para ${user?.name || 'cliente'}`}
-                        title="Código de activación nuevo"
-                        onClick={() => void handleNewActivationCode(user)}
-                        disabled={regeneratingId === recordId(user.id ?? user._id)}
-                      >
-                        <KeyRound className="h-4 w-4" aria-hidden="true" />
-                      </button>
-                    )}
-                    {canFollowUp && !isStaff && recordId(user.id ?? user._id) && (
-                      <button
-                        className="mr-3 cursor-pointer text-slate-400 transition hover:text-green-600"
-                        type="button"
-                        aria-label={`Seguimiento de ${user?.name || 'cliente'}`}
-                        title="Progreso y observaciones"
-                        onClick={() => openProgress(user)}
-                      >
-                        <ChartColumn className="h-4 w-4" aria-hidden="true" />
-                      </button>
-                    )}
-                    {canSeeHistory && !isStaff && recordId(user.id ?? user._id) && (
-                      <button
-                        className="mr-3 cursor-pointer text-slate-400 transition hover:text-green-600"
-                        type="button"
-                        aria-label={`Historial de ${user?.name || 'cliente'}`}
-                        title="Historial compartido"
-                        onClick={() => setHistoryClient({ id: recordId(user.id ?? user._id), name: userDisplayName(user) || 'Cliente' })}
-                      >
-                        <History className="h-4 w-4" aria-hidden="true" />
-                      </button>
-                    )}
-                    {isAdmin && canEditUser(user) && (
-                      <button
-                        className="cursor-pointer text-slate-400 transition hover:text-green-600"
-                        type="button"
-                        aria-label={`Editar ${user?.name || 'usuario'}`}
-                        title="Editar"
-                        onClick={() => openEditModal(user)}
-                      >
-                        <Pencil className="h-4 w-4" aria-hidden="true" />
-                      </button>
-                    )}
+                  <td className={tdClass}>
+                    <div className="flex flex-wrap gap-1.5">
+                      {isPendingActivation
+                        ? <span title="Registrado en recepción; aún no activa su cuenta en la app."><Badge tone="warning" icon={Clock3}>Sin activar</Badge></span>
+                        : isActive ? <Badge tone="success">Activo</Badge> : <Badge>Inactivo</Badge>}
+                    </div>
                   </td>
+                  {showingClients && (
+                    <td className={tdClass}>
+                      <p className="whitespace-nowrap font-medium text-ink">{user.membership?.planName || 'Sin plan'}</p>
+                      <div className="mt-1"><Badge tone={badge.tone}>{badge.label}</Badge></div>
+                    </td>
+                  )}
+                  {showingClients && (
+                    <td className={`${tdClass} whitespace-nowrap text-slate-500 tabular`}>{formatMembershipDate(user.membership?.expiresAt)}</td>
+                  )}
+                  <td className={`${tdClass} whitespace-nowrap`}>{rowActions(user, isStaff, isPendingActivation)}</td>
                 </tr>
               )
-            })
-          ) : (
-            <tr>
-              <td className="px-6 py-10 text-center text-sm text-slate-500" colSpan={showMembership ? 7 : 5}>
-                {emptyMessage}
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
+            })}
+          </tbody>
+        </table>
+      </div>
     )
   }
 
   return (
-    <section className="min-h-screen bg-canvas px-8 py-10">
-      <p className="text-sm font-medium uppercase tracking-[0.25em] text-slate-500">Comunidad</p>
-      <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-4xl font-semibold tracking-tight text-slate-900">Usuarios</h1>
-          <p className="mt-3 text-slate-500">Consulta y gestiona los usuarios de la plataforma.</p>
-        </div>
-        {canEnroll && (
-          <div className="flex flex-wrap gap-3">
+    <section className="min-h-screen bg-canvas px-4 py-8 sm:px-8 sm:py-10">
+      <PageHeader
+        eyebrow="Operación"
+        title="Usuarios"
+        description={isAdmin ? 'Los clientes de tu gimnasio, su membresía y el equipo que trabaja contigo.' : 'Los clientes de tu gimnasio y el estado de su membresía.'}
+        actions={canEnroll && (
+          <>
             {/* Clients: «Registrar cliente». Staff: a new account, or an invitation for someone who already uses GymGo. */}
             {isAdmin && (
               <>
-                <button
-                  className="rounded-lg border border-slate-200 bg-white px-4 py-2 font-medium text-slate-700 transition hover:bg-slate-50"
-                  type="button"
-                  onClick={() => openInvite({ email: '', roles: [] })}
-                >
-                  Invitar trabajador existente
+                <button className={secondaryButton} type="button" onClick={() => openInvite({ email: '', roles: [] })}>
+                  <Mail size={17} aria-hidden /> Invitar existente
                 </button>
-                <button
-                  className="rounded-lg border border-slate-200 bg-white px-4 py-2 font-medium text-slate-700 transition hover:bg-slate-50"
-                  type="button"
-                  onClick={openModal}
-                >
-                  Agregar trabajador
+                <button className={secondaryButton} type="button" onClick={openModal}>
+                  <UserRoundPlus size={17} aria-hidden /> Agregar trabajador
                 </button>
               </>
             )}
-            <button
-              className="rounded-lg bg-brand px-4 py-2 font-medium text-ink transition hover:bg-brand-hover"
-              type="button"
-              onClick={() => setEnrollment('form')}
-            >
-              + Registrar cliente
+            <button className={primaryButton} type="button" onClick={() => setEnrollment('form')}>
+              <UserPlus size={18} aria-hidden /> Registrar cliente
             </button>
-          </div>
+          </>
         )}
+      />
+
+      <div className="mt-6 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+        <KpiCard label="Clientes" value={allClients.length} icon={UsersIcon} isLoading={isLoading} hint={isAdmin ? `${allStaff.length} en el staff` : 'En tu gimnasio'} />
+        <KpiCard label="Membresía activa" value={countClients((user) => user.membershipState === 'active' || user.membershipState === 'expiring')} icon={BadgeCheck} tone="brand" isLoading={isLoading} hint="Incluye las que vencen pronto" />
+        <KpiCard
+          label="Por vencer (7 días)"
+          value={countClients((user) => user.membershipState === 'expiring')}
+          icon={Clock3}
+          tone={countClients((user) => user.membershipState === 'expiring') > 0 ? 'warning' : 'default'}
+          isLoading={isLoading}
+          hint="Conviene recordarles"
+        />
+        <KpiCard label="Sin activar" value={countClients((user) => user.pendingActivation === true)} icon={UserX} isLoading={isLoading} hint="Registrados sin entrar a la app" />
       </div>
 
-      <div className="mt-8 overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
-        {error && (
-          <div className="border-b border-red-100 bg-red-50 px-6 py-4 text-sm text-red-700" role="alert">
-            {error}
+      <Panel
+        className="mt-6"
+        title={tab === 'invitaciones' ? 'Invitaciones al staff' : showingClients ? 'Clientes' : 'Staff'}
+        icon={tab === 'invitaciones' ? Mail : showingClients ? UsersIcon : BadgeCheck}
+        description={tab === 'invitaciones'
+          ? 'Para quien ya tiene cuenta GymGo. Se une al staff cuando acepta.'
+          : isLoading ? undefined : isFiltered ? `${rows.length} de ${showingClients ? allClients.length : allStaff.length}` : undefined}
+        actions={isAdmin && (
+          <div className="-mx-1 max-w-full overflow-x-auto px-1">
+            <Segmented label="Grupo" value={tab} options={tabOptions} onChange={setActiveTab} />
           </div>
         )}
+      >
+        {error && <p className={`${errorAlert} mb-4`} role="alert">{error}</p>}
 
-        <div className={`border-b border-slate-100 p-4 ${activeTab === 'invitaciones' ? 'hidden' : ''}`}>
-          <input
-            className="w-full max-w-sm rounded-lg border border-slate-200 px-4 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-100"
-            type="search"
-            placeholder="Buscar..."
-            aria-label="Buscar usuarios"
-            value={searchTerm}
-            onChange={(event) => setSearchTerm(event.target.value)}
-          />
-          {activeTab === 'clientes' && (
-            <select
-              className="mt-3 w-full max-w-sm rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100 sm:ml-3 sm:mt-0 sm:w-auto"
-              aria-label="Filtrar por membresía"
-              value={membershipFilter}
-              onChange={(event) => setMembershipFilter(event.target.value as MembershipState | 'pendingPayment' | '')}
-            >
-              <option value="">Todas las membresías</option>
-              {MEMBERSHIP_FILTERS.map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label} ({allClients.filter((user) => (value === 'pendingPayment' ? user.hasPendingPayment === true : user.membershipState === value)).length})
-                </option>
-              ))}
-            </select>
-          )}
-        </div>
-
-        {isLoading ? (
-          <UserSkeleton />
+        {tab === 'invitaciones' ? (
+          <StaffInvitationsPanel isOwner={isOwner} invitePrefill={invitePrefill} onCloseInvite={() => setInvitePrefill(null)} />
         ) : (
-          <div className="p-6">
-            <div className="mb-4 flex border-b border-gray-200">
-              <button
-                className={`px-4 py-2 ${activeTab === 'clientes' ? 'border-b-2 border-green-500 font-semibold text-green-700' : 'text-gray-500'}`}
-                type="button"
-                onClick={() => setActiveTab('clientes')}
-              >
-                Clientes {clients.length}
-              </button>
-              {isAdmin && (
-                <button
-                  className={`px-4 py-2 ${activeTab === 'staff' ? 'border-b-2 border-green-500 font-semibold text-green-700' : 'text-gray-500'}`}
-                  type="button"
-                  onClick={() => setActiveTab('staff')}
+          <>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <label className="relative block sm:w-72">
+                <span className="sr-only">Buscar usuarios</span>
+                <Search className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} aria-hidden />
+                <input className={`${fieldClass} pl-10`} type="search" placeholder="Buscar por nombre o correo" value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} />
+              </label>
+              {showingClients && (
+                <select
+                  className={`${fieldClass} sm:w-60`}
+                  aria-label="Filtrar por membresía"
+                  value={membershipFilter}
+                  onChange={(event) => setMembershipFilter(event.target.value as MembershipState | 'pendingPayment' | '')}
                 >
-                  Staff {staff.length}
-                </button>
-              )}
-              {isAdmin && (
-                <button
-                  className={`px-4 py-2 ${activeTab === 'invitaciones' ? 'border-b-2 border-green-500 font-semibold text-green-700' : 'text-gray-500'}`}
-                  type="button"
-                  onClick={() => setActiveTab('invitaciones')}
-                >
-                  Invitaciones
-                </button>
+                  <option value="">Todas las membresías</option>
+                  {MEMBERSHIP_FILTERS.map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label} ({countClients((user) => (value === 'pendingPayment' ? user.hasPendingPayment === true : user.membershipState === value))})
+                    </option>
+                  ))}
+                </select>
               )}
             </div>
 
-            {isAdmin && activeTab === 'invitaciones' ? (
-              <StaffInvitationsPanel isOwner={isOwner} invitePrefill={invitePrefill} onCloseInvite={() => setInvitePrefill(null)} />
-            ) : (
-              <div className="overflow-x-auto">
-                {renderUsersTable(
-                  activeTab === 'clientes' || !isAdmin ? clients : staff,
-                  activeTab === 'clientes' || !isAdmin
-                    ? searchTerm ? 'No hay clientes que coincidan con la búsqueda.' : 'No hay clientes encontrados.'
-                    : searchTerm ? 'No hay miembros del staff que coincidan con la búsqueda.' : 'No hay miembros del staff encontrados.',
-                  activeTab === 'clientes' || !isAdmin,
-                )}
-              </div>
-            )}
-          </div>
+            <div className="mt-4">
+              {isLoading ? (
+                <div className="space-y-3" aria-label="Cargando usuarios" aria-busy="true">
+                  {Array.from({ length: 5 }).map((_, index) => <div className="skeleton h-14 w-full" key={index} />)}
+                </div>
+              ) : renderUsersTable()}
+            </div>
+          </>
         )}
-      </div>
+      </Panel>
 
       {enrollment && (
         <ClientEnrollmentModal
@@ -706,32 +704,13 @@ function Users() {
       )}
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4 backdrop-blur-sm">
-          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
-            <div className="flex items-start justify-between gap-4">
+        <Modal eyebrow={editingUser ? 'Usuarios' : 'Staff'} title={editingUser ? 'Editar usuario' : 'Agregar trabajador'} onClose={closeModal} size="xl">
+          <form className="space-y-5" onSubmit={handleSubmitUser}>
+            <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <p className="text-sm font-medium uppercase tracking-[0.2em] text-emerald-700">{editingUser ? 'Comunidad' : 'Equipo'}</p>
-                <h2 className="mt-2 text-2xl font-semibold text-slate-900">
-                  {editingUser ? 'Editar usuario' : 'Agregar trabajador'}
-                </h2>
-              </div>
-              <button
-                className="text-2xl leading-none text-slate-400 transition hover:text-slate-700"
-                type="button"
-                aria-label="Cerrar modal"
-                onClick={closeModal}
-              >
-                ×
-              </button>
-            </div>
-
-            <form className="mt-6 space-y-5" onSubmit={handleSubmitUser}>
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="user-name">
-                  Nombre
-                </label>
+                <label className={labelClass} htmlFor="user-name">Nombre</label>
                 <input
-                  className="w-full rounded-lg border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                  className={fieldClass}
                   id="user-name"
                   type="text"
                   value={form.name || ''}
@@ -739,13 +718,10 @@ function Users() {
                   required
                 />
               </div>
-
               <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="user-last-name">
-                  Apellidos
-                </label>
+                <label className={labelClass} htmlFor="user-last-name">Apellidos</label>
                 <input
-                  className="w-full rounded-lg border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                  className={fieldClass}
                   id="user-last-name"
                   type="text"
                   value={form.lastName || ''}
@@ -753,13 +729,13 @@ function Users() {
                   required
                 />
               </div>
+            </div>
 
+            <div className={editingUser ? '' : 'grid gap-4 sm:grid-cols-2'}>
               <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="user-email">
-                  Correo Electrónico
-                </label>
+                <label className={labelClass} htmlFor="user-email">Correo electrónico</label>
                 <input
-                  className="w-full rounded-lg border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100 disabled:bg-slate-100 disabled:text-slate-500"
+                  className={fieldClass}
                   id="user-email"
                   type="email"
                   autoComplete="email"
@@ -770,7 +746,7 @@ function Users() {
                   required
                 />
                 {credentialsLocked && (
-                  <p className="mt-1 text-xs text-slate-500" id="user-credentials-hint">
+                  <p className={hintClass} id="user-credentials-hint">
                     Esta cuenta también se usa en otro gimnasio: solo su titular puede cambiar el correo o la contraseña desde su cuenta.
                   </p>
                 )}
@@ -778,11 +754,9 @@ function Users() {
 
               {!editingUser && (
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="user-password">
-                    Contraseña
-                  </label>
+                  <label className={labelClass} htmlFor="user-password">Contraseña</label>
                   <input
-                    className="w-full rounded-lg border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                    className={fieldClass}
                     id="user-password"
                     type="password"
                     autoComplete="new-password"
@@ -792,128 +766,124 @@ function Users() {
                   />
                 </div>
               )}
+            </div>
 
-              <fieldset>
-                <legend className="mb-2 block text-sm font-medium text-slate-700">Roles</legend>
-                {isOwnerRow ? (
-                  <p className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                    Propietario de la organización. Su rol no se cambia desde aquí.
-                  </p>
-                ) : (
-                  <>
-                    <div className="flex flex-wrap gap-3">
-                      {/* New clients go through «Registrar cliente»; Cliente stays here to change an existing account. */}
-                      {((editingUser ? ['Cliente', ...STAFF_ROLES] : STAFF_ROLES) as AssignableRole[]).map((role) => {
-                        const isChecked = form.roles.includes(role)
-                        const isDisabled = !canEditRoles || (role === 'Gerente' && !isOwner)
-                        return (
-                          <label
-                            className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition ${
-                              isChecked ? 'border-green-500 bg-green-50 text-green-800' : 'border-slate-200 bg-white text-slate-700'
-                            } ${isDisabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
-                            key={role}
-                          >
-                            <input
-                              className="accent-green-600"
-                              type="checkbox"
-                              checked={isChecked}
-                              disabled={isDisabled}
-                              onChange={(event) => toggleRole(role, event.target.checked)}
-                            />
-                            {ROLE_LABELS[role]}
-                          </label>
-                        )
-                      })}
-                    </div>
-                    <p className="mt-2 text-xs text-slate-500">
-                      {editingUser ? 'Cliente es un rol único. ' : ''}Gerente, Coach y Recepción se combinan y aplican a la sucursal {isAllGyms ? 'seleccionada' : 'activa'}.
-                      {!isOwner && ' Solo el propietario asigna el rol Gerente.'}
-                    </p>
-                  </>
-                )}
-              </fieldset>
-
-              {!editingUser && (
-                <GymSelect
-                  id="user-gym"
-                  label={isClientForm ? 'Sucursal base' : 'Sucursal donde trabaja'}
-                  value={gymId}
-                  onChange={setGymId}
-                />
-              )}
-
-              {/* Editing staff in the all-gyms view needs the gym whose roles change. */}
-              {editingUser && canEditRoles && (!isClientUser(editingUser) || rolesChanged) && (
-                <GymSelect
-                  id="user-role-gym"
-                  label="Sucursal de los roles"
-                  value={gymId}
-                  onChange={changeRoleGym}
-                />
-              )}
-
-              {isClientForm && (
-                <section className="space-y-5 rounded-xl border border-slate-200 bg-slate-50 p-5">
-                  <div>
-                    <h3 className="text-lg font-semibold text-slate-900">Perfil Deportivo y Membresía</h3>
-                    <p className="mt-1 text-sm text-slate-500">Información de entrenamiento y asignación del cliente.</p>
+            <fieldset>
+              <legend className={labelClass}>Roles</legend>
+              {isOwnerRow ? (
+                <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                  Propietario de la organización. Su rol no se cambia desde aquí.
+                </p>
+              ) : (
+                <>
+                  <div className="flex flex-wrap gap-2">
+                    {/* New clients go through «Registrar cliente»; Cliente stays here to change an existing account. */}
+                    {((editingUser ? ['Cliente', ...STAFF_ROLES] : STAFF_ROLES) as AssignableRole[]).map((role) => {
+                      const isChecked = form.roles.includes(role)
+                      const isDisabled = !canEditRoles || (role === 'Gerente' && !isOwner)
+                      return (
+                        <label className={chipClass(isChecked, isDisabled)} key={role}>
+                          <input
+                            className="sr-only"
+                            type="checkbox"
+                            checked={isChecked}
+                            disabled={isDisabled}
+                            onChange={(event) => toggleRole(role, event.target.checked)}
+                          />
+                          {isChecked && <Check size={13} aria-hidden />}
+                          {ROLE_LABELS[role]}
+                        </label>
+                      )
+                    })}
                   </div>
+                  <p className={hintClass}>
+                    {editingUser ? 'Cliente es un rol único. ' : ''}Gerente, Coach y Recepción se combinan y aplican a la sucursal {isAllGyms ? 'seleccionada' : 'activa'}.
+                    {!isOwner && ' Solo el propietario asigna el rol Gerente.'}
+                  </p>
+                </>
+              )}
+            </fieldset>
 
+            {!editingUser && (
+              <GymSelect
+                id="user-gym"
+                label={isClientForm ? 'Sucursal base' : 'Sucursal donde trabaja'}
+                value={gymId}
+                onChange={setGymId}
+              />
+            )}
+
+            {/* Editing staff in the all-gyms view needs the gym whose roles change. */}
+            {editingUser && canEditRoles && (!isClientUser(editingUser) || rolesChanged) && (
+              <GymSelect
+                id="user-role-gym"
+                label="Sucursal de los roles"
+                value={gymId}
+                onChange={changeRoleGym}
+              />
+            )}
+
+            {isClientForm && (
+              <fieldset className="space-y-4 rounded-xl border border-slate-200 p-4">
+                <legend className="px-1 text-sm font-semibold text-ink">Perfil deportivo y membresía</legend>
+
+                <div>
+                  <label className={labelClass} htmlFor="user-phone">Teléfono</label>
+                  <input
+                    className={fieldClass}
+                    id="user-phone"
+                    type="tel"
+                    value={form.phone}
+                    onChange={(event) => setForm({ ...form, phone: event.target.value })}
+                  />
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2">
                   <div>
-                    <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="user-phone">
-                      Teléfono
-                    </label>
+                    <label className={labelClass} htmlFor="user-goal">Objetivo deportivo</label>
                     <input
-                      className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
-                      id="user-phone"
-                      type="tel"
-                      value={form.phone}
-                      onChange={(event) => setForm({ ...form, phone: event.target.value })}
+                      className={fieldClass}
+                      id="user-goal"
+                      type="text"
+                      placeholder="Ej. Ganar masa, dormir mejor..."
+                      value={form.goal}
+                      onChange={(event) => setForm({ ...form, goal: event.target.value })}
                     />
                   </div>
-
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <div>
-                      <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="user-goal">
-                        Objetivo deportivo
-                      </label>
-                      <input
-                        className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
-                        id="user-goal"
-                        type="text"
-                        placeholder="Ej. Ganar masa, dormir mejor..."
-                        value={form.goal}
-                        onChange={(event) => setForm({ ...form, goal: event.target.value })}
-                      />
-                    </div>
-
-                    <div>
-                      <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="user-experience">
-                        Nivel de experiencia
-                      </label>
-                      <select
-                        className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
-                        id="user-experience"
-                        value={form.experienceLevel}
-                        onChange={(event) => setForm({ ...form, experienceLevel: event.target.value })}
-                      >
-                        <option value="">Selecciona un nivel</option>
-                        <option value="principiante">Principiante</option>
-                        <option value="intermedio">Intermedio</option>
-                        <option value="avanzado">Avanzado</option>
-                      </select>
-                    </div>
+                  <div>
+                    <label className={labelClass} htmlFor="user-experience">Nivel de experiencia</label>
+                    <select
+                      className={fieldClass}
+                      id="user-experience"
+                      value={form.experienceLevel}
+                      onChange={(event) => setForm({ ...form, experienceLevel: event.target.value })}
+                    >
+                      <option value="">Selecciona un nivel</option>
+                      <option value="principiante">Principiante</option>
+                      <option value="intermedio">Intermedio</option>
+                      <option value="avanzado">Avanzado</option>
+                    </select>
                   </div>
+                </div>
 
-                  <fieldset>
-                    <legend className="mb-2 block text-sm font-medium text-slate-700">Días disponibles</legend>
-                    <div className="flex flex-wrap gap-3">
-                      {trainingDays.map(({ label, value }) => (
-                        <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700" key={value}>
+                <fieldset>
+                  <legend className={labelClass}>Días disponibles</legend>
+                  <div className="flex flex-wrap gap-2">
+                    {trainingDays.map(({ label, name, value }) => {
+                      const isChecked = form.availableTrainingDays?.includes(value) ?? false
+                      return (
+                        <label
+                          className={`inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl border text-sm font-semibold transition has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand/40 ${
+                            isChecked ? 'border-ink bg-ink text-brand' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                          }`}
+                          key={value}
+                          title={name}
+                        >
                           <input
-                            className="accent-green-600"
+                            className="sr-only"
                             type="checkbox"
-                            checked={form.availableTrainingDays?.includes(value) ?? false}
+                            aria-label={name}
+                            checked={isChecked}
                             onChange={(event) => {
                               setForm((currentForm) => {
                                 const selectedDays = currentForm.availableTrainingDays || []
@@ -928,88 +898,74 @@ function Users() {
                           />
                           {label}
                         </label>
-                      ))}
-                    </div>
-                  </fieldset>
+                      )
+                    })}
+                  </div>
+                </fieldset>
 
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <div>
-                      <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="user-plan">
-                        Plan de membresía
-                      </label>
-                      <select
-                        className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100 disabled:bg-slate-100 disabled:text-slate-500"
-                        id="user-plan"
-                        value={form.planId}
-                        onChange={(event) => setForm({ ...form, planId: event.target.value })}
-                        disabled={Boolean(editingUser)}
-                        aria-describedby={editingUser ? 'user-plan-hint' : undefined}
-                      >
-                        <option value="">Sin plan asignado</option>
-                        {plans.map((plan, index) => {
-                          const planId = plan.id || plan._id
-                          return (
-                            <option key={planId || `plan-${index}`} value={planId || ''}>
-                              {plan.name || plan.nombre || 'Plan sin nombre'}
-                            </option>
-                          )
-                        })}
-                      </select>
-                      {editingUser && (
-                        <p className="mt-1 text-xs text-slate-500" id="user-plan-hint">
-                          Para cambiar el plan registra un pago en Pagos.
-                        </p>
-                      )}
-                    </div>
-
-                    <div>
-                      <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="user-coach">
-                        Coach asignado
-                      </label>
-                      <select
-                        className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
-                        id="user-coach"
-                        value={form.assignedCoach || ''}
-                        onChange={(event) => setForm({ ...form, assignedCoach: event.target.value })}
-                      >
-                        <option value="">Sin coach asignado</option>
-                        {coaches.map((coach) => (
-                          <option key={recordId(coach.id ?? coach._id)} value={recordId(coach.id ?? coach._id)}>
-                            {coach.name} {coach.lastName || ''}
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className={labelClass} htmlFor="user-plan">Plan de membresía</label>
+                    <select
+                      className={fieldClass}
+                      id="user-plan"
+                      value={form.planId}
+                      onChange={(event) => setForm({ ...form, planId: event.target.value })}
+                      disabled={Boolean(editingUser)}
+                      aria-describedby={editingUser ? 'user-plan-hint' : undefined}
+                    >
+                      <option value="">Sin plan asignado</option>
+                      {plans.map((plan, index) => {
+                        const planId = plan.id || plan._id
+                        return (
+                          <option key={planId || `plan-${index}`} value={planId || ''}>
+                            {plan.name || plan.nombre || 'Plan sin nombre'}
                           </option>
-                        ))}
-                      </select>
-                    </div>
+                        )
+                      })}
+                    </select>
+                    {editingUser && <p className={hintClass} id="user-plan-hint">Para cambiar el plan cobra la membresía en Caja.</p>}
                   </div>
-
                   <div>
-                    <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="user-observations">
-                      Observaciones médicas o técnicas
-                    </label>
-                    <textarea
-                      className="min-h-24 w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
-                      id="user-observations"
-                      value={form.observations}
-                      onChange={(event) => setForm({ ...form, observations: event.target.value })}
-                      rows={3}
-                    />
+                    <label className={labelClass} htmlFor="user-coach">Coach asignado</label>
+                    <select
+                      className={fieldClass}
+                      id="user-coach"
+                      value={form.assignedCoach || ''}
+                      onChange={(event) => setForm({ ...form, assignedCoach: event.target.value })}
+                    >
+                      <option value="">Sin coach asignado</option>
+                      {coaches.map((coach) => (
+                        <option key={recordId(coach.id ?? coach._id)} value={recordId(coach.id ?? coach._id)}>
+                          {coach.name} {coach.lastName || ''}
+                        </option>
+                      ))}
+                    </select>
                   </div>
-                </section>
-              )}
+                </div>
 
-              {!isClientForm && (
-                <section className="space-y-5 rounded-xl border border-slate-200 bg-slate-50 p-5">
-                  <div>
-                    <h3 className="text-lg font-semibold text-slate-900">Perfil Administrativo</h3>
-                    <p className="mt-1 text-sm text-slate-500">Información laboral y de acceso del equipo.</p>
-                  </div>
+                <div>
+                  <label className={labelClass} htmlFor="user-observations">Observaciones médicas o técnicas</label>
+                  <textarea
+                    className={`${fieldClass} min-h-24 resize-y`}
+                    id="user-observations"
+                    value={form.observations}
+                    onChange={(event) => setForm({ ...form, observations: event.target.value })}
+                    rows={3}
+                  />
+                </div>
+              </fieldset>
+            )}
 
+            {!isClientForm && (
+              <fieldset className="space-y-4 rounded-xl border border-slate-200 p-4">
+                <legend className="px-1 text-sm font-semibold text-ink">Datos del empleado</legend>
+
+                <div className="grid gap-4 sm:grid-cols-2">
                   <div>
-                    <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="staff-phone">
-                      Teléfono (10 dígitos)
-                    </label>
+                    <label className={labelClass} htmlFor="staff-phone">Teléfono (10 dígitos)</label>
                     <input
-                      className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                      className={fieldClass}
                       id="staff-phone"
                       type="tel"
                       inputMode="numeric"
@@ -1018,31 +974,10 @@ function Users() {
                       onChange={(event) => setForm({ ...form, phone: event.target.value })}
                     />
                   </div>
-
                   <div>
-                    <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="staff-address">
-                      Dirección
-                    </label>
-                    <input
-                      className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
-                      id="staff-address"
-                      type="text"
-                      value={form.address}
-                      onChange={(event) => setForm({ ...form, address: event.target.value })}
-                    />
-                  </div>
-
-                  <p className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                    Los documentos del empleado (CV, identificación, certificaciones…) se suben y verifican en{' '}
-                    <Link className="font-medium text-green-700 hover:text-green-900" to="/documents">Documentos › Expediente del personal</Link>.
-                  </p>
-
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="staff-status">
-                      Estado del Empleado
-                    </label>
+                    <label className={labelClass} htmlFor="staff-status">Estado</label>
                     <select
-                      className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                      className={fieldClass}
                       id="staff-status"
                       value={String(form.isActive)}
                       onChange={(event) => setForm({ ...form, isActive: event.target.value === 'true' })}
@@ -1051,67 +986,70 @@ function Users() {
                       <option value="false">Inactivo</option>
                     </select>
                   </div>
-
-                  {editingUser && (
-                    <div>
-                      <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="staff-password-reset">
-                        Reset de Contraseña
-                      </label>
-                      <input
-                        className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100 disabled:bg-slate-100 disabled:text-slate-500"
-                        id="staff-password-reset"
-                        type="password"
-                        autoComplete="new-password"
-                        placeholder={credentialsLocked ? 'Solo su titular puede cambiarla' : 'Nueva contraseña (dejar en blanco para conservar actual)'}
-                        value={form.password}
-                        onChange={(event) => setForm({ ...form, password: event.target.value })}
-                        disabled={credentialsLocked}
-                        aria-describedby={credentialsLocked ? 'user-credentials-hint' : undefined}
-                      />
-                    </div>
-                  )}
-                </section>
-              )}
-
-              {modalError && (
-                <div className="border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
-                  <p>{modalError}</p>
-                  {existingAccount && (
-                    <button
-                      className="mt-2 font-medium text-red-800 underline underline-offset-2 hover:text-red-900"
-                      type="button"
-                      onClick={() => {
-                        const prefill = existingAccount
-                        closeModal()
-                        openInvite(prefill)
-                      }}
-                    >
-                      Invitar esa cuenta a tu staff
-                    </button>
-                  )}
                 </div>
-              )}
 
-              <div className="flex justify-end gap-3 pt-2">
-                <button
-                  className="rounded-lg px-4 py-2 font-medium text-slate-600 transition hover:bg-slate-100 disabled:opacity-50"
-                  type="button"
-                  onClick={closeModal}
-                  disabled={isSubmitting}
-                >
-                  Cancelar
-                </button>
-                <button
-                  className="rounded-lg bg-brand px-4 py-2 font-medium text-ink transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
-                  type="submit"
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting ? 'Guardando...' : editingUser ? 'Actualizar' : 'Guardar'}
-                </button>
+                <div>
+                  <label className={labelClass} htmlFor="staff-address">Dirección</label>
+                  <input
+                    className={fieldClass}
+                    id="staff-address"
+                    type="text"
+                    value={form.address}
+                    onChange={(event) => setForm({ ...form, address: event.target.value })}
+                  />
+                </div>
+
+                {editingUser && (
+                  <div>
+                    <label className={labelClass} htmlFor="staff-password-reset">Nueva contraseña</label>
+                    <input
+                      className={fieldClass}
+                      id="staff-password-reset"
+                      type="password"
+                      autoComplete="new-password"
+                      placeholder={credentialsLocked ? 'Solo su titular puede cambiarla' : 'Déjala en blanco para conservar la actual'}
+                      value={form.password}
+                      onChange={(event) => setForm({ ...form, password: event.target.value })}
+                      disabled={credentialsLocked}
+                      aria-describedby={credentialsLocked ? 'user-credentials-hint' : undefined}
+                    />
+                  </div>
+                )}
+
+                <p className="text-xs text-slate-500">
+                  Los documentos del empleado (CV, identificación, certificaciones…) se suben y verifican en{' '}
+                  <Link className="font-medium text-brand-text hover:underline" to="/documents">Documentos › Expediente del personal</Link>.
+                </p>
+              </fieldset>
+            )}
+
+            {modalError && (
+              <div className={errorAlert} role="alert">
+                <p>{modalError}</p>
+                {existingAccount && (
+                  <button
+                    className="mt-2 font-semibold text-red-800 underline underline-offset-2 hover:text-red-900"
+                    type="button"
+                    onClick={() => {
+                      const prefill = existingAccount
+                      closeModal()
+                      openInvite(prefill)
+                    }}
+                  >
+                    Invitar esa cuenta a tu staff
+                  </button>
+                )}
               </div>
-            </form>
-          </div>
-        </div>
+            )}
+
+            <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
+              <button className={secondaryButton} type="button" onClick={closeModal} disabled={isSubmitting}>Cancelar</button>
+              <button className={primaryButton} type="submit" disabled={isSubmitting}>
+                {isSubmitting ? 'Guardando...' : editingUser ? 'Guardar cambios' : 'Agregar trabajador'}
+              </button>
+            </div>
+          </form>
+        </Modal>
       )}
     </section>
   )

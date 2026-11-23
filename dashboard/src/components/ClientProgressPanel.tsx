@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Dumbbell, Flame, Timer, Trophy, X } from 'lucide-react'
+import { ChartColumn, Dumbbell, Flame, NotebookPen, Timer, Trophy, UserRound } from 'lucide-react'
 import {
   getClientAnalytics,
   updateClientObservations,
@@ -10,6 +10,13 @@ import {
 import type { UserMembership } from '../types'
 import { formatMembershipDate, membershipBadge } from '../utils/membership'
 import BarChart, { type BarDatum } from './charts/BarChart'
+import Drawer from './ui/Drawer'
+import Panel from './ui/Panel'
+import Badge from './ui/Badge'
+import KpiCard from './ui/KpiCard'
+import Segmented from './ui/Segmented'
+import EmptyState from './ui/EmptyState'
+import { errorAlert, fieldClass, primaryButton } from './ui/styles'
 
 export interface ProgressClient {
   id: string
@@ -30,7 +37,9 @@ const METRICS: Record<Metric, { label: string; unit: string }> = {
   caloriesBurned: { label: 'Calorías', unit: 'kcal' },
 }
 
-const PERIODS: Array<[AnalyticsPeriod, string]> = [['day', 'Día'], ['week', 'Semana'], ['month', 'Mes']]
+const METRIC_OPTIONS = (Object.keys(METRICS) as Metric[]).map((key) => [key, METRICS[key].label] as const)
+
+const PERIODS = [['day', 'Día'], ['week', 'Semana'], ['month', 'Mes']] as const satisfies ReadonlyArray<readonly [AnalyticsPeriod, string]>
 
 const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
 
@@ -117,154 +126,114 @@ function ClientProgressPanel({ client, onObservationsSaved, onClose }: ClientPro
   ] : []
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/50" role="dialog" aria-modal="true" aria-labelledby="progress-title">
-      <div className="flex h-full w-full max-w-3xl flex-col overflow-y-auto bg-canvas shadow-xl">
-        <header className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-slate-200 bg-white px-6 py-5">
+    <Drawer eyebrow="Seguimiento del cliente" title={client.name} description={client.email} onClose={onClose}>
+      <Panel title="Perfil y membresía" icon={UserRound}>
+        <dl className="grid gap-4 text-sm sm:grid-cols-3">
           <div>
-            <p className="text-xs font-medium uppercase tracking-[0.2em] text-slate-500">Seguimiento del cliente</p>
-            <h2 className="mt-1 text-2xl font-semibold text-slate-900" id="progress-title">{client.name}</h2>
-            {client.email && <p className="mt-1 text-sm text-slate-500">{client.email}</p>}
+            <dt className="text-slate-500">Membresía</dt>
+            <dd className="mt-1 flex flex-wrap items-center gap-2">
+              <span className="font-medium text-ink">{client.membership?.planName || 'Sin plan'}</span>
+              <Badge tone={badge.tone}>{badge.label}</Badge>
+            </dd>
           </div>
-          <button className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900" type="button" aria-label="Cerrar" onClick={onClose}>
-            <X size={20} />
-          </button>
-        </header>
+          <div><dt className="text-slate-500">Vence</dt><dd className="mt-1 font-medium text-ink tabular">{formatMembershipDate(client.membership?.expiresAt)}</dd></div>
+          <div><dt className="text-slate-500">Coach</dt><dd className="mt-1 font-medium text-ink">{client.coachName || 'Sin coach asignado'}</dd></div>
+          <div><dt className="text-slate-500">Objetivo</dt><dd className="mt-1 text-ink">{client.goal || '—'}</dd></div>
+          <div><dt className="text-slate-500">Nivel</dt><dd className="mt-1 capitalize text-ink">{client.experienceLevel || '—'}</dd></div>
+        </dl>
+      </Panel>
 
-        <div className="space-y-6 px-6 py-6">
-          <section className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
-            <h3 className="font-semibold text-slate-900">Perfil y membresía</h3>
-            <dl className="mt-3 grid gap-4 text-sm sm:grid-cols-3">
-              <div>
-                <dt className="text-slate-500">Membresía</dt>
-                <dd className="mt-1 flex flex-wrap items-center gap-2">
-                  <span className="font-medium text-slate-900">{client.membership?.planName || 'Sin plan'}</span>
-                  <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${badge.tone}`}>{badge.label}</span>
-                </dd>
-              </div>
-              <div><dt className="text-slate-500">Vence</dt><dd className="mt-1 font-medium text-slate-900">{formatMembershipDate(client.membership?.expiresAt)}</dd></div>
-              <div><dt className="text-slate-500">Coach</dt><dd className="mt-1 font-medium text-slate-900">{client.coachName || 'Sin coach asignado'}</dd></div>
-              <div><dt className="text-slate-500">Objetivo</dt><dd className="mt-1 text-slate-900">{client.goal || '—'}</dd></div>
-              <div><dt className="text-slate-500">Nivel</dt><dd className="mt-1 capitalize text-slate-900">{client.experienceLevel || '—'}</dd></div>
-            </dl>
-          </section>
+      <Panel title="Observaciones médicas o técnicas" icon={NotebookPen} description="Solo las ve el staff de esta organización.">
+        <form onSubmit={handleSaveObservations}>
+          <label className="sr-only" htmlFor="progress-observations">Observaciones médicas o técnicas</label>
+          <textarea
+            className={`${fieldClass} min-h-28 resize-y`}
+            id="progress-observations"
+            value={observations}
+            maxLength={4000}
+            placeholder="Lesiones, restricciones, indicaciones del coach..."
+            onChange={(event) => {
+              setObservations(event.target.value)
+              setNotesMessage(null)
+            }}
+          />
+          <div className="mt-3 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p
+              className={`text-sm ${notesMessage?.tone === 'error' ? 'text-red-700' : 'text-emerald-700'}`}
+              role={notesMessage?.tone === 'error' ? 'alert' : 'status'}
+            >
+              {notesMessage?.text}
+            </p>
+            <button className={primaryButton} type="submit" disabled={isSaving || observations.trim() === savedObservations.trim()}>
+              {isSaving ? 'Guardando...' : 'Guardar observaciones'}
+            </button>
+          </div>
+        </form>
+      </Panel>
 
-          <form className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm" onSubmit={handleSaveObservations}>
-            <label className="font-semibold text-slate-900" htmlFor="progress-observations">Observaciones médicas o técnicas</label>
-            <p className="mt-1 text-xs text-slate-500">Solo las ve el staff de esta organización.</p>
-            <textarea
-              className="mt-3 min-h-28 w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
-              id="progress-observations"
-              value={observations}
-              maxLength={4000}
-              onChange={(event) => {
-                setObservations(event.target.value)
-                setNotesMessage(null)
-              }}
+      <Panel
+        title="Progreso"
+        icon={ChartColumn}
+        description="Entrenamientos completados con esta organización."
+        actions={(
+          <>
+            <Segmented label="Periodo" value={period} options={PERIODS} onChange={setPeriod} />
+            <input
+              className={`${fieldClass.replace('w-full ', '')} w-40 py-1.5`}
+              type="date"
+              aria-label="Fecha del periodo"
+              value={date}
+              max={localToday()}
+              onChange={(event) => { if (event.target.value) setDate(event.target.value) }}
             />
-            <div className="mt-3 flex items-center justify-between gap-3">
-              <p
-                className={`text-sm ${notesMessage?.tone === 'error' ? 'text-red-700' : 'text-emerald-700'}`}
-                role={notesMessage?.tone === 'error' ? 'alert' : 'status'}
-              >
-                {notesMessage?.text}
-              </p>
-              <button
-                className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-ink transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
-                type="submit"
-                disabled={isSaving || observations.trim() === savedObservations.trim()}
-              >
-                {isSaving ? 'Guardando...' : 'Guardar observaciones'}
-              </button>
+          </>
+        )}
+      >
+        {analyticsError ? (
+          <p className={errorAlert} role="alert">{analyticsError}</p>
+        ) : !analytics ? (
+          <div className="space-y-4" aria-label="Cargando progreso" aria-busy="true">
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+              {Array.from({ length: 4 }).map((_, index) => <div className="skeleton h-24 w-full rounded-card" key={index} />)}
             </div>
-          </form>
+            <div className="skeleton h-56 w-full rounded-card" />
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+              {tiles.map(({ label, value, icon }) => <KpiCard label={label} value={value} icon={icon} key={label} />)}
+            </div>
 
-          <section className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h3 className="font-semibold text-slate-900">Progreso</h3>
-                <p className="mt-1 text-xs text-slate-500">Entrenamientos completados con esta organización.</p>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="inline-flex rounded-lg border border-slate-200 p-0.5 text-sm" role="group" aria-label="Periodo">
-                  {PERIODS.map(([value, label]) => (
-                    <button
-                      className={`rounded-md px-3 py-1 transition ${period === value ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
-                      type="button"
-                      aria-pressed={period === value}
-                      key={value}
-                      onClick={() => setPeriod(value)}
-                    >
-                      {label}
-                    </button>
-                  ))}
+            {analytics.bestLift && (
+              <p className="mt-4 flex flex-wrap items-center gap-x-1.5 text-sm text-slate-600">
+                <Trophy size={15} className="text-brand-text" aria-hidden />
+                Mejor levantamiento: <span className="font-semibold text-ink tabular">{analytics.bestLift.weightKg} kg</span>
+                {analytics.bestLift.exerciseName && ` en ${analytics.bestLift.exerciseName}`}
+                {' · '}{formatMembershipDate(analytics.bestLift.completedAt)}
+              </p>
+            )}
+
+            {hasSessions ? (
+              <div className="mt-6">
+                <div className="mb-3 -mx-1 overflow-x-auto px-1">
+                  <Segmented label="Métrica de la gráfica" value={metric} options={METRIC_OPTIONS} onChange={setMetric} />
                 </div>
-                <input
-                  className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-700 outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100"
-                  type="date"
-                  aria-label="Fecha del periodo"
-                  value={date}
-                  max={localToday()}
-                  onChange={(event) => { if (event.target.value) setDate(event.target.value) }}
+                <BarChart
+                  data={chartBars(analytics, metric)}
+                  caption={`${METRICS[metric].label} por ${period === 'day' ? 'hora' : 'día'}`}
+                  valueLabel={`${METRICS[metric].label} (${METRICS[metric].unit})`}
+                  formatValue={(value) => `${formatNumber(value)} ${METRICS[metric].unit}`}
                 />
               </div>
-            </div>
-
-            {analyticsError ? (
-              <p className="mt-4 rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">{analyticsError}</p>
-            ) : !analytics ? (
-              <div className="mt-4 h-64 animate-pulse rounded-lg bg-slate-100" aria-label="Cargando progreso" aria-busy="true" />
             ) : (
-              <>
-                <dl className="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
-                  {tiles.map(({ label, value, icon: Icon }) => (
-                    <div className="rounded-lg bg-slate-50 px-4 py-3" key={label}>
-                      <dt className="flex items-center gap-2 text-sm text-slate-500"><Icon size={16} aria-hidden="true" /> {label}</dt>
-                      <dd className="mt-1 text-xl font-semibold text-slate-900">{value}</dd>
-                    </div>
-                  ))}
-                </dl>
-
-                {analytics.bestLift && (
-                  <p className="mt-4 text-sm text-slate-600">
-                    Mejor levantamiento: <span className="font-semibold text-slate-900">{analytics.bestLift.weightKg} kg</span>
-                    {analytics.bestLift.exerciseName && ` en ${analytics.bestLift.exerciseName}`}
-                    {' · '}{formatMembershipDate(analytics.bestLift.completedAt)}
-                  </p>
-                )}
-
-                {hasSessions ? (
-                  <div className="mt-6">
-                    <div className="mb-3 inline-flex rounded-lg border border-slate-200 p-0.5 text-sm" role="group" aria-label="Métrica de la gráfica">
-                      {(Object.keys(METRICS) as Metric[]).map((key) => (
-                        <button
-                          className={`rounded-md px-3 py-1 transition ${metric === key ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
-                          type="button"
-                          aria-pressed={metric === key}
-                          key={key}
-                          onClick={() => setMetric(key)}
-                        >
-                          {METRICS[key].label}
-                        </button>
-                      ))}
-                    </div>
-                    <BarChart
-                      data={chartBars(analytics, metric)}
-                      caption={`${METRICS[metric].label} por ${period === 'day' ? 'hora' : 'día'}`}
-                      valueLabel={`${METRICS[metric].label} (${METRICS[metric].unit})`}
-                      formatValue={(value) => `${formatNumber(value)} ${METRICS[metric].unit}`}
-                    />
-                  </div>
-                ) : (
-                  <p className="mt-6 rounded-lg bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
-                    Sin entrenamientos completados en este periodo.
-                  </p>
-                )}
-              </>
+              <div className="mt-6">
+                <EmptyState icon={Dumbbell} title="Sin entrenamientos en este periodo">Cambia el periodo o la fecha para ver otros días.</EmptyState>
+              </div>
             )}
-          </section>
-        </div>
-      </div>
-    </div>
+          </>
+        )}
+      </Panel>
+    </Drawer>
   )
 }
 

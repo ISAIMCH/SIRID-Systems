@@ -1,31 +1,22 @@
 import { useEffect, useState } from 'react'
-import { Clock, FileCheck, MapPin, MoreVertical, Pencil, Trash2 } from 'lucide-react'
+import { Check, Clock, CreditCard, FileCheck, MapPin, Pencil, Plus, RefreshCw, Ticket, Trash2 } from 'lucide-react'
 import { createPlan, deletePlan, getPlans, updatePlan } from '../services/api'
 import { useAuth } from '../store/useAuth'
 import { useIsOwner } from '../utils/access'
 import { useQuickAction } from '../utils/quickAction'
 import type { GymAccessScope, Plan, PlanType } from '../types'
+import PageHeader from '../components/ui/PageHeader'
+import Panel from '../components/ui/Panel'
+import Modal from '../components/ui/Modal'
+import Badge, { type BadgeTone } from '../components/ui/Badge'
+import EmptyState from '../components/ui/EmptyState'
+import { errorAlert, fieldClass, hintClass, iconButton, labelClass, primaryButton, secondaryButton } from '../components/ui/styles'
 
 type PlansResponse = Plan[] | {
   data?: unknown
   plans?: unknown
   planes?: unknown
   [key: string]: unknown
-}
-
-function PlanSkeleton() {
-  return (
-    <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3" aria-label="Cargando planes" aria-busy="true">
-      {Array.from({ length: 3 }).map((_, index) => (
-        <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm" key={index}>
-          <div className="h-5 w-2/5 animate-pulse rounded bg-slate-200" />
-          <div className="mt-6 h-10 w-3/5 animate-pulse rounded bg-slate-200" />
-          <div className="mt-5 h-4 w-full animate-pulse rounded bg-slate-200" />
-          <div className="mt-3 h-4 w-4/5 animate-pulse rounded bg-slate-200" />
-        </div>
-      ))}
-    </div>
-  )
 }
 
 interface PlanRules {
@@ -45,20 +36,12 @@ interface PlanFormState extends PlanRules {
   planType: PlanType
 }
 
-const PLAN_TYPE_LABELS: Record<PlanType, string> = {
-  standard: 'Estándar',
-  student: 'Estudiante',
-  limited_hours: 'Horario limitado',
-  single_gym: 'Una sucursal',
-  promotional: 'Promocional',
-}
-
-const PLAN_TYPE_BADGES: Record<PlanType, string> = {
-  standard: 'bg-slate-100 text-slate-600',
-  student: 'bg-sky-100 text-sky-800',
-  limited_hours: 'bg-violet-100 text-violet-800',
-  single_gym: 'bg-emerald-100 text-emerald-800',
-  promotional: 'bg-amber-100 text-amber-800',
+const PLAN_TYPES: Record<PlanType, { label: string; tone: BadgeTone }> = {
+  standard: { label: 'Estándar', tone: 'neutral' },
+  student: { label: 'Estudiante', tone: 'info' },
+  limited_hours: { label: 'Horario limitado', tone: 'warning' },
+  single_gym: { label: 'Una sucursal', tone: 'neutral' },
+  promotional: { label: 'Promocional', tone: 'brand' },
 }
 
 const anyRules: PlanRules = {
@@ -88,7 +71,20 @@ const emptyPlanForm: PlanFormState = {
   ...anyRules,
 }
 
-const fieldClassName = 'w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100'
+const currency = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 0 })
+
+function formatPrice(price: number | string | undefined) {
+  const numericPrice = Number(price)
+  return Number.isFinite(numericPrice) ? currency.format(numericPrice) : 'Sin precio'
+}
+
+// Plans store days; older ones may carry a free-text period.
+function durationText(duration: number | string | undefined) {
+  if (duration === undefined || duration === '') return null
+  const days = Number(duration)
+  if (!Number.isFinite(days)) return String(duration)
+  return days === 1 ? '1 día' : `${days} días`
+}
 
 function planRulesFrom(plan: Plan): PlanRules {
   return {
@@ -113,11 +109,14 @@ function PlanRulesList({ plan, gymNames }: { plan: Plan; gymNames: Map<string, s
     : 'Cualquier hora'
 
   return (
-    <ul className="mt-5 space-y-2 text-sm text-slate-600">
-      <li className="flex items-start gap-2"><MapPin className="mt-0.5 shrink-0 text-slate-400" size={16} aria-hidden="true" />{gyms}</li>
-      <li className="flex items-start gap-2"><Clock className="mt-0.5 shrink-0 text-slate-400" size={16} aria-hidden="true" />{schedule}</li>
+    <ul className="space-y-1.5 text-xs text-slate-500">
+      <li className="flex items-start gap-1.5"><MapPin className="mt-px shrink-0" size={14} aria-hidden />{gyms}</li>
+      <li className="flex items-start gap-1.5"><Clock className="mt-px shrink-0" size={14} aria-hidden />{schedule}</li>
+      {plan.autoRenew !== false && (
+        <li className="flex items-start gap-1.5"><RefreshCw className="mt-px shrink-0" size={14} aria-hidden />Renovación automática</li>
+      )}
       {plan.requiredDocument === 'student_id' && (
-        <li className="flex items-start gap-2"><FileCheck className="mt-0.5 shrink-0 text-slate-400" size={16} aria-hidden="true" />Requiere credencial de estudiante verificada</li>
+        <li className="flex items-start gap-1.5 text-sky-700"><FileCheck className="mt-px shrink-0" size={14} aria-hidden />Requiere credencial de estudiante verificada</li>
       )}
     </ul>
   )
@@ -125,7 +124,6 @@ function PlanRulesList({ plan, gymNames }: { plan: Plan; gymNames: Map<string, s
 
 async function fetchPlans() {
   const res = await getPlans<PlansResponse>()
-  console.log('Raw API Response:', res)
   const plansCandidate = Array.isArray(res)
     ? res
     : res?.data || res?.plans || res?.planes || Object.values(res).find((value) => Array.isArray(value)) || []
@@ -136,8 +134,7 @@ async function fetchPlans() {
 function Subscriptions() {
   const { organizationGyms } = useAuth()
   const gymNames = new Map(organizationGyms.map((gym) => [gym.id, gym.name]))
-  // Recepcion reads plans to charge them; only Admins manage them.
-  // Plans are the organization's catalog: only the owner manages them.
+  // Plans are the organization's catalog: only the owner manages them; Recepcion reads them to charge them.
   const canManage = useIsOwner()
   const [plans, setPlans] = useState<Plan[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -146,7 +143,6 @@ function Subscriptions() {
   const [form, setForm] = useState<PlanFormState>(emptyPlanForm)
   const [specificationsText, setSpecificationsText] = useState('')
   const [editingPlan, setEditingPlan] = useState<Plan | null>(null)
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [modalError, setModalError] = useState<string | null>(null)
 
@@ -156,19 +152,12 @@ function Subscriptions() {
     async function loadPlans() {
       try {
         const plansArray = await fetchPlans()
-
         if (isMounted) {
           setPlans(plansArray)
           setError(null)
         }
       } catch (requestError) {
-        if (isMounted) {
-          setError(
-            requestError instanceof Error
-              ? requestError.message
-              : 'No se pudieron cargar los planes.',
-          )
-        }
+        if (isMounted) setError(requestError instanceof Error ? requestError.message : 'No se pudieron cargar los planes.')
       } finally {
         if (isMounted) setIsLoading(false)
       }
@@ -213,7 +202,6 @@ function Subscriptions() {
     })
     setSpecificationsText((plan.specifications ?? plan.caracteristicas)?.join(', ') || '')
     setModalError(null)
-    setOpenMenuId(null)
     setIsModalOpen(true)
   }
 
@@ -223,7 +211,7 @@ function Subscriptions() {
       setError('No se puede eliminar un plan sin identificador.')
       return
     }
-    if (!window.confirm('¿Estás seguro de eliminar este plan?')) return
+    if (!window.confirm(`¿Eliminar el plan ${plan.name || plan.nombre || 'sin nombre'}?`)) return
 
     try {
       await deletePlan(planId)
@@ -231,8 +219,6 @@ function Subscriptions() {
       setError(null)
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'No se pudo eliminar el plan.')
-    } finally {
-      setOpenMenuId(null)
     }
   }
 
@@ -263,8 +249,7 @@ function Subscriptions() {
       } else {
         await createPlan(payload)
       }
-      const refreshedPlans = await fetchPlans()
-      setPlans(refreshedPlans)
+      setPlans(await fetchPlans())
       setError(null)
       setForm(emptyPlanForm)
       setSpecificationsText('')
@@ -274,172 +259,117 @@ function Subscriptions() {
       setModalError(
         requestError instanceof Error
           ? requestError.message
-          : editingPlan
-            ? 'No se pudo actualizar el plan.'
-            : 'No se pudo crear el plan.',
+          : editingPlan ? 'No se pudo actualizar el plan.' : 'No se pudo crear el plan.',
       )
     } finally {
       setIsSubmitting(false)
     }
   }
 
-  const formatPrice = (price: number | string | undefined) => {
-    const numericPrice = Number(price)
-    if (!Number.isFinite(numericPrice)) return 'Precio no disponible'
-
-    return new Intl.NumberFormat('es-MX', {
-      style: 'currency',
-      currency: 'MXN',
-      maximumFractionDigits: 0,
-    }).format(numericPrice)
-  }
+  const activeCount = plans.filter((plan) => plan.isActive ?? true).length
 
   return (
-    <section className="min-h-screen bg-canvas px-8 py-10">
-      <p className="text-sm font-medium uppercase tracking-[0.25em] text-slate-500">Facturación</p>
-      <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-4xl font-semibold tracking-tight text-slate-900">Suscripciones</h1>
-          <p className="mt-3 text-slate-500">Supervisa los planes y suscripciones activas.</p>
-        </div>
-        {canManage && (
-          <button
-            className="rounded-lg bg-brand px-4 py-2 font-medium text-ink transition hover:bg-brand-hover"
-            type="button"
-            onClick={openModal}
-          >
-            + Nuevo Plan
+    <section className="min-h-screen bg-canvas px-4 py-8 sm:px-8 sm:py-10">
+      <PageHeader
+        eyebrow="Comercial"
+        title="Suscripciones"
+        description={canManage ? 'Los planes de membresía que vende tu organización, su precio y sus reglas de acceso.' : 'Los planes de membresía que Caja puede cobrar.'}
+        actions={canManage && (
+          <button className={primaryButton} type="button" onClick={openModal}>
+            <Plus size={18} aria-hidden /> Nuevo plan
           </button>
         )}
-      </div>
+      />
 
-      <div className="mt-8">
-        {error && (
-          <div className="mb-6 border border-red-100 bg-red-50 px-6 py-4 text-sm text-red-700" role="alert">
-            {error}
-          </div>
-        )}
+      <Panel
+        className="mt-6"
+        title="Planes de membresía"
+        icon={CreditCard}
+        description={isLoading ? undefined : `${plans.length} ${plans.length === 1 ? 'plan' : 'planes'} · ${activeCount} activo${activeCount === 1 ? '' : 's'}`}
+      >
+        {error && <p className={`${errorAlert} mb-4`} role="alert">{error}</p>}
 
         {isLoading ? (
-          <PlanSkeleton />
-        ) : plans.length > 0 ? (
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3" aria-label="Cargando planes" aria-busy="true">
+            {Array.from({ length: 3 }).map((_, index) => <div className="skeleton h-64 w-full rounded-card" key={index} />)}
+          </div>
+        ) : plans.length === 0 ? (
+          <EmptyState icon={Ticket} title="Aún no hay planes">
+            {canManage ? 'Crea tu primer plan de membresía para cobrarlo en Caja y en la app.' : 'Cuando el propietario cree planes aparecerán aquí.'}
+          </EmptyState>
+        ) : (
+          <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {plans.map((plan, index) => {
               const planId = plan.id || plan._id || `plan-${index}`
               const planName = plan.name || plan.nombre || 'Plan sin nombre'
               const planPrice = plan.price ?? plan.precio
-              const planDuration = plan.durationInDays ?? plan.duration ?? plan.tipoCobro
+              const planDuration = durationText(plan.durationInDays ?? plan.duration ?? plan.tipoCobro)
               const isActive = plan.isActive ?? true
-              const planType = plan.planType ?? 'standard'
+              const planType = PLAN_TYPES[plan.planType ?? 'standard']
               const specifications = plan.specifications ?? plan.caracteristicas ?? []
 
               return (
-                <article
-                  className="relative rounded-2xl border border-slate-100 bg-white p-6 shadow-sm transition-shadow hover:shadow-md"
+                <li
+                  className={`group flex flex-col rounded-card border border-slate-200 bg-white p-5 transition duration-200 hover:-translate-y-0.5 hover:shadow-lift ${isActive ? '' : 'opacity-75'}`}
                   key={planId}
                 >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0">
-                      <h2 className="text-xl font-semibold text-slate-900">{planName}</h2>
-                      <span className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${PLAN_TYPE_BADGES[planType]}`}>
-                        {PLAN_TYPE_LABELS[planType]}
-                      </span>
-                    </div>
-                    <div className="relative flex items-center gap-2">
-                      <span
-                        className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium ${
-                          isActive ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-600'
-                        }`}
-                      >
-                        {isActive ? 'Activo' : 'Inactivo'}
-                      </span>
-                      {canManage && (
-                        <button
-                          className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
-                          type="button"
-                          aria-label={`Acciones de ${planName}`}
-                          onClick={() => setOpenMenuId(openMenuId === planId ? null : planId)}
-                        >
-                          <MoreVertical size={18} />
-                        </button>
-                      )}
-                      {canManage && openMenuId === planId && (
-                        <div className="absolute right-0 top-9 z-10 w-36 rounded-lg border border-slate-100 bg-white py-1 shadow-lg">
-                          <button
-                            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
-                            type="button"
-                            onClick={() => editPlan(plan)}
-                          >
-                            <Pencil size={15} />
-                            Editar
-                          </button>
-                          <button
-                            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50"
-                            type="button"
-                            onClick={() => removePlan(plan)}
-                          >
-                            <Trash2 size={15} />
-                            Eliminar
-                          </button>
-                        </div>
-                      )}
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="min-w-0 font-semibold text-ink">{planName}</p>
+                    <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
+                      <Badge tone={planType.tone}>{planType.label}</Badge>
+                      {!isActive && <Badge>Inactivo</Badge>}
                     </div>
                   </div>
 
-                  <p className="mt-7 text-4xl font-semibold tracking-tight text-slate-900">
-                    {formatPrice(planPrice)}
+                  <p className="mt-4 flex items-baseline gap-1.5">
+                    <span className="font-display text-4xl font-bold leading-none tracking-tight text-ink tabular">{formatPrice(planPrice)}</span>
+                    {planDuration && <span className="text-sm text-slate-500">/ {planDuration}</span>}
                   </p>
-                  {planDuration && <p className="mt-2 text-sm text-slate-500">{planDuration}</p>}
 
-                  {plan.descripcion && <p className="mt-5 text-sm leading-6 text-slate-500">{plan.descripcion}</p>}
+                  {plan.descripcion && <p className="mt-3 line-clamp-2 text-sm text-slate-500">{plan.descripcion}</p>}
 
-                  <PlanRulesList plan={plan} gymNames={gymNames} />
+                  <div className="mt-4">
+                    <PlanRulesList plan={plan} gymNames={gymNames} />
+                  </div>
 
                   {specifications.length > 0 && (
-                    <ul className="mt-6 space-y-2 border-t border-slate-100 pt-5 text-sm text-slate-600">
+                    <ul className="mt-4 space-y-1.5 border-t border-slate-100 pt-4 text-sm text-slate-600">
                       {specifications.map((feature) => (
-                        <li key={feature}>{feature}</li>
+                        <li className="flex items-start gap-2" key={feature}>
+                          <Check className="mt-0.5 shrink-0 text-brand-text" size={15} aria-hidden />
+                          {feature}
+                        </li>
                       ))}
                     </ul>
                   )}
-                </article>
+
+                  {canManage && (
+                    <div className="mt-auto pt-4">
+                      <div className="flex justify-end gap-1 border-t border-slate-100 pt-3">
+                        <button className={`${iconButton} hover:text-brand-text`} type="button" aria-label={`Editar ${planName}`} title="Editar" onClick={() => editPlan(plan)}>
+                          <Pencil size={17} aria-hidden />
+                        </button>
+                        <button className={`${iconButton} hover:bg-red-50 hover:text-red-600`} type="button" aria-label={`Eliminar ${planName}`} title="Eliminar" onClick={() => void removePlan(plan)}>
+                          <Trash2 size={17} aria-hidden />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </li>
               )
             })}
-          </div>
-        ) : (
-          <div className="rounded-2xl border border-slate-100 bg-white px-6 py-12 text-center text-sm text-slate-500 shadow-sm">
-            No hay planes disponibles para mostrar.
-          </div>
+          </ul>
         )}
-      </div>
+      </Panel>
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4 backdrop-blur-sm">
-          <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
-            <div className="flex items-start justify-between gap-4">
+        <Modal eyebrow="Suscripciones" title={editingPlan ? 'Editar plan' : 'Nuevo plan'} onClose={closeModal} size="xl">
+          <form className="space-y-5" onSubmit={handleCreatePlan}>
+            <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <p className="text-sm font-medium uppercase tracking-[0.2em] text-emerald-700">Suscripciones</p>
-                <h2 className="mt-2 text-2xl font-semibold text-slate-900">
-                  {editingPlan ? 'Editar Plan' : 'Nuevo plan'}
-                </h2>
-              </div>
-              <button
-                className="text-2xl leading-none text-slate-400 transition hover:text-slate-700"
-                type="button"
-                aria-label="Cerrar modal"
-                onClick={closeModal}
-              >
-                ×
-              </button>
-            </div>
-
-            <form className="mt-6 space-y-5" onSubmit={handleCreatePlan}>
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="plan-name">
-                  Nombre del Plan
-                </label>
+                <label className={labelClass} htmlFor="plan-name">Nombre del plan</label>
                 <input
-                  className="w-full rounded-lg border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                  className={fieldClass}
                   id="plan-name"
                   type="text"
                   value={form.nombre}
@@ -447,33 +377,29 @@ function Subscriptions() {
                   required
                 />
               </div>
-
               <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="plan-type">
-                  Tipo de Plan
-                </label>
+                <label className={labelClass} htmlFor="plan-type">Tipo de plan</label>
                 <select
-                  className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                  className={fieldClass}
                   id="plan-type"
                   value={form.planType}
                   onChange={(event) => {
                     const planType = event.target.value as PlanType
                     setForm({ ...form, planType, ...PLAN_TYPE_PRESETS[planType] })
                   }}
+                  aria-describedby="plan-type-hint"
                 >
-                  {Object.entries(PLAN_TYPE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                  {Object.entries(PLAN_TYPES).map(([value, { label }]) => <option key={value} value={value}>{label}</option>)}
                 </select>
-                <p className="mt-2 text-xs text-slate-500">
-                  El tipo llena las reglas de acceso de abajo; puedes ajustarlas antes de guardar.
-                </p>
+                <p className={hintClass} id="plan-type-hint">Llena las reglas de acceso de abajo; puedes ajustarlas antes de guardar.</p>
               </div>
+            </div>
 
+            <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="plan-price">
-                  Precio
-                </label>
+                <label className={labelClass} htmlFor="plan-price">Precio (MXN)</label>
                 <input
-                  className="w-full rounded-lg border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                  className={fieldClass}
                   id="plan-price"
                   type="number"
                   min="0"
@@ -483,13 +409,10 @@ function Subscriptions() {
                   required
                 />
               </div>
-
               <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="plan-duration">
-                  Duración en días
-                </label>
+                <label className={labelClass} htmlFor="plan-duration">Duración en días</label>
                 <input
-                  className="w-full rounded-lg border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                  className={fieldClass}
                   id="plan-duration"
                   type="number"
                   min="1"
@@ -498,163 +421,148 @@ function Subscriptions() {
                   required
                 />
               </div>
+            </div>
 
-              <fieldset className="space-y-4 rounded-xl border border-slate-200 p-4">
-                <legend className="px-1 text-sm font-semibold text-slate-900">Reglas de acceso</legend>
-
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="plan-access-scope">
-                    Sucursales
-                  </label>
-                  <select
-                    className={fieldClassName}
-                    id="plan-access-scope"
-                    value={form.accessScope}
-                    onChange={(event) => setForm({ ...form, accessScope: event.target.value as GymAccessScope })}
-                  >
-                    <option value="all">Todas las sucursales</option>
-                    <option value="home">Solo la sucursal donde se vende</option>
-                    <option value="list">Sucursales específicas</option>
-                  </select>
-                  {form.accessScope === 'list' && (
-                    <div className="mt-3 max-h-40 space-y-2 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50 p-3">
-                      {organizationGyms.length > 0 ? organizationGyms.map((gym) => (
-                        <label className="flex items-center gap-3 rounded-md bg-white px-3 py-2 text-sm text-slate-700" key={gym.id}>
-                          <input
-                            className="h-4 w-4 accent-green-500"
-                            type="checkbox"
-                            checked={form.gymIds.includes(gym.id)}
-                            onChange={(event) => setForm({
-                              ...form,
-                              gymIds: event.target.checked ? [...form.gymIds, gym.id] : form.gymIds.filter((id) => id !== gym.id),
-                            })}
-                          />
-                          {gym.name}
-                        </label>
-                      )) : (
-                        <p className="text-sm text-slate-500">No hay sucursales disponibles.</p>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                <div>
-                  <label className="flex items-center gap-3 text-sm font-medium text-slate-700" htmlFor="plan-has-schedule">
-                    <input
-                      className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
-                      id="plan-has-schedule"
-                      type="checkbox"
-                      checked={form.hasSchedule}
-                      onChange={(event) => setForm({ ...form, hasSchedule: event.target.checked })}
-                    />
-                    Limitar el horario de entrada
-                  </label>
-                  {form.hasSchedule && (
-                    <div className="mt-3 grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="mb-1 block text-xs font-medium text-slate-600" htmlFor="plan-start-time">Desde</label>
-                        <input
-                          className={fieldClassName}
-                          id="plan-start-time"
-                          type="time"
-                          value={form.startTime}
-                          onChange={(event) => setForm({ ...form, startTime: event.target.value })}
-                          required
-                        />
-                      </div>
-                      <div>
-                        <label className="mb-1 block text-xs font-medium text-slate-600" htmlFor="plan-end-time">Hasta</label>
-                        <input
-                          className={fieldClassName}
-                          id="plan-end-time"
-                          type="time"
-                          value={form.endTime}
-                          onChange={(event) => setForm({ ...form, endTime: event.target.value })}
-                          required
-                        />
-                      </div>
-                      <p className="col-span-2 text-xs text-slate-500">
-                        Hora local de cada sucursal. Si la hora de salida es menor que la de entrada, el horario cruza la medianoche. La salida del gimnasio siempre se permite.
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="plan-required-document">
-                    Documento requerido
-                  </label>
-                  <select
-                    className={fieldClassName}
-                    id="plan-required-document"
-                    value={form.requiredDocument}
-                    onChange={(event) => setForm({ ...form, requiredDocument: event.target.value as PlanRules['requiredDocument'] })}
-                  >
-                    <option value="">Ninguno</option>
-                    <option value="student_id">Credencial de estudiante</option>
-                  </select>
-                  {form.requiredDocument && (
-                    <p className="mt-2 text-xs text-slate-500">
-                      Se puede vender sin el documento; el acceso se niega hasta que esté verificado y vigente.
-                    </p>
-                  )}
-                </div>
-              </fieldset>
-
-              <label className="flex items-center gap-3 text-sm font-medium text-slate-700" htmlFor="plan-auto-renew">
-                <input
-                  className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
-                  id="plan-auto-renew"
-                  type="checkbox"
-                  checked={form.autoRenew}
-                  onChange={(event) => setForm({ ...form, autoRenew: event.target.checked })}
-                />
-                Renovación Automática
-              </label>
+            <fieldset className="space-y-4 rounded-xl border border-slate-200 p-4">
+              <legend className="px-1 text-sm font-semibold text-ink">Reglas de acceso</legend>
 
               <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="plan-specifications">
-                  Especificaciones
+                <label className={labelClass} htmlFor="plan-access-scope">Sucursales</label>
+                <select
+                  className={fieldClass}
+                  id="plan-access-scope"
+                  value={form.accessScope}
+                  onChange={(event) => setForm({ ...form, accessScope: event.target.value as GymAccessScope })}
+                >
+                  <option value="all">Todas las sucursales</option>
+                  <option value="home">Solo la sucursal donde se vende</option>
+                  <option value="list">Sucursales específicas</option>
+                </select>
+                {form.accessScope === 'list' && (
+                  organizationGyms.length > 0 ? (
+                    <div className="mt-3 flex max-h-40 flex-wrap gap-2 overflow-y-auto">
+                      {organizationGyms.map((gym) => {
+                        const isChecked = form.gymIds.includes(gym.id)
+                        return (
+                          <label
+                            className={`inline-flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand/40 ${isChecked ? 'border-brand-text/30 bg-brand-soft font-medium text-brand-ink' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}
+                            key={gym.id}
+                          >
+                            <input
+                              className="sr-only"
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={(event) => setForm({
+                                ...form,
+                                gymIds: event.target.checked ? [...form.gymIds, gym.id] : form.gymIds.filter((id) => id !== gym.id),
+                              })}
+                            />
+                            {isChecked && <Check size={13} aria-hidden />}
+                            {gym.name}
+                          </label>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <p className="mt-3 rounded-xl border border-dashed border-slate-200 px-4 py-3 text-sm text-slate-500">No hay sucursales disponibles.</p>
+                  )
+                )}
+              </div>
+
+              <div>
+                <label className="flex items-center justify-between gap-4" htmlFor="plan-has-schedule">
+                  <span className="text-sm font-medium text-slate-700">Limitar el horario de entrada</span>
+                  <input
+                    className="h-5 w-5 accent-brand-text"
+                    id="plan-has-schedule"
+                    type="checkbox"
+                    checked={form.hasSchedule}
+                    onChange={(event) => setForm({ ...form, hasSchedule: event.target.checked })}
+                  />
                 </label>
-                <textarea
-                  className="min-h-24 w-full resize-y rounded-lg border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
-                  id="plan-specifications"
-                  value={specificationsText}
-                  onChange={(event) => setSpecificationsText(event.target.value)}
-                  placeholder="Acceso 24/7, Regaderas, App"
-                  rows={3}
-                />
-                <p className="mt-2 text-xs text-slate-500">
-                  Separadas por comas (ej. Acceso 24/7, Regaderas, App)
-                </p>
+                {form.hasSchedule && (
+                  <div className="mt-3 grid grid-cols-2 gap-3">
+                    <div>
+                      <label className={labelClass} htmlFor="plan-start-time">Desde</label>
+                      <input
+                        className={fieldClass}
+                        id="plan-start-time"
+                        type="time"
+                        value={form.startTime}
+                        onChange={(event) => setForm({ ...form, startTime: event.target.value })}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className={labelClass} htmlFor="plan-end-time">Hasta</label>
+                      <input
+                        className={fieldClass}
+                        id="plan-end-time"
+                        type="time"
+                        value={form.endTime}
+                        onChange={(event) => setForm({ ...form, endTime: event.target.value })}
+                        required
+                      />
+                    </div>
+                    <p className="col-span-2 text-xs text-slate-500">
+                      Hora local de cada sucursal. Si la hora de salida es menor que la de entrada, el horario cruza la medianoche. La salida del gimnasio siempre se permite.
+                    </p>
+                  </div>
+                )}
               </div>
 
-              {modalError && (
-                <p className="border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
-                  {modalError}
-                </p>
-              )}
-
-              <div className="flex justify-end gap-3 pt-2">
-                <button
-                  className="rounded-lg px-4 py-2 font-medium text-slate-600 transition hover:bg-slate-100 disabled:opacity-50"
-                  type="button"
-                  onClick={closeModal}
-                  disabled={isSubmitting}
+              <div>
+                <label className={labelClass} htmlFor="plan-required-document">Documento requerido</label>
+                <select
+                  className={fieldClass}
+                  id="plan-required-document"
+                  value={form.requiredDocument}
+                  onChange={(event) => setForm({ ...form, requiredDocument: event.target.value as PlanRules['requiredDocument'] })}
                 >
-                  Cancelar
-                </button>
-                <button
-                  className="rounded-lg bg-brand px-4 py-2 font-medium text-ink transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
-                  type="submit"
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting ? 'Guardando...' : editingPlan ? 'Actualizar' : 'Guardar'}
-                </button>
+                  <option value="">Ninguno</option>
+                  <option value="student_id">Credencial de estudiante</option>
+                </select>
+                {form.requiredDocument && (
+                  <p className={hintClass}>Se puede vender sin el documento; el acceso se niega hasta que esté verificado y vigente.</p>
+                )}
               </div>
-            </form>
-          </div>
-        </div>
+            </fieldset>
+
+            <div>
+              <label className={labelClass} htmlFor="plan-specifications">Especificaciones</label>
+              <textarea
+                className={`${fieldClass} min-h-24 resize-y`}
+                id="plan-specifications"
+                value={specificationsText}
+                onChange={(event) => setSpecificationsText(event.target.value)}
+                placeholder="Acceso 24/7, Regaderas, App"
+                rows={3}
+                aria-describedby="plan-specifications-hint"
+              />
+              <p className={hintClass} id="plan-specifications-hint">Separadas por comas. Se muestran en la tarjeta del plan.</p>
+            </div>
+
+            <label className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 px-4 py-3" htmlFor="plan-auto-renew">
+              <span className="text-sm font-medium text-ink">Renovación automática</span>
+              <input
+                className="h-5 w-5 accent-brand-text"
+                id="plan-auto-renew"
+                type="checkbox"
+                checked={form.autoRenew}
+                onChange={(event) => setForm({ ...form, autoRenew: event.target.checked })}
+              />
+            </label>
+
+            {modalError && <p className={errorAlert} role="alert">{modalError}</p>}
+
+            <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
+              <button className={secondaryButton} type="button" onClick={closeModal} disabled={isSubmitting}>Cancelar</button>
+              <button className={primaryButton} type="submit" disabled={isSubmitting}>
+                {isSubmitting ? 'Guardando...' : editingPlan ? 'Guardar cambios' : 'Crear plan'}
+              </button>
+            </div>
+          </form>
+        </Modal>
       )}
     </section>
   )

@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Printer } from 'lucide-react'
+import { Printer, Wallet } from 'lucide-react'
 import { enrollClient } from '../services/api'
 import type { ActivationCode } from '../services/api'
 import type { User } from '../types'
 import GymSelect from './GymSelect'
+import Modal from './ui/Modal'
+import { errorAlert, fieldClass, hintClass, labelClass, primaryButton, secondaryButton } from './ui/styles'
 import { useAuth } from '../store/useAuth'
 import { targetGymField } from '../utils/targetGym'
 
@@ -24,8 +26,6 @@ interface ClientEnrollmentModalProps {
   onEnrolled: (user: User) => void
   onClose: () => void
 }
-
-const inputClassName = 'w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100'
 
 const TRAINING_DAYS = [
   { label: 'L', name: 'Lunes', value: 1 },
@@ -143,123 +143,104 @@ function ClientEnrollmentModal({ initialOutcome = null, coaches = [], onEnrolled
     else if (current.linkedExisting) summary = 'Ya tenía cuenta GymGo: quedó registrada como cliente y verá un aviso en su app. Inicia sesión con su contraseña de siempre.'
 
     return (
-      <div className="mt-6 space-y-5">
-        <div>
-          <p className="font-medium text-slate-900">{current.client.name}</p>
-          <p className="text-sm text-slate-500">{current.client.email}</p>
+      <div className="space-y-5">
+        <div className="flex items-center gap-3">
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-slate-100 text-sm font-semibold text-slate-600" aria-hidden>
+            {current.client.name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toLocaleUpperCase()).join('')}
+          </span>
+          <div className="min-w-0">
+            <p className="truncate font-semibold text-ink">{current.client.name}</p>
+            <p className="truncate text-sm text-slate-500">{current.client.email}</p>
+          </div>
         </div>
-        <p className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">{summary}</p>
+        <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">{summary}</p>
 
         {activation && (
-          <div className="rounded-xl border border-green-200 bg-green-50 px-6 py-5 text-center">
-            <p className="text-xs font-medium uppercase tracking-[0.2em] text-green-800">Código de activación</p>
-            <p className="mt-2 select-all font-mono text-4xl font-semibold tracking-[0.25em] text-slate-900">{activation.code}</p>
-            <p className="mt-2 text-sm text-slate-600">
+          <div className="relative overflow-hidden rounded-card bg-ink px-6 py-6 text-center text-white">
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_85%_15%,rgba(16,255,133,0.25),transparent_55%)]" aria-hidden="true" />
+            <p className="relative text-xs font-semibold uppercase tracking-[0.2em] text-brand">Código de activación</p>
+            <p className="relative mt-3 select-all font-mono text-4xl font-semibold tracking-[0.25em] tabular">{activation.code}</p>
+            <p className="relative mt-3 text-sm text-slate-300">
               Válido hasta el {formatDate(activation.expiresAt)}. Solo se muestra ahora: imprímelo o díctaselo al cliente.
             </p>
           </div>
         )}
 
-        {error && <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">{error}</p>}
+        {error && <p className={errorAlert} role="alert">{error}</p>}
 
-        <div className="flex flex-wrap justify-end gap-3">
+        <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:flex-wrap sm:justify-end">
+          <button className={secondaryButton} type="button" onClick={onClose}>Listo</button>
           {activation && (
-            <button
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 font-medium text-slate-700 transition hover:bg-slate-50"
-              type="button"
-              onClick={() => handlePrint(activation)}
-            >
-              <Printer size={16} aria-hidden="true" /> Imprimir
+            <button className={secondaryButton} type="button" onClick={() => handlePrint(activation)}>
+              <Printer size={16} aria-hidden /> Imprimir
             </button>
           )}
           {current.client.id && (
-            <Link
-              className="rounded-lg bg-brand px-4 py-2 font-medium text-ink transition hover:bg-brand-hover"
-              to={`/caja?cliente=${encodeURIComponent(current.client.id)}`}
-            >
-              Cobrar membresía
+            <Link className={primaryButton} to={`/caja?cliente=${encodeURIComponent(current.client.id)}`}>
+              <Wallet size={16} aria-hidden /> Cobrar membresía
             </Link>
           )}
-          <button
-            className="rounded-lg border border-slate-200 bg-white px-4 py-2 font-medium text-slate-700 transition hover:bg-slate-50"
-            type="button"
-            onClick={onClose}
-          >
-            Listo
-          </button>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4 backdrop-blur-sm">
-      <div className="max-h-[90vh] w-full max-w-2xl animate-pop-in overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-sm font-medium uppercase tracking-[0.2em] text-emerald-700">Clientes</p>
-            <h2 className="mt-2 text-2xl font-semibold text-slate-900">
-              {outcome ? 'Código de activación' : 'Registrar cliente'}
-            </h2>
-          </div>
-          <button
-            className="text-2xl leading-none text-slate-400 transition hover:text-slate-700"
-            type="button"
-            aria-label="Cerrar"
-            onClick={() => { if (!isSubmitting) onClose() }}
-          >
-            ×
-          </button>
-        </div>
-
-        {outcome ? renderOutcome(outcome) : (
-          <form className="mt-6 space-y-5" onSubmit={handleSubmit}>
-            <p className="text-sm text-slate-500">
-              Da de alta al cliente con su perfil. Puedes cobrar la membresía enseguida; la cuenta se activa después en la app con el código.
-            </p>
-            <div className="grid gap-5 sm:grid-cols-2">
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="enroll-name">Nombre</label>
-                <input
-                  className={inputClassName}
-                  id="enroll-name"
-                  type="text"
-                  value={form.name}
-                  onChange={(event) => setForm({ ...form, name: event.target.value })}
-                  minLength={2}
-                  maxLength={100}
-                  required
-                />
-              </div>
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="enroll-last-name">Apellidos</label>
-                <input
-                  className={inputClassName}
-                  id="enroll-last-name"
-                  type="text"
-                  value={form.lastName}
-                  onChange={(event) => setForm({ ...form, lastName: event.target.value })}
-                  maxLength={50}
-                />
-              </div>
+    <Modal
+      eyebrow="Clientes"
+      title={outcome ? 'Código de activación' : 'Registrar cliente'}
+      onClose={() => { if (!isSubmitting) onClose() }}
+      size={outcome ? 'lg' : 'xl'}
+    >
+      {outcome ? renderOutcome(outcome) : (
+        <form className="space-y-5" onSubmit={handleSubmit}>
+          <p className="-mt-1 text-sm text-slate-500">
+            Da de alta al cliente con su perfil. Puedes cobrar la membresía enseguida; la cuenta se activa después en la app con el código.
+          </p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className={labelClass} htmlFor="enroll-name">Nombre</label>
+              <input
+                className={fieldClass}
+                id="enroll-name"
+                type="text"
+                value={form.name}
+                onChange={(event) => setForm({ ...form, name: event.target.value })}
+                minLength={2}
+                maxLength={100}
+                required
+              />
             </div>
             <div>
-              <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="enroll-email">Correo electrónico</label>
+              <label className={labelClass} htmlFor="enroll-last-name">Apellidos</label>
               <input
-                className={inputClassName}
+                className={fieldClass}
+                id="enroll-last-name"
+                type="text"
+                value={form.lastName}
+                onChange={(event) => setForm({ ...form, lastName: event.target.value })}
+                maxLength={50}
+              />
+            </div>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className={labelClass} htmlFor="enroll-email">Correo electrónico</label>
+              <input
+                className={fieldClass}
                 id="enroll-email"
                 type="email"
                 autoComplete="off"
                 value={form.email}
                 onChange={(event) => setForm({ ...form, email: event.target.value })}
+                aria-describedby="enroll-email-hint"
                 required
               />
-              <p className="mt-1 text-xs text-slate-500">Si ya usa GymGo en otro gimnasio, se vincula su cuenta sin ver su historial.</p>
             </div>
             <div>
-              <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="enroll-phone">Teléfono (10 dígitos)</label>
+              <label className={labelClass} htmlFor="enroll-phone">Teléfono (10 dígitos)</label>
               <input
-                className={inputClassName}
+                className={fieldClass}
                 id="enroll-phone"
                 type="tel"
                 inputMode="numeric"
@@ -269,125 +250,115 @@ function ClientEnrollmentModal({ initialOutcome = null, coaches = [], onEnrolled
                 required
               />
             </div>
-            <GymSelect id="enroll-gym" label="Sucursal del cliente" value={gymId} onChange={setGymId} />
+          </div>
+          <p className={`${hintClass} -mt-3`} id="enroll-email-hint">Si ya usa GymGo en otro gimnasio, se vincula su cuenta sin ver su historial.</p>
+          <GymSelect id="enroll-gym" label="Sucursal del cliente" value={gymId} onChange={setGymId} />
 
-            <section className="space-y-5 rounded-xl border border-slate-200 bg-slate-50 p-5">
+          <fieldset className="space-y-4 rounded-xl border border-slate-200 p-4">
+            <legend className="px-1 text-sm font-semibold text-ink">
+              Perfil de entrenamiento <span className="font-normal text-slate-400">(opcional)</span>
+            </legend>
+            <p className="-mt-1 text-xs text-slate-500">Si la persona ya tenía cuenta GymGo, su objetivo, nivel y días se conservan.</p>
+            <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <h3 className="text-base font-semibold text-slate-900">Perfil de entrenamiento</h3>
-                <p className="mt-1 text-sm text-slate-500">Opcional. Si la persona ya tenía cuenta GymGo, su objetivo, nivel y días se conservan.</p>
-              </div>
-              <div className="grid gap-5 sm:grid-cols-2">
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="enroll-goal">Objetivo deportivo</label>
-                  <input
-                    className={inputClassName}
-                    id="enroll-goal"
-                    type="text"
-                    placeholder="Ej. Ganar masa, bajar de peso..."
-                    value={form.goal}
-                    onChange={(event) => setForm({ ...form, goal: event.target.value })}
-                    maxLength={120}
-                  />
-                </div>
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="enroll-level">Nivel de experiencia</label>
-                  <select
-                    className={inputClassName}
-                    id="enroll-level"
-                    value={form.experienceLevel}
-                    onChange={(event) => setForm({ ...form, experienceLevel: event.target.value })}
-                  >
-                    <option value="">Sin especificar</option>
-                    <option value="principiante">Principiante</option>
-                    <option value="intermedio">Intermedio</option>
-                    <option value="avanzado">Avanzado</option>
-                  </select>
-                </div>
-              </div>
-              <fieldset>
-                <legend className="mb-2 block text-sm font-medium text-slate-700">Días disponibles</legend>
-                <div className="flex flex-wrap gap-2">
-                  {TRAINING_DAYS.map(({ label, name, value }) => {
-                    const isChecked = form.availableTrainingDays.includes(value)
-                    return (
-                      <label
-                        className={`inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg border text-sm font-medium transition has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand-text ${
-                          isChecked ? 'border-ink bg-ink text-white' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
-                        }`}
-                        key={value}
-                        title={name}
-                      >
-                        <input
-                          className="sr-only"
-                          type="checkbox"
-                          aria-label={name}
-                          checked={isChecked}
-                          onChange={(event) => setForm((current) => ({
-                            ...current,
-                            availableTrainingDays: event.target.checked
-                              ? [...current.availableTrainingDays, value]
-                              : current.availableTrainingDays.filter((day) => day !== value),
-                          }))}
-                        />
-                        {label}
-                      </label>
-                    )
-                  })}
-                </div>
-              </fieldset>
-              {coaches.length > 0 && (
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="enroll-coach">Coach asignado</label>
-                  <select
-                    className={inputClassName}
-                    id="enroll-coach"
-                    value={form.assignedCoach}
-                    onChange={(event) => setForm({ ...form, assignedCoach: event.target.value })}
-                  >
-                    <option value="">Sin coach</option>
-                    {coaches.map((coach) => {
-                      const coachId = coach.id || coach._id || ''
-                      return <option key={coachId} value={coachId}>{coachName(coach)}</option>
-                    })}
-                  </select>
-                </div>
-              )}
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="enroll-notes">Observaciones</label>
-                <textarea
-                  className={`${inputClassName} min-h-[88px] resize-y`}
-                  id="enroll-notes"
-                  placeholder="Lesiones, restricciones, preferencias..."
-                  value={form.observations}
-                  onChange={(event) => setForm({ ...form, observations: event.target.value })}
-                  maxLength={4000}
+                <label className={labelClass} htmlFor="enroll-goal">Objetivo deportivo</label>
+                <input
+                  className={fieldClass}
+                  id="enroll-goal"
+                  type="text"
+                  placeholder="Ej. Ganar masa, bajar de peso..."
+                  value={form.goal}
+                  onChange={(event) => setForm({ ...form, goal: event.target.value })}
+                  maxLength={120}
                 />
               </div>
-            </section>
-
-            {error && <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">{error}</p>}
-
-            <div className="flex justify-end gap-3">
-              <button
-                className="rounded-lg border border-slate-200 bg-white px-4 py-2 font-medium text-slate-700 transition hover:bg-slate-50"
-                type="button"
-                onClick={onClose}
-                disabled={isSubmitting}
-              >
-                Cancelar
-              </button>
-              <button
-                className="rounded-lg bg-brand px-4 py-2 font-medium text-ink transition hover:bg-brand-hover disabled:opacity-50"
-                type="submit"
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? 'Registrando...' : 'Registrar'}
-              </button>
+              <div>
+                <label className={labelClass} htmlFor="enroll-level">Nivel de experiencia</label>
+                <select
+                  className={fieldClass}
+                  id="enroll-level"
+                  value={form.experienceLevel}
+                  onChange={(event) => setForm({ ...form, experienceLevel: event.target.value })}
+                >
+                  <option value="">Sin especificar</option>
+                  <option value="principiante">Principiante</option>
+                  <option value="intermedio">Intermedio</option>
+                  <option value="avanzado">Avanzado</option>
+                </select>
+              </div>
             </div>
-          </form>
-        )}
-      </div>
-    </div>
+            <fieldset>
+              <legend className={labelClass}>Días disponibles</legend>
+              <div className="flex flex-wrap gap-2">
+                {TRAINING_DAYS.map(({ label, name, value }) => {
+                  const isChecked = form.availableTrainingDays.includes(value)
+                  return (
+                    <label
+                      className={`inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl border text-sm font-semibold transition has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand/40 ${
+                        isChecked ? 'border-ink bg-ink text-brand' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                      }`}
+                      key={value}
+                      title={name}
+                    >
+                      <input
+                        className="sr-only"
+                        type="checkbox"
+                        aria-label={name}
+                        checked={isChecked}
+                        onChange={(event) => setForm((current) => ({
+                          ...current,
+                          availableTrainingDays: event.target.checked
+                            ? [...current.availableTrainingDays, value]
+                            : current.availableTrainingDays.filter((day) => day !== value),
+                        }))}
+                      />
+                      {label}
+                    </label>
+                  )
+                })}
+              </div>
+            </fieldset>
+            {coaches.length > 0 && (
+              <div>
+                <label className={labelClass} htmlFor="enroll-coach">Coach asignado</label>
+                <select
+                  className={fieldClass}
+                  id="enroll-coach"
+                  value={form.assignedCoach}
+                  onChange={(event) => setForm({ ...form, assignedCoach: event.target.value })}
+                >
+                  <option value="">Sin coach</option>
+                  {coaches.map((coach) => {
+                    const coachId = coach.id || coach._id || ''
+                    return <option key={coachId} value={coachId}>{coachName(coach)}</option>
+                  })}
+                </select>
+              </div>
+            )}
+            <div>
+              <label className={labelClass} htmlFor="enroll-notes">Observaciones</label>
+              <textarea
+                className={`${fieldClass} min-h-[88px] resize-y`}
+                id="enroll-notes"
+                placeholder="Lesiones, restricciones, preferencias..."
+                value={form.observations}
+                onChange={(event) => setForm({ ...form, observations: event.target.value })}
+                maxLength={4000}
+              />
+            </div>
+          </fieldset>
+
+          {error && <p className={errorAlert} role="alert">{error}</p>}
+
+          <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
+            <button className={secondaryButton} type="button" onClick={onClose} disabled={isSubmitting}>Cancelar</button>
+            <button className={primaryButton} type="submit" disabled={isSubmitting}>
+              {isSubmitting ? 'Registrando...' : 'Registrar'}
+            </button>
+          </div>
+        </form>
+      )}
+    </Modal>
   )
 }
 

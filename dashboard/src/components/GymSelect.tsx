@@ -1,4 +1,5 @@
 import { useAuth } from '../store/useAuth'
+import { fieldClass, labelClass } from './ui/styles'
 
 interface GymSelectProps {
   id: string
@@ -15,11 +16,11 @@ function GymSelect({ id, label = 'Sucursal', value, onChange }: GymSelectProps) 
 
   return (
     <div>
-      <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor={id}>
+      <label className={labelClass} htmlFor={id}>
         {label}
       </label>
       <select
-        className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
+        className={fieldClass}
         id={id}
         value={value}
         onChange={(event) => onChange(event.target.value)}

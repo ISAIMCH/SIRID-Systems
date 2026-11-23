@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Eye, EyeOff, History, Send, ShieldCheck, X } from 'lucide-react'
+import { Dumbbell, Eye, EyeOff, History, ListChecks, Send, ShieldCheck, Share2 } from 'lucide-react'
 import GymSelect from './GymSelect'
 import {
   getHistoryAccessLogs,
@@ -14,12 +14,17 @@ import {
 import { socket } from '../services/socket'
 import { useAuth } from '../store/useAuth'
 import { targetGymField } from '../utils/targetGym'
+import Drawer from './ui/Drawer'
+import Panel from './ui/Panel'
+import Badge, { type BadgeTone } from './ui/Badge'
+import EmptyState from './ui/EmptyState'
+import { errorAlert, primaryButton, secondaryButton, tableHeadClass, tdClass, thClass } from './ui/styles'
 
-const STATUS_COPY: Record<HistoryShareStatus, { label: string; tone: string }> = {
-  pending: { label: 'Esperando respuesta del cliente', tone: 'bg-amber-50 text-amber-800 border-amber-200' },
-  approved: { label: 'Compartido', tone: 'bg-emerald-50 text-emerald-800 border-emerald-200' },
-  rejected: { label: 'Rechazado por el cliente', tone: 'bg-slate-100 text-slate-700 border-slate-200' },
-  revoked: { label: 'Revocado por el cliente', tone: 'bg-red-50 text-red-800 border-red-200' },
+const STATUS_COPY: Record<HistoryShareStatus, { label: string; tone: BadgeTone }> = {
+  pending: { label: 'Esperando respuesta', tone: 'warning' },
+  approved: { label: 'Compartido', tone: 'success' },
+  rejected: { label: 'Rechazado por el cliente', tone: 'neutral' },
+  revoked: { label: 'Revocado por el cliente', tone: 'danger' },
 }
 
 const SECTION_LABELS = { workouts: 'entrenamientos', routines: 'rutinas', sensitive: 'datos sensibles' } as const
@@ -117,167 +122,150 @@ function ClientHistoryPanel({ client, canSeeLogs, onClose }: ClientHistoryPanelP
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/50" role="dialog" aria-modal="true" aria-labelledby="history-title">
-      <div className="flex h-full w-full max-w-3xl flex-col overflow-y-auto bg-canvas shadow-xl">
-        <header className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-slate-200 bg-white px-6 py-5">
-          <div>
-            <p className="text-xs font-medium uppercase tracking-[0.2em] text-slate-500">Historial compartido</p>
-            <h2 className="mt-1 text-2xl font-semibold text-slate-900" id="history-title">{client.name}</h2>
-            <p className="mt-1 text-sm text-slate-500">Entrenamientos y rutinas de todos los gimnasios del cliente, solo mientras él lo autorice.</p>
+    <Drawer
+      eyebrow="Historial compartido"
+      title={client.name}
+      description="Entrenamientos y rutinas de todos los gimnasios del cliente, solo mientras él lo autorice."
+      onClose={onClose}
+    >
+      {error && <p className={errorAlert} role="alert">{error}</p>}
+
+      <Panel title="Solicitudes" icon={Share2}>
+        {isLoading ? (
+          <div className="skeleton h-16 w-full" />
+        ) : shares.length === 0 ? (
+          <p className="text-sm text-slate-500">Aún no le has pedido su historial a este cliente.</p>
+        ) : (
+          <ul className="-my-3 divide-y divide-slate-100">
+            {shares.map((share) => (
+              <li className="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between" key={share.id}>
+                <div className="min-w-0 text-sm">
+                  <p className="font-medium text-ink">{share.gym.name ?? 'Sucursal'}</p>
+                  <p className="text-slate-500">
+                    Solicitado el {formatDate(share.requestedAt)}{share.requestedBy?.name ? ` por ${share.requestedBy.name}` : ''}
+                    {share.status === 'approved' && (share.includeSensitive ? ' · incluye datos sensibles' : ' · sin datos sensibles')}
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-3">
+                  <Badge tone={STATUS_COPY[share.status].tone}>{STATUS_COPY[share.status].label}</Badge>
+                  {share.status === 'approved' && (
+                    <button className={`${primaryButton} min-h-[36px] px-3 py-1.5`} type="button" onClick={() => void openHistory(share)} disabled={isOpening}>
+                      <Eye size={15} aria-hidden /> {isOpening ? 'Abriendo...' : 'Ver historial'}
+                    </button>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {!isLoading && (
+          <div className="mt-4 flex flex-col gap-3 border-t border-slate-100 pt-4 sm:flex-row sm:items-end">
+            {isAllGyms && (
+              <div className="sm:w-64">
+                <GymSelect id="history-gym" label="Sucursal que solicita" value={gymId} onChange={setGymId} />
+              </div>
+            )}
+            <button
+              className={secondaryButton}
+              type="button"
+              onClick={() => void handleRequest()}
+              disabled={isRequesting || !canRequest}
+              title={canRequest ? undefined : 'Esta sucursal ya tiene una solicitud pendiente o aprobada.'}
+            >
+              <Send size={15} aria-hidden /> {isRequesting ? 'Enviando...' : 'Solicitar historial'}
+            </button>
+            <p className="text-xs text-slate-500 sm:ml-1 sm:self-center">El cliente decide en su app si lo comparte.</p>
           </div>
-          <button className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900" type="button" aria-label="Cerrar" onClick={onClose}>
-            <X size={20} />
-          </button>
-        </header>
+        )}
+      </Panel>
 
-        <div className="space-y-6 px-6 py-6">
-          {error && <p className="rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">{error}</p>}
+      {history ? (
+        <>
+          {history.sensitive ? (
+            <section className="rounded-card border border-amber-200 bg-amber-50 p-5 sm:p-6">
+              <h3 className="flex items-center gap-2 text-base font-semibold text-amber-900"><ShieldCheck size={18} aria-hidden /> Datos sensibles</h3>
+              <dl className="mt-4 grid gap-4 text-sm sm:grid-cols-3">
+                <div><dt className="text-amber-800">Peso</dt><dd className="mt-0.5 font-display text-2xl font-bold text-ink tabular">{history.sensitive.weightKg ? `${history.sensitive.weightKg} kg` : '—'}</dd></div>
+                <div><dt className="text-amber-800">Estatura</dt><dd className="mt-0.5 font-display text-2xl font-bold text-ink tabular">{history.sensitive.heightCm ? `${history.sensitive.heightCm} cm` : '—'}</dd></div>
+                <div className="sm:col-span-3"><dt className="text-amber-800">Lesiones o restricciones</dt><dd className="mt-0.5 text-ink">{history.sensitive.restrictions || 'Sin registrar'}</dd></div>
+              </dl>
+            </section>
+          ) : (
+            <p className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-4 text-sm text-slate-500">
+              <EyeOff size={16} aria-hidden /> El cliente no comparte sus medidas ni lesiones.
+            </p>
+          )}
 
-          <section className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
-            <h3 className="font-semibold text-slate-900">Solicitudes</h3>
-            {isLoading ? (
-              <div className="mt-4 h-16 animate-pulse rounded-lg bg-slate-100" />
-            ) : shares.length === 0 ? (
-              <p className="mt-2 text-sm text-slate-500">Aún no le has pedido su historial a este cliente.</p>
+          <Panel title="Entrenamientos" icon={Dumbbell} description={`${history.workouts.length} registrado${history.workouts.length === 1 ? '' : 's'}`}>
+            {history.workouts.length === 0 ? (
+              <EmptyState icon={Dumbbell} title="Sin entrenamientos registrados" />
             ) : (
-              <ul className="mt-4 divide-y divide-slate-100">
-                {shares.map((share) => (
-                  <li className="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between" key={share.id}>
-                    <div className="text-sm">
-                      <p className="font-medium text-slate-900">{share.gym.name ?? 'Sucursal'}</p>
-                      <p className="text-slate-500">
-                        Solicitado el {formatDate(share.requestedAt)}{share.requestedBy?.name ? ` por ${share.requestedBy.name}` : ''}
-                        {share.status === 'approved' && (share.includeSensitive ? ' · incluye datos sensibles' : ' · sin datos sensibles')}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className={`rounded-full border px-3 py-0.5 text-xs font-medium ${STATUS_COPY[share.status].tone}`}>{STATUS_COPY[share.status].label}</span>
-                      {share.status === 'approved' && (
-                        <button
-                          className="inline-flex items-center gap-2 rounded-lg bg-ink px-3 py-1.5 text-sm font-medium text-white transition hover:bg-slate-800 disabled:opacity-50"
-                          type="button"
-                          onClick={() => void openHistory(share)}
-                          disabled={isOpening}
-                        >
-                          <Eye size={15} aria-hidden="true" /> {isOpening ? 'Abriendo...' : 'Ver historial'}
-                        </button>
-                      )}
-                    </div>
+              <div className="-mx-5 overflow-x-auto sm:-mx-6">
+                <table className="min-w-full text-left text-sm">
+                  <thead className={tableHeadClass}>
+                    <tr>
+                      <th className={thClass}>Fecha</th>
+                      <th className={thClass}>Rutina</th>
+                      <th className={thClass}>Gimnasio</th>
+                      <th className={`${thClass} text-right`}>Duración</th>
+                      <th className={`${thClass} text-right`}>Volumen</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-slate-700">
+                    {history.workouts.map((workout) => (
+                      <tr key={workout._id}>
+                        <td className={`${tdClass} whitespace-nowrap tabular`}>{formatDate(workout.completedAt)}</td>
+                        <td className={`${tdClass} font-medium text-ink`}>{workout.routineTitle}</td>
+                        <td className={`${tdClass} text-slate-500`}>{origin(workout)}</td>
+                        <td className={`${tdClass} whitespace-nowrap text-right tabular`}>{workout.durationMinutes} min</td>
+                        <td className={`${tdClass} whitespace-nowrap text-right tabular`}>{Math.round(workout.totalVolumeKg).toLocaleString('es-MX')} kg</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Panel>
+
+          <Panel title="Rutinas" icon={ListChecks} description={`${history.routines.length} asignada${history.routines.length === 1 ? '' : 's'}`}>
+            {history.routines.length === 0 ? (
+              <EmptyState icon={ListChecks} title="Sin rutinas asignadas" />
+            ) : (
+              <ul className="-my-2 divide-y divide-slate-100 text-sm">
+                {history.routines.map((routine, index) => (
+                  <li className="flex flex-col gap-1 py-2.5 sm:flex-row sm:justify-between" key={routine.id ?? routine._id ?? index}>
+                    <span className="font-medium text-ink">{routine.title}{routine.goal ? <span className="font-normal text-slate-500"> · {routine.goal}</span> : null}</span>
+                    <span className="text-slate-500">{origin(routine)}</span>
                   </li>
                 ))}
               </ul>
             )}
+          </Panel>
+        </>
+      ) : approved && !isLoading ? (
+        <p className="rounded-xl border border-dashed border-slate-200 bg-white px-5 py-6 text-center text-sm text-slate-500">
+          Abrir el historial queda registrado en la bitácora que el cliente puede consultar.
+        </p>
+      ) : null}
 
-            {!isLoading && (
-              <div className="mt-4 flex flex-col gap-3 border-t border-slate-100 pt-4 sm:flex-row sm:items-end">
-                <div className="sm:w-64">
-                  <GymSelect id="history-gym" label="Sucursal que solicita" value={gymId} onChange={setGymId} />
-                </div>
-                <button
-                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-                  type="button"
-                  onClick={() => void handleRequest()}
-                  disabled={isRequesting || !canRequest}
-                  title={canRequest ? undefined : 'Esta sucursal ya tiene una solicitud pendiente o aprobada.'}
-                >
-                  <Send size={15} aria-hidden="true" /> {isRequesting ? 'Enviando...' : 'Solicitar historial'}
-                </button>
-                <p className="text-xs text-slate-500 sm:ml-2">El cliente decide en su app si lo comparte.</p>
-              </div>
-            )}
-          </section>
-
-          {history ? (
-            <>
-              {history.sensitive ? (
-                <section className="rounded-xl border border-amber-200 bg-amber-50 p-5">
-                  <h3 className="flex items-center gap-2 font-semibold text-amber-900"><ShieldCheck size={18} aria-hidden="true" /> Datos sensibles</h3>
-                  <dl className="mt-3 grid gap-4 text-sm sm:grid-cols-3">
-                    <div><dt className="text-amber-800">Peso</dt><dd className="font-semibold text-slate-900">{history.sensitive.weightKg ? `${history.sensitive.weightKg} kg` : '—'}</dd></div>
-                    <div><dt className="text-amber-800">Estatura</dt><dd className="font-semibold text-slate-900">{history.sensitive.heightCm ? `${history.sensitive.heightCm} cm` : '—'}</dd></div>
-                    <div className="sm:col-span-3"><dt className="text-amber-800">Lesiones o restricciones</dt><dd className="text-slate-900">{history.sensitive.restrictions || 'Sin registrar'}</dd></div>
-                  </dl>
-                </section>
-              ) : (
-                <p className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-4 text-sm text-slate-500">
-                  <EyeOff size={16} aria-hidden="true" /> El cliente no comparte sus medidas ni lesiones.
-                </p>
-              )}
-
-              <section className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
-                <h3 className="font-semibold text-slate-900">Entrenamientos ({history.workouts.length})</h3>
-                {history.workouts.length === 0 ? (
-                  <p className="mt-2 text-sm text-slate-500">Sin entrenamientos registrados.</p>
-                ) : (
-                  <div className="mt-4 overflow-x-auto">
-                    <table className="min-w-full text-left text-sm">
-                      <thead className="border-b border-slate-100 text-xs uppercase tracking-wider text-slate-500">
-                        <tr>
-                          <th className="py-2 pr-4 font-medium">Fecha</th>
-                          <th className="py-2 pr-4 font-medium">Rutina</th>
-                          <th className="py-2 pr-4 font-medium">Gimnasio</th>
-                          <th className="py-2 pr-4 font-medium">Duración</th>
-                          <th className="py-2 font-medium">Volumen</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 text-slate-700">
-                        {history.workouts.map((workout) => (
-                          <tr key={workout._id}>
-                            <td className="whitespace-nowrap py-2 pr-4">{formatDate(workout.completedAt)}</td>
-                            <td className="py-2 pr-4 font-medium text-slate-900">{workout.routineTitle}</td>
-                            <td className="py-2 pr-4 text-slate-500">{origin(workout)}</td>
-                            <td className="whitespace-nowrap py-2 pr-4">{workout.durationMinutes} min</td>
-                            <td className="whitespace-nowrap py-2">{Math.round(workout.totalVolumeKg)} kg</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </section>
-
-              <section className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
-                <h3 className="font-semibold text-slate-900">Rutinas ({history.routines.length})</h3>
-                {history.routines.length === 0 ? (
-                  <p className="mt-2 text-sm text-slate-500">Sin rutinas asignadas.</p>
-                ) : (
-                  <ul className="mt-3 divide-y divide-slate-100 text-sm">
-                    {history.routines.map((routine, index) => (
-                      <li className="flex flex-col gap-1 py-2 sm:flex-row sm:justify-between" key={routine.id ?? routine._id ?? index}>
-                        <span className="font-medium text-slate-900">{routine.title}{routine.goal ? <span className="font-normal text-slate-500"> · {routine.goal}</span> : null}</span>
-                        <span className="text-slate-500">{origin(routine)}</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </section>
-            </>
-          ) : approved && !isLoading ? (
-            <p className="rounded-xl border border-dashed border-slate-200 bg-white px-5 py-6 text-center text-sm text-slate-500">
-              Abrir el historial queda registrado en la bitácora que el cliente puede consultar.
-            </p>
-          ) : null}
-
-          {canSeeLogs && (
-            <section className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
-              <h3 className="flex items-center gap-2 font-semibold text-slate-900"><History size={18} aria-hidden="true" /> Bitácora de consultas</h3>
-              {logs.length === 0 ? (
-                <p className="mt-2 text-sm text-slate-500">Nadie ha consultado el historial compartido de este cliente.</p>
-              ) : (
-                <ul className="mt-3 divide-y divide-slate-100 text-sm">
-                  {logs.map((log) => (
-                    <li className="flex flex-col gap-1 py-2 sm:flex-row sm:justify-between" key={log.id}>
-                      <span><span className="font-medium text-slate-900">{log.viewer.name ?? 'Personal'}</span> <span className="text-slate-500">· {log.gym.name} · {log.sections.map((section) => SECTION_LABELS[section]).join(', ')}</span></span>
-                      <span className="text-slate-500">{formatDate(log.createdAt, true)}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
+      {canSeeLogs && (
+        <Panel title="Bitácora de consultas" icon={History}>
+          {logs.length === 0 ? (
+            <p className="text-sm text-slate-500">Nadie ha consultado el historial compartido de este cliente.</p>
+          ) : (
+            <ul className="-my-2 divide-y divide-slate-100 text-sm">
+              {logs.map((log) => (
+                <li className="flex flex-col gap-1 py-2.5 sm:flex-row sm:justify-between" key={log.id}>
+                  <span><span className="font-medium text-ink">{log.viewer.name ?? 'Personal'}</span> <span className="text-slate-500">· {log.gym.name} · {log.sections.map((section) => SECTION_LABELS[section]).join(', ')}</span></span>
+                  <span className="whitespace-nowrap text-slate-500 tabular">{formatDate(log.createdAt, true)}</span>
+                </li>
+              ))}
+            </ul>
           )}
-        </div>
-      </div>
-    </div>
+        </Panel>
+      )}
+    </Drawer>
   )
 }
 
