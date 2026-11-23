@@ -1,6 +1,9 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { ArrowRight, MailCheck } from 'lucide-react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+import AuthShell from '../components/AuthShell'
 import OrganizationStatusCard from '../components/OrganizationStatusCard'
+import { errorAlert, fieldClass, labelClass, primaryButton, successAlert } from '../components/ui/styles'
 import {
   blockedOrganization,
   emailNotVerified,
@@ -14,7 +17,6 @@ import { clearOrganizationNotice, readOrganizationNotice } from '../store/organi
 import { useAuth } from '../store/useAuth'
 import { canUseDashboard } from '../utils/access'
 
-const inputClass = 'w-full border border-slate-200 px-4 py-3 text-slate-900 outline-none transition focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100'
 const RESEND_SECONDS = 60
 
 function Login() {
@@ -113,124 +115,100 @@ function Login() {
     }
   }
 
-  const errorBox = error && (
-    <p className="border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
-      {error}
-    </p>
-  )
+  const errorBox = error && <p className={errorAlert} role="alert">{error}</p>
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-canvas px-6 py-12">
-      <section className="w-full max-w-md border border-slate-100 bg-white p-8 shadow-xl shadow-slate-200/60 sm:p-10">
-        {notice ? (
-          <OrganizationStatusCard notice={notice} onBack={() => { clearOrganizationNotice(); setNotice(null); setPassword('') }} />
-        ) : verifying !== null ? (
-          <>
-            <div className="mb-8">
-              <p className="text-xl font-semibold tracking-tight text-ink">GymGo</p>
-              <h1 className="mt-8 text-3xl font-semibold tracking-tight text-slate-900">Confirma tu correo</h1>
-              <p className="mt-2 text-sm text-slate-500">
-                Te enviamos un código de 6 dígitos a <strong className="text-slate-700">{verifying}</strong>. Revisa también la carpeta de spam.
-              </p>
-            </div>
-            <form className="space-y-5" onSubmit={handleVerify} noValidate>
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="verifyCode">Código de verificación</label>
-                <input
-                  className={`${inputClass} text-center font-mono text-2xl tracking-[0.5em]`}
-                  id="verifyCode"
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  maxLength={6}
-                  placeholder="000000"
-                  value={code}
-                  onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
-                  autoFocus
-                  required
-                />
-              </div>
-              {errorBox}
-              {info && <p className="border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-800" role="status">{info}</p>}
-              <button
-                className="w-full bg-brand px-4 py-3 font-semibold text-ink transition hover:bg-brand-hover active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
-                type="submit"
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? 'Confirmando...' : 'Confirmar y entrar'}
-              </button>
-            </form>
-            <div className="mt-6 flex flex-wrap items-center justify-between gap-3 text-sm">
-              <button className="font-medium text-emerald-700 hover:underline disabled:text-slate-400 disabled:no-underline" type="button" onClick={() => void handleResend()} disabled={resendIn > 0}>
-                {resendIn > 0 ? `Reenviar código (${resendIn} s)` : 'Reenviar código'}
-              </button>
-              <button className="text-slate-500 hover:underline" type="button" onClick={() => { setVerifying(null); setError(''); setInfo('') }}>
-                Usar otra cuenta
-              </button>
-            </div>
-          </>
-        ) : (
+    <AuthShell eyebrow="Panel administrativo">
+      {notice ? (
+        <OrganizationStatusCard notice={notice} onBack={() => { clearOrganizationNotice(); setNotice(null); setPassword('') }} />
+      ) : verifying !== null ? (
         <>
-        <div className="mb-8">
-          <p className="text-xl font-semibold tracking-tight text-ink">GymGo</p>
-          <p className="mt-1 text-xs font-medium uppercase tracking-[0.25em] text-emerald-700">
-            Panel administrativo
+          <span className="grid h-11 w-11 place-items-center rounded-xl bg-brand-soft text-brand-text" aria-hidden="true">
+            <MailCheck size={22} />
+          </span>
+          <h1 className="mt-4 font-display text-2xl font-bold tracking-tight text-ink">Confirma tu correo</h1>
+          <p className="mt-2 text-sm leading-6 text-slate-500">
+            Te enviamos un código de 6 dígitos a <strong className="text-slate-700">{verifying}</strong>. Revisa también la carpeta de spam.
           </p>
-          <h1 className="mt-8 text-3xl font-semibold tracking-tight text-slate-900">Bienvenido</h1>
-          <p className="mt-2 text-sm text-slate-500">Accede como administrador o coach.</p>
-        </div>
-
-        <form className="space-y-5" onSubmit={handleSubmit}>
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="email">
-              Correo electrónico
-            </label>
-            <input
-              className={inputClass}
-              id="email"
-              type="email"
-              autoComplete="email"
-              placeholder="admin@gymgo.com"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              required
-            />
+          <form className="mt-6 space-y-5" onSubmit={handleVerify} noValidate>
+            <div>
+              <label className={labelClass} htmlFor="verifyCode">Código de verificación</label>
+              <input
+                className={`${fieldClass} py-3 text-center font-mono text-2xl tracking-[0.5em]`}
+                id="verifyCode"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                maxLength={6}
+                placeholder="000000"
+                value={code}
+                onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                autoFocus
+                required
+              />
+            </div>
+            {errorBox}
+            {info && <p className={successAlert} role="status">{info}</p>}
+            <button className={`${primaryButton} w-full min-h-[44px]`} type="submit" disabled={isSubmitting}>
+              {isSubmitting ? 'Confirmando…' : 'Confirmar y entrar'}
+            </button>
+          </form>
+          <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-5 text-sm">
+            <button className="font-semibold text-brand-text hover:underline disabled:font-medium disabled:text-slate-400 disabled:no-underline" type="button" onClick={() => void handleResend()} disabled={resendIn > 0}>
+              {resendIn > 0 ? <>Reenviar código (<span className="tabular">{resendIn}</span> s)</> : 'Reenviar código'}
+            </button>
+            <button className="text-slate-500 hover:text-ink hover:underline" type="button" onClick={() => { setVerifying(null); setError(''); setInfo('') }}>
+              Usar otra cuenta
+            </button>
           </div>
-
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="password">
-              Contraseña
-            </label>
-            <input
-              className={inputClass}
-              id="password"
-              type="password"
-              autoComplete="current-password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              required
-            />
-          </div>
-
-          {errorBox}
-
-          <button
-            className="w-full bg-brand px-4 py-3 font-semibold text-ink transition hover:bg-brand-hover active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
-            type="submit"
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? 'Validando...' : 'Acceder al Panel'}
-          </button>
-        </form>
-
-        <p className="mt-8 text-center text-sm text-slate-500">
-          ¿Tienes un gimnasio?{' '}
-          <Link className="font-medium text-emerald-700 hover:underline" to="/signup">Regístralo en GymGo</Link>
-        </p>
         </>
-        )}
-      </section>
-    </main>
+      ) : (
+        <>
+          <h1 className="font-display text-2xl font-bold tracking-tight text-ink">Bienvenido de vuelta</h1>
+          <p className="mt-1.5 text-sm text-slate-500">Entra como propietario, gerente, recepción o coach.</p>
+
+          <form className="mt-6 space-y-5" onSubmit={handleSubmit}>
+            <div>
+              <label className={labelClass} htmlFor="email">Correo electrónico</label>
+              <input
+                className={fieldClass}
+                id="email"
+                type="email"
+                autoComplete="email"
+                placeholder="tu@gimnasio.com"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                required
+              />
+            </div>
+
+            <div>
+              <label className={labelClass} htmlFor="password">Contraseña</label>
+              <input
+                className={fieldClass}
+                id="password"
+                type="password"
+                autoComplete="current-password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                required
+              />
+            </div>
+
+            {errorBox}
+
+            <button className={`${primaryButton} w-full min-h-[44px]`} type="submit" disabled={isSubmitting}>
+              {isSubmitting ? 'Validando…' : <>Entrar al panel <ArrowRight size={16} aria-hidden /></>}
+            </button>
+          </form>
+
+          <p className="mt-6 border-t border-slate-100 pt-5 text-center text-sm text-slate-500">
+            ¿Tienes un gimnasio?{' '}
+            <Link className="font-semibold text-brand-text hover:underline" to="/signup">Regístralo en GymGo</Link>
+          </p>
+        </>
+      )}
+    </AuthShell>
   )
 }
 
