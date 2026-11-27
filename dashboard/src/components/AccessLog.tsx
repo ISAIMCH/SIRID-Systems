@@ -18,7 +18,10 @@ const SEARCH_DELAY_MS = 350
 
 function entryDetail(entry: AccessLogEntry) {
   if (entry.event === 'denied') return `${denialTitleForCode(entry.reason?.code)}: ${entry.reason?.message ?? ''}`
-  if (entry.source === 'auto') return 'Salida automática al entrar a otra sucursal'
+  // The API closes a check-in left open: the client entered another gym, or scanned again after 4 hours.
+  if (entry.source === 'auto') {
+    return entry.reason?.code === 'max_stay' ? 'Salida automática: más de 4 h sin registrar la salida' : 'Salida automática al entrar a otra sucursal'
+  }
   if (entry.device) return `Torniquete ${entry.device}`
   if (entry.validatedBy) return `Escaneado por ${entry.validatedBy}`
   return '—'

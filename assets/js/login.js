@@ -11,6 +11,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const safeReturn = returnTo && SAFE_RETURN.test(returnTo) ? returnTo : null;
     const notify = (type, message) => window.siridStatus(status, type, message);
 
+    // The recovery page starts with the email already typed here.
+    document.getElementById('forgotLink').addEventListener('click', (event) => {
+        const email = document.getElementById('email').value.trim();
+        if (email) event.currentTarget.href = `recuperar.html?email=${encodeURIComponent(email)}`;
+    });
+
     if (safeReturn?.startsWith('pagos.html')) {
         document.getElementById('signupLink').href = `registro.html${safeReturn.slice('pagos.html'.length)}`;
     }

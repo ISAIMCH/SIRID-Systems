@@ -6,6 +6,7 @@ import Exercises from './pages/Exercises'
 import Inventory from './pages/Inventory'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
+import ForgotPassword from './pages/ForgotPassword'
 import Overview from './pages/Overview'
 import Promotions from './pages/Promotions'
 import Payments from './pages/Payments'
@@ -104,6 +105,7 @@ function App() {
         <Routes>
           <Route path="login" element={<Login />} />
           <Route path="signup" element={<Signup />} />
+          <Route path="forgot-password" element={<ForgotPassword />} />
           <Route element={<ProtectedRoute />}>
             <Route element={<AdminLayout />}>
               <Route index element={<HomeRoute />} />

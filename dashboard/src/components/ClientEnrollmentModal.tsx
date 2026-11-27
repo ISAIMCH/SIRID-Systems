@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Printer, Wallet } from 'lucide-react'
-import { enrollClient } from '../services/api'
-import type { ActivationCode } from '../services/api'
+import { MailCheck, Printer, Wallet } from 'lucide-react'
+import { cancelClientLink, confirmClientLink, enrollClient, resendClientLinkCode } from '../services/api'
+import type { ActivationCode, ClientEnrollmentResult, ClientLinkRequest } from '../services/api'
+import { connectSocket } from '../services/socket'
 import type { User } from '../types'
 import GymSelect from './GymSelect'
 import Modal from './ui/Modal'
@@ -83,13 +84,132 @@ function printActivationSheet(outcome: EnrollmentOutcome, activation: Activation
   sheet.print()
 }
 
+type PendingLink = { request: ClientLinkRequest; alreadyPending?: boolean; emailSent?: boolean }
+
+// The email already has a GymGo account from another gym: it joins this gym only once its holder agrees, by reading
+// to reception the code we emailed them or by accepting in their app.
+function LinkPendingView({ pending, onLinked, onCancelled, onClose }: {
+  pending: PendingLink
+  onLinked: (result: ClientEnrollmentResult | null) => void
+  onCancelled: () => void
+  onClose: () => void
+}) {
+  const [code, setCode] = useState('')
+  const [busy, setBusy] = useState<'confirm' | 'resend' | 'cancel' | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [info, setInfo] = useState(pending.alreadyPending
+    ? 'Ya había una solicitud pendiente para este correo. Si no le llegó el código, reenvíalo.'
+    : pending.emailSent === false
+      ? 'No pudimos enviar el correo. Reenvía el código o pide que acepte desde su app.'
+      : '')
+  const requestId = pending.request.id
+
+  // The holder may accept or reject in their app while reception waits.
+  useEffect(() => {
+    const socket = connectSocket()
+    const onUpdate = (event: { id: string; status: string }) => {
+      if (event.id !== requestId) return
+      if (event.status === 'accepted') onLinked(null)
+      if (event.status === 'rejected') {
+        setInfo('')
+        setError('La persona rechazó la solicitud desde su app.')
+      }
+    }
+    socket.on('client-link-updated', onUpdate)
+    return () => { socket.off('client-link-updated', onUpdate) }
+  }, [requestId, onLinked])
+
+  async function run(action: 'confirm' | 'resend' | 'cancel') {
+    setError(null)
+    setInfo('')
+    setBusy(action)
+    try {
+      if (action === 'confirm') {
+        onLinked(await confirmClientLink(requestId, code))
+      } else if (action === 'resend') {
+        const result = await resendClientLinkCode(requestId)
+        setCode('')
+        setInfo(result.emailSent ? 'Enviamos un código nuevo a su correo.' : 'No pudimos enviar el correo. Pide que acepte desde su app.')
+      } else {
+        await cancelClientLink(requestId)
+        onCancelled()
+      }
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'No se pudo completar la acción.')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  return (
+    <form className="space-y-5" onSubmit={(event) => { event.preventDefault(); void run('confirm') }}>
+      <div className="flex items-center gap-3">
+        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-amber-50 text-amber-600" aria-hidden>
+          <MailCheck size={20} />
+        </span>
+        <div className="min-w-0">
+          <p className="font-semibold text-ink">Esperando confirmación</p>
+          <p className="truncate text-sm text-slate-500">{pending.request.email}</p>
+        </div>
+      </div>
+      <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+        Este correo ya tiene cuenta de GymGo en otro gimnasio. Para registrarla aquí la persona debe estar de acuerdo:
+        le enviamos un código de 6 dígitos a su correo para que te lo dicte. También puede aceptar desde su app.
+      </p>
+      <div>
+        <label className={labelClass} htmlFor="link-code">Código del correo</label>
+        <input
+          className={`${fieldClass} font-mono text-lg tracking-[0.3em]`}
+          id="link-code"
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          pattern="\d{6}"
+          maxLength={6}
+          value={code}
+          onChange={(event) => setCode(event.target.value.replace(/\D/g, ''))}
+          required
+        />
+      </div>
+      {info && <p className={hintClass}>{info}</p>}
+      {error && <p className={errorAlert} role="alert">{error}</p>}
+      <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:flex-wrap sm:justify-end">
+        <button className={secondaryButton} type="button" onClick={onClose} disabled={busy !== null}>Cerrar</button>
+        <button className={secondaryButton} type="button" onClick={() => void run('cancel')} disabled={busy !== null}>
+          {busy === 'cancel' ? 'Cancelando...' : 'Cancelar solicitud'}
+        </button>
+        <button className={secondaryButton} type="button" onClick={() => void run('resend')} disabled={busy !== null}>
+          {busy === 'resend' ? 'Enviando...' : 'Reenviar código'}
+        </button>
+        <button className={primaryButton} type="submit" disabled={busy !== null || code.length !== 6}>
+          {busy === 'confirm' ? 'Confirmando...' : 'Confirmar'}
+        </button>
+      </div>
+    </form>
+  )
+}
+
 function ClientEnrollmentModal({ initialOutcome = null, coaches = [], onEnrolled, onClose }: ClientEnrollmentModalProps) {
   const { isAllGyms } = useAuth()
   const [form, setForm] = useState(emptyForm)
   const [gymId, setGymId] = useState('')
   const [outcome, setOutcome] = useState<EnrollmentOutcome | null>(initialOutcome)
+  const [pendingLink, setPendingLink] = useState<PendingLink | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  function showLinked(result: ClientEnrollmentResult | null, email: string) {
+    if (result) onEnrolled(result.user)
+    setPendingLink(null)
+    setOutcome({
+      client: {
+        id: result?.user.id || result?.user._id || '',
+        name: result ? [result.user.name, result.user.lastName].filter(Boolean).join(' ') || email : email,
+        email,
+      },
+      activation: null,
+      linkedExisting: true,
+    })
+  }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -108,6 +228,10 @@ function ClientEnrollmentModal({ initialOutcome = null, coaches = [], onEnrolled
         observations: form.observations.trim() || undefined,
         ...targetGymField(isAllGyms, gymId),
       })
+      if (result.linkRequest) {
+        setPendingLink({ request: result.linkRequest, alreadyPending: result.alreadyPending, emailSent: result.emailSent })
+        return
+      }
       onEnrolled(result.user)
       setOutcome({
         client: {
@@ -139,8 +263,8 @@ function ClientEnrollmentModal({ initialOutcome = null, coaches = [], onEnrolled
     const { activation } = current
     let summary = 'Cuenta creada. Entrégale el código para que active su cuenta en la app.'
     if (current.alreadyClient) summary = 'Esta persona ya es cliente de tu gimnasio; no se cambió nada.'
-    else if (current.linkedExisting && activation) summary = 'Esta cuenta aún no se activa. Se generó un código nuevo y el anterior dejó de funcionar.'
-    else if (current.linkedExisting) summary = 'Ya tenía cuenta GymGo: quedó registrada como cliente y verá un aviso en su app. Inicia sesión con su contraseña de siempre.'
+    else if (current.linkedExisting && activation) summary = 'Se generó un código nuevo y el anterior dejó de funcionar.'
+    else if (current.linkedExisting) summary = 'Aceptó la solicitud: quedó registrada como cliente de tu gimnasio. Entra con su contraseña de siempre.'
 
     return (
       <div className="space-y-5">
@@ -188,11 +312,18 @@ function ClientEnrollmentModal({ initialOutcome = null, coaches = [], onEnrolled
   return (
     <Modal
       eyebrow="Clientes"
-      title={outcome ? 'Código de activación' : 'Registrar cliente'}
+      title={pendingLink ? 'Confirmación del cliente' : outcome ? (outcome.activation ? 'Código de activación' : 'Cliente registrado') : 'Registrar cliente'}
       onClose={() => { if (!isSubmitting) onClose() }}
-      size={outcome ? 'lg' : 'xl'}
+      size={outcome || pendingLink ? 'lg' : 'xl'}
     >
-      {outcome ? renderOutcome(outcome) : (
+      {pendingLink ? (
+        <LinkPendingView
+          pending={pendingLink}
+          onLinked={(result) => showLinked(result, pendingLink.request.email)}
+          onCancelled={() => setPendingLink(null)}
+          onClose={onClose}
+        />
+      ) : outcome ? renderOutcome(outcome) : (
         <form className="space-y-5" onSubmit={handleSubmit}>
           <p className="-mt-1 text-sm text-slate-500">
             Da de alta al cliente con su perfil. Puedes cobrar la membresía enseguida; la cuenta se activa después en la app con el código.
@@ -251,7 +382,7 @@ function ClientEnrollmentModal({ initialOutcome = null, coaches = [], onEnrolled
               />
             </div>
           </div>
-          <p className={`${hintClass} -mt-3`} id="enroll-email-hint">Si ya usa GymGo en otro gimnasio, se vincula su cuenta sin ver su historial.</p>
+          <p className={`${hintClass} -mt-3`} id="enroll-email-hint">Si ya usa GymGo en otro gimnasio, le enviaremos un código a su correo para que confirme; su historial sigue siendo privado.</p>
           <GymSelect id="enroll-gym" label="Sucursal del cliente" value={gymId} onChange={setGymId} />
 
           <fieldset className="space-y-4 rounded-xl border border-slate-200 p-4">
