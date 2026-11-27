@@ -182,7 +182,10 @@ function Login() {
             </div>
 
             <div>
-              <label className={labelClass} htmlFor="password">Contraseña</label>
+              <div className="flex items-baseline justify-between gap-3">
+                <label className={labelClass} htmlFor="password">Contraseña</label>
+                <Link className="text-sm font-semibold text-brand-text hover:underline" to="/forgot-password" state={{ email }}>¿La olvidaste?</Link>
+              </div>
               <input
                 className={fieldClass}
                 id="password"

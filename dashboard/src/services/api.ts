@@ -150,6 +150,22 @@ export function resendVerificationCode(email: string) {
   }, { withGym: false, sessionOn401: 'keep' })
 }
 
+// "¿Olvidaste tu contraseña?": the API answers the same whether or not the account exists.
+export function requestPasswordReset(email: string) {
+  return apiClient<{ sent: boolean }>('/auth/password-reset', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  }, { withGym: false, sessionOn401: 'keep' })
+}
+
+// The emailed code and a new password: closes every other session and answers with a new one.
+export function resetPassword(email: string, code: string, password: string) {
+  return apiClient<LoginResponse>('/auth/password-reset/confirm', {
+    method: 'POST',
+    body: JSON.stringify({ email, code, password }),
+  }, { withGym: false, sessionOn401: 'keep' })
+}
+
 // The organization an API error says is blocked (403 with code organization_*), or null.
 export function blockedOrganization(error: unknown): OrganizationNotice | null {
   if (!(error instanceof ApiError) || error.status !== 403) return null

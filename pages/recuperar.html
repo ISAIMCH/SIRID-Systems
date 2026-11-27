@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#09090b">
+    <title>Recuperar contraseña | GymGo</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <link rel="stylesheet" href="../assets/css/estilos.css">
+</head>
+<body class="auth-page">
+    <div class="auth-layout">
+        <aside class="auth-aside" aria-hidden="true">
+            <a class="brand" href="../index.html" tabindex="-1"><span class="brand-mark">G</span><span>GYMGO</span></a>
+            <div class="position-relative">
+                <span class="kicker on-dark">Recupera tu acceso</span>
+                <h2>Tu gimnasio, en foco.</h2>
+                <p>Entra con tu cuenta de GymGo para pagar tu plan o abrir el panel de tu gimnasio.</p>
+                <ul class="auth-points">
+                    <li><i class="bi bi-speedometer2"></i>La misma cuenta del panel y de la app GymGo.</li>
+                    <li><i class="bi bi-receipt"></i>Paga o cambia tu plan cuando lo necesites.</li>
+                    <li><i class="bi bi-shield-lock"></i>Tu sesión se cierra sola al terminar su vigencia.</li>
+                </ul>
+            </div>
+            <div class="auth-aside-footer">&copy; 2026 SIRID Systems</div>
+            <div class="auth-phone phone"><img src="../assets/img/app/cliente-inicio.webp" alt=""></div>
+        </aside>
+
+        <main class="auth-main">
+            <div class="auth-topbar">
+                <a class="brand d-lg-none" href="../index.html"><span class="brand-mark" aria-hidden="true">G</span><span>GYMGO</span></a>
+                <a class="auth-back-link ms-auto" href="../index.html"><i class="bi bi-arrow-left"></i>Volver al inicio</a>
+            </div>
+
+            <div class="auth-center">
+                <div class="login-card">
+                    <div class="mb-4">
+                        <h1 class="login-title" id="resetTitle" tabindex="-1">¿Olvidaste tu contraseña?</h1>
+                        <p class="auth-subtitle" id="resetSubtitle">Escribe el correo de tu cuenta y te enviaremos un código para crear una contraseña nueva.</p>
+                    </div>
+
+                    <form id="requestForm" novalidate>
+                        <div id="requestStatus" class="status-msg mb-3" role="alert" aria-live="assertive"></div>
+                        <div class="mb-4">
+                            <label for="email" class="form-label">Correo electrónico</label>
+                            <div class="input-icon">
+                                <i class="bi bi-envelope" aria-hidden="true"></i>
+                                <input type="email" class="form-control form-control-premium" id="email" placeholder="admin@tugimnasio.com" autocomplete="email" maxlength="254" required>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-premium w-100" id="requestSubmit">Enviar código</button>
+                        <p class="auth-footer text-center mt-4 mb-0"><a href="login.html">Volver a iniciar sesión</a></p>
+                    </form>
+
+                    <form id="resetForm" novalidate hidden>
+                        <div id="resetStatus" class="status-msg mb-3" role="alert" aria-live="assertive"></div>
+                        <div class="mb-3">
+                            <label for="code" class="form-label">Código del correo</label>
+                            <input id="code" class="form-control form-control-premium verify-code-input" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="password" class="form-label">Contraseña nueva</label>
+                            <div class="input-icon">
+                                <i class="bi bi-lock" aria-hidden="true"></i>
+                                <input type="password" class="form-control form-control-premium has-toggle" id="password" placeholder="Mínimo 10 caracteres" autocomplete="new-password" minlength="10" maxlength="72" required>
+                                <button type="button" class="toggle-password" data-toggle-password="password" aria-label="Mostrar contraseña"><i class="bi bi-eye"></i></button>
+                            </div>
+                        </div>
+                        <div class="mb-4">
+                            <label for="confirmation" class="form-label">Repite la contraseña</label>
+                            <div class="input-icon">
+                                <i class="bi bi-lock" aria-hidden="true"></i>
+                                <input type="password" class="form-control form-control-premium" id="confirmation" placeholder="Escríbela otra vez" autocomplete="new-password" maxlength="72" required>
+                            </div>
+                            <div class="form-text">Al cambiarla se cierra tu sesión en los demás dispositivos.</div>
+                        </div>
+                        <button type="submit" class="btn btn-premium w-100" id="resetSubmit">Guardar y entrar</button>
+                        <button type="button" class="btn btn-link w-100 mt-2" id="resendCode">Reenviar código</button>
+                        <button type="button" class="btn btn-link w-100" id="otherEmail">Usar otro correo</button>
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="../assets/js/config.js"></script>
+    <script src="../assets/js/analytics.js"></script>
+    <script src="../assets/js/ui.js"></script>
+    <script src="../assets/js/gymgo.js"></script>
+    <script src="../assets/js/recuperar.js"></script>
+</body>
+</html>
