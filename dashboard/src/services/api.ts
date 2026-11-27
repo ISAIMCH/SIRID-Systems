@@ -238,13 +238,25 @@ export interface ClientEnrollmentPayload {
   observations?: string
 }
 
-// A new account brings an activation code; an existing GymGo account is linked (its holder gets a notice in the app),
-// or gets a new code when it was never activated.
+// A request to add, as a client, an account another gym registered. The gym sees only the email it typed.
+export interface ClientLinkRequest {
+  id: string
+  email: string
+  gym: { id: string; name?: string }
+  status: 'pending' | 'accepted' | 'rejected' | 'cancelled' | 'expired'
+  expiresAt: string
+}
+
+// A new account brings an activation code. An email that already has a GymGo account from another gym brings a
+// link request instead: nothing is linked (and no data is shown) until its holder agrees.
 export interface ClientEnrollmentResult {
   user: User
   linkedExisting: boolean
   alreadyClient?: boolean
   activation: ActivationCode | null
+  linkRequest?: ClientLinkRequest
+  alreadyPending?: boolean
+  emailSent?: boolean
 }
 
 // Reception registers a client who has no app yet, so a membership can be charged right away.
@@ -252,7 +264,20 @@ export function enrollClient(payload: ClientEnrollmentPayload) {
   return apiClient<ClientEnrollmentResult>('/auth/clients', { method: 'POST', body: JSON.stringify(payload) })
 }
 
-// Only while the account is not activated; the previous code stops working.
+// The person read to reception the 6-digit code we emailed them: that is their consent.
+export function confirmClientLink(requestId: string, code: string) {
+  return apiClient<ClientEnrollmentResult>(`/auth/clients/link-requests/${requestId}/confirm`, { method: 'POST', body: JSON.stringify({ code }) })
+}
+
+export function resendClientLinkCode(requestId: string) {
+  return apiClient<{ linkRequest: ClientLinkRequest; emailSent: boolean }>(`/auth/clients/link-requests/${requestId}/resend`, { method: 'POST' })
+}
+
+export function cancelClientLink(requestId: string) {
+  return apiClient<void>(`/auth/clients/link-requests/${requestId}/cancel`, { method: 'POST' })
+}
+
+// Only while the account is not activated, and only by the gym that opened it; the previous code stops working.
 export function regenerateActivationCode(userId: string) {
   return apiClient<{ activation: ActivationCode }>(`/auth/clients/${userId}/activation-code`, { method: 'POST' })
 }
