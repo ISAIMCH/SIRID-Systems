@@ -24,6 +24,9 @@ jobs:
           cache: npm
           cache-dependency-path: dashboard/package-lock.json
       - run: npm ci
+      # A new high or critical advisory in a production dependency fails the build (SEC-09). Development tools
+      # (Vite, linters) are left out: they never run on the browser.
+      - run: npm audit --omit=dev --audit-level=high
       - run: npm run lint
       # tsc -b + vite build. The API URL is only read at runtime, so the build needs no secrets.
       - run: npm run build
