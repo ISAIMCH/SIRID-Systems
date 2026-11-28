@@ -100,19 +100,33 @@ export interface Product {
   price: number | string
   // Units in the selected gym (or the main one); stockByGym lists every gym the user sees.
   stock: number
-  stockByGym?: Array<{ gymId: string; quantity: number }>
+  // Management data (Admin only): unit cost ("último costo"), the selected gym's minimum and whether it is low.
+  cost?: number | null
+  minQuantity?: number | null
+  lowStock?: boolean
+  stockByGym?: Array<{ gymId: string; quantity: number; minQuantity?: number | null; lowStock?: boolean }>
   imageUrl?: string
+}
+
+export interface InventoryStats {
+  from: string
+  to: string
+  stock: { units: number; valueAtCost: number; valueAtPrice: number; unitsWithoutCost: number }
+  lowStock: Array<{ productId: string; name: string; gymId: string; quantity: number; minQuantity: number | null }>
+  sales: { orders: number; units: number; revenue: number; costOfGoods: number; grossProfit: number; revenueWithoutCost: number; unitsWithoutCost: number }
+  topProducts: Array<{ productId: string; name: string; units: number; revenue: number; costOfGoods: number; grossProfit: number | null }>
 }
 
 export interface InventoryMovement {
   _id: string
   productId: { _id: string; name: string } | string | null
   gymId: { _id: string; name: string } | string | null
-  type: 'initial' | 'sale' | 'adjustment'
+  type: 'initial' | 'sale' | 'adjustment' | 'restock'
   quantityBefore: number
   change: number
   quantityAfter: number
   reason?: string
+  unitCost?: number | null
   by: { _id: string; name: string } | string | null
   orderId?: string | null
   createdAt: string

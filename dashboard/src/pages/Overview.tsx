@@ -306,10 +306,10 @@ function Overview() {
       plans: planDistribution(data.clients, now),
       expiring: expiringSoon(data.clients, now),
       pendingPayments: data.payments.filter((payment) => payment.status?.toLowerCase() === 'pending').length,
-      // A product counts as low when any visible gym is running out of it.
+      // A product counts as low when any visible gym reaches its minimum (the API flags it; 5 when none is set).
       lowStock: data.products.filter((product) => (product.stockByGym?.length
-        ? product.stockByGym.some((item) => item.quantity <= LOW_STOCK_THRESHOLD)
-        : numericValue(product.stock) <= LOW_STOCK_THRESHOLD)).length,
+        ? product.stockByGym.some((item) => item.lowStock ?? item.quantity <= LOW_STOCK_THRESHOLD)
+        : product.lowStock ?? numericValue(product.stock) <= LOW_STOCK_THRESHOLD)).length,
       activity: [...saleActivity(data.sales), ...paymentActivity(data.payments)]
         .sort((first, second) => toTime(second.date) - toTime(first.date))
         .slice(0, 6),
@@ -682,7 +682,7 @@ function Overview() {
               <ul className="space-y-2">
                 {[
                   { label: 'Pagos por confirmar', value: metrics.pendingPayments, icon: Receipt, to: '/payments' },
-                  { label: `Productos con stock bajo (≤ ${LOW_STOCK_THRESHOLD})`, value: metrics.lowStock, icon: PackageX, to: '/inventory?stock=bajo' },
+                  { label: 'Productos con stock bajo', value: metrics.lowStock, icon: PackageX, to: '/inventory?stock=bajo' },
                   { label: 'Cuentas por activar', value: metrics.pendingActivation, icon: KeyRound, to: '/users' },
                 ].map(({ label, value, icon: Icon, to }) => {
                   const content = (

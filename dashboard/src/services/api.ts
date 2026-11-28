@@ -706,6 +706,27 @@ export function deleteProduct(id: string) {
   })
 }
 
+// Units that arrived for one gym; a unit cost becomes the product's cost from now on.
+export function restockProduct(id: string, data: { quantity: number; unitCost?: number | null; reason?: string; gymId?: string }) {
+  return apiClient<{ quantityBefore: number; quantity: number; cost: number | null }>(`/products/${id}/restock`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+// The minimum stock of a product in one gym (null goes back to the default threshold).
+export function setProductMinStock(id: string, data: { minQuantity: number | null; gymId?: string }) {
+  return apiClient<{ minQuantity: number | null }>(`/products/${id}/min-stock`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  })
+}
+
+export function getInventoryStats(params: { gymId?: string; from?: string; to?: string } = {}) {
+  const query = new URLSearchParams(Object.entries(params).filter(([, value]) => value))
+  return apiClient<import('../types').InventoryStats>(`/products/stats?${query}`)
+}
+
 export interface EquipmentPayload {
   name: string
   zone: string
