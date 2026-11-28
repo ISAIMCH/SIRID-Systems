@@ -1439,6 +1439,58 @@ export function updatePlatformExercise(id: string, data: Partial<PlatformExercis
   }, { withGym: false })
 }
 
+export interface EquipmentCatalogItem {
+  _id: string
+  slug: string
+  name: string
+  family: string
+  type: 'strength' | 'cardio'
+  description: string
+  muscleGroups: string[]
+  imageUrl: string | null
+  origin: 'seed' | 'sirid'
+  isActive: boolean
+  updatedAt: string
+}
+
+export interface EquipmentCatalogPayload {
+  name: string
+  family: string
+  type: 'strength' | 'cardio'
+  description: string
+  muscleGroups: string[]
+  imageUrl: string
+}
+
+export interface EquipmentCatalogFilters {
+  q?: string
+  family?: string
+  status?: 'active' | 'inactive' | 'all'
+  page?: number
+}
+
+export function getPlatformEquipmentCatalog(filters: EquipmentCatalogFilters) {
+  return apiClient<{ items: EquipmentCatalogItem[]; page: number; limit: number; total: number; hasMore: boolean }>(
+    `/platform/equipment-catalog${queryString(filters)}`,
+    {},
+    { withGym: false },
+  )
+}
+
+export function createPlatformEquipmentItem(data: EquipmentCatalogPayload) {
+  return apiClient<{ item: EquipmentCatalogItem }>('/platform/equipment-catalog', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, { withGym: false })
+}
+
+export function updatePlatformEquipmentItem(id: string, data: Partial<EquipmentCatalogPayload> & { isActive?: boolean }) {
+  return apiClient<{ item: EquipmentCatalogItem }>(`/platform/equipment-catalog/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  }, { withGym: false })
+}
+
 /* ===== GymGo plan (what the owner pays SIRID) ===== */
 
 export type PlanFeature = 'iot' | 'occupancy' | 'documents' | 'historyShare'
