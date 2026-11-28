@@ -144,6 +144,9 @@ export interface Equipment {
   type?: string
   equipmentCategory?: string
   imageUrl?: string
+  // Photo of the linked master-catalog item, shown while the gym has none of its own.
+  catalogImageUrl?: string | null
+  catalogItemId?: string | null
   totalQuantity?: number
   maintenanceQuantity?: number
   status: EquipmentStatus
