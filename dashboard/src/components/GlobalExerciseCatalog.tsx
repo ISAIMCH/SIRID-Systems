@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { AlertTriangle, BookOpen, Dumbbell, Lock, Search } from 'lucide-react'
-import { getCatalogExercise, getExerciseCatalog } from '../services/api'
-import type { CatalogExercise, CatalogExerciseDetail, ExerciseCatalogPage } from '../services/api'
+import { getCatalogExercise, getExerciseAvailability, getExerciseCatalog } from '../services/api'
+import type { CatalogExercise, CatalogExerciseDetail, ExerciseAvailability, ExerciseCatalogPage, GymAvailability } from '../services/api'
 import { EQUIPMENT_CATEGORIES, MUSCLE_GROUPS } from '../utils/exerciseCatalog'
 import Panel from './ui/Panel'
 import Modal from './ui/Modal'
@@ -9,15 +9,26 @@ import Badge, { type BadgeTone } from './ui/Badge'
 import EmptyState from './ui/EmptyState'
 import { errorAlert, fieldClass, secondaryButton } from './ui/styles'
 
+const AVAILABILITY: Record<ExerciseAvailability, { label: string; tone: BadgeTone }> = {
+  available: { label: 'Disponible', tone: 'success' },
+  maintenance: { label: 'En mantenimiento', tone: 'warning' },
+  locked: { label: 'Falta equipo', tone: 'neutral' },
+}
+
 function ExerciseDetailDialog({ exercise, onClose }: { exercise: CatalogExercise; onClose: () => void }) {
   const [detail, setDetail] = useState<CatalogExerciseDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [gyms, setGyms] = useState<GymAvailability[]>([])
 
   useEffect(() => {
     let active = true
     getCatalogExercise(exercise._id)
       .then((response) => { if (active) setDetail(response.exercise) })
       .catch((requestError: unknown) => { if (active) setError(requestError instanceof Error ? requestError.message : 'No se pudo cargar el ejercicio.') })
+    // Where it can be done: only worth showing with more than one gym; a failure just hides the section.
+    getExerciseAvailability([exercise._id])
+      .then((response) => { if (active) setGyms(response.gyms) })
+      .catch(() => undefined)
     return () => { active = false }
   }, [exercise._id])
 
@@ -52,6 +63,22 @@ function ExerciseDetailDialog({ exercise, onClose }: { exercise: CatalogExercise
               </ol>
             )
             : <p className="mt-2 text-sm text-slate-500">Este ejercicio no tiene instrucciones paso a paso.</p>)}
+          {gyms.length > 1 && (
+            <>
+              <h3 className="mt-5 text-sm font-semibold text-ink">Por sucursal</h3>
+              <ul className="mt-2 divide-y divide-slate-100 text-sm">
+                {gyms.map((gym) => {
+                  const state = AVAILABILITY[gym.exercises[exercise._id] ?? 'locked']
+                  return (
+                    <li className="flex items-center justify-between gap-3 py-2" key={gym.gymId}>
+                      <span className="text-slate-700">{gym.name}</span>
+                      <Badge tone={state.tone}>{state.label}</Badge>
+                    </li>
+                  )
+                })}
+              </ul>
+            </>
+          )}
           {detail?.attribution && <p className="mt-4 text-xs text-slate-400">{detail.attribution}</p>}
         </div>
       </div>

@@ -1376,6 +1376,23 @@ export function getExerciseCatalog(filters: ExerciseCatalogFilters) {
   return apiClient<ExerciseCatalogPage>(`/exercises/catalog${queryString(filters)}`)
 }
 
+export type ExerciseAvailability = 'available' | 'maintenance' | 'locked'
+
+export interface GymAvailability {
+  gymId: string
+  name: string
+  equipment: { _id: string; name: string; zone: string; family: string; catalogItemId: string | null; imageUrl: string; totalQuantity: number; usableUnits: number; status: string }[]
+  unlockedCategories: string[]
+  outOfServiceCategories: string[]
+  exercises: Record<string, ExerciseAvailability>
+}
+
+// Equipment and exercise state at each gym the person can work or train at (all of the staff member's gyms).
+export function getExerciseAvailability(exerciseIds: string[] = []) {
+  const query = exerciseIds.length ? `?exerciseIds=${exerciseIds.join(',')}` : ''
+  return apiClient<{ currentGymId: string; gyms: GymAvailability[] }>(`/exercises/availability${query}`, {}, { withGym: false })
+}
+
 export function getCatalogExercise(id: string) {
   return apiClient<{ exercise: CatalogExerciseDetail }>(`/exercises/catalog/${id}`)
 }
