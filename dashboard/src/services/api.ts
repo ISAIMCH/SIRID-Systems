@@ -737,11 +737,18 @@ export interface EquipmentPayload {
   maintenanceQuantity: number
   status: EquipmentStatus
   equipmentCategory?: string
+  // Item of SIRID's master catalog; null registers custom equipment.
+  catalogItemId?: string | null
   gymId?: string
 }
 
 export function getEquipment<T = Equipment[]>() {
   return apiClient<T>('/equipment')
+}
+
+// Visible items of SIRID's master catalog, to pick one when registering equipment.
+export function getEquipmentCatalog() {
+  return apiClient<{ items: EquipmentCatalogItem[] }>('/equipment/catalog')
 }
 
 export function createEquipment(data: EquipmentPayload) {

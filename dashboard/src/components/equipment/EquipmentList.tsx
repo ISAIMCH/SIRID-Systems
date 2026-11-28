@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { AlertTriangle, Image as ImageIcon, Pencil, Plus, Search, Trash2, Wrench } from 'lucide-react'
-import { createEquipment, deleteEquipment, updateEquipment } from '../../services/api'
-import type { EquipmentPayload } from '../../services/api'
+import { createEquipment, deleteEquipment, getEquipmentCatalog, updateEquipment } from '../../services/api'
+import type { EquipmentCatalogItem, EquipmentPayload } from '../../services/api'
 import type { Equipment, EquipmentStatus } from '../../types'
 import GymSelect from '../GymSelect'
 import Panel from '../ui/Panel'
@@ -14,6 +14,8 @@ import { targetGymField } from '../../utils/targetGym'
 import { EQUIPMENT_CATEGORIES, isEquipmentCategory } from '../../utils/exerciseCatalog'
 
 interface EquipmentFormState {
+  // Id of the master-catalog item, or '' for custom equipment.
+  catalogo: string
   nombre: string
   zona: string
   marca: string
@@ -37,6 +39,7 @@ const TYPE_LABELS: Record<string, string> = { cardio: 'Cardio', strength: 'Fuerz
 const typeLabel = (type?: string) => (type ? TYPE_LABELS[type.toLowerCase()] ?? type : 'Sin tipo')
 
 const emptyEquipmentForm: EquipmentFormState = {
+  catalogo: '',
   nombre: '',
   zona: '',
   marca: '',
@@ -52,8 +55,9 @@ const equipmentKey = (item: Equipment, index: number) => item._id || item.id || 
 const availableUnits = (item: Equipment) => Math.max(0, (item.totalQuantity ?? 0) - (item.maintenanceQuantity || 0))
 
 function Thumbnail({ item }: { item: Equipment }) {
-  return item.imageUrl ? (
-    <img className="h-11 w-11 shrink-0 rounded-xl object-cover ring-1 ring-slate-200" src={item.imageUrl} alt="" />
+  const src = item.imageUrl || item.catalogImageUrl
+  return src ? (
+    <img className="h-11 w-11 shrink-0 rounded-xl object-cover ring-1 ring-slate-200" src={src} alt="" />
   ) : (
     <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-400">
       <ImageIcon size={18} aria-hidden />
@@ -110,8 +114,39 @@ function EquipmentList({ equipment, isLoading, error, onChanged }: EquipmentList
   const [modalError, setModalError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [customZone, setCustomZone] = useState('')
+  const [catalog, setCatalog] = useState<EquipmentCatalogItem[] | null>(null)
+  const [catalogError, setCatalogError] = useState<string | null>(null)
+
+  // The master catalog loads the first time the form opens; without it the gym can still register custom equipment.
+  function loadCatalog() {
+    if (catalog) return
+    getEquipmentCatalog()
+      .then((response) => { setCatalog(response.items); setCatalogError(null) })
+      .catch((requestError) => setCatalogError(requestError instanceof Error ? requestError.message : 'No se pudo cargar el catálogo de equipos.'))
+  }
+
+  const catalogById = new Map((catalog ?? []).map((item) => [item._id, item]))
+  const catalogFamilies = [...new Set((catalog ?? []).map((item) => item.family))]
+
+  // Picking a catalog item fills name (unless the gym already wrote its own), type and family.
+  function pickCatalogItem(id: string) {
+    const item = catalogById.get(id)
+    setForm((current) => {
+      if (!item) return { ...current, catalogo: '' }
+      const previous = catalogById.get(current.catalogo)
+      const keepName = current.nombre.trim() && current.nombre !== previous?.name
+      return {
+        ...current,
+        catalogo: id,
+        nombre: keepName ? current.nombre : item.name,
+        tipo: item.type === 'cardio' ? 'Cardio' : 'Fuerza',
+        categoria: item.family,
+      }
+    })
+  }
 
   function openCreateModal() {
+    loadCatalog()
     setEditingEquipment(null)
     setForm(emptyEquipmentForm)
     setCustomZone('')
@@ -122,8 +157,10 @@ function EquipmentList({ equipment, isLoading, error, onChanged }: EquipmentList
   function openEditModal(item: Equipment) {
     const zone = item.zone || ''
     const isPresetZone = zoneOptions.includes(zone)
+    loadCatalog()
     setEditingEquipment(item)
     setForm({
+      catalogo: item.catalogItemId || '',
       nombre: item.name || '',
       zona: isPresetZone ? zone : customZoneOption,
       marca: item.brand || '',
@@ -160,6 +197,7 @@ function EquipmentList({ equipment, isLoading, error, onChanged }: EquipmentList
         brand: form.marca.trim(),
         type: equipmentTypeMap[form.tipo.trim().toLowerCase()] || form.tipo.trim().toLowerCase(),
         equipmentCategory: form.categoria,
+        catalogItemId: form.catalogo || null,
         imageUrl: form.imageUrl.trim(),
         totalQuantity: Number(form.cantidadTotal),
         maintenanceQuantity: Number(form.cantidadMantenimiento),
@@ -335,6 +373,23 @@ function EquipmentList({ equipment, isLoading, error, onChanged }: EquipmentList
           <form className="space-y-4" onSubmit={handleSubmit}>
             {!editingEquipment && <GymSelect id="equipment-gym" value={gymId} onChange={setGymId} />}
             <div>
+              <label className={labelClass} htmlFor="equipment-catalog">Catálogo de SIRID</label>
+              <select className={fieldClass} id="equipment-catalog" value={form.catalogo} onChange={(event) => pickCatalogItem(event.target.value)} disabled={!catalog && !catalogError}>
+                <option value="">{catalog || catalogError ? 'Equipo personalizado (no está en el catálogo)' : 'Cargando catálogo...'}</option>
+                {catalogFamilies.map((family) => (
+                  <optgroup key={family} label={family}>
+                    {(catalog ?? []).filter((item) => item.family === family).map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}
+                  </optgroup>
+                ))}
+                {form.catalogo && catalog && !catalogById.has(form.catalogo) && <option value={form.catalogo}>Equipo que SIRID ya no ofrece</option>}
+              </select>
+              <p className={`${hintClass} mt-1`}>
+                {catalogError ?? (form.catalogo
+                  ? 'Llenamos nombre, tipo y categoría; puedes cambiar el nombre, la marca y la foto.'
+                  : 'Elige tu máquina para que desbloquee los ejercicios correctos, o regístrala como personalizada.')}
+              </p>
+            </div>
+            <div>
               <label className={labelClass} htmlFor="equipment-name">Nombre</label>
               <input className={fieldClass} id="equipment-name" type="text" value={form.nombre} onChange={(event) => setForm({ ...form, nombre: event.target.value })} required />
             </div>
@@ -371,17 +426,22 @@ function EquipmentList({ equipment, isLoading, error, onChanged }: EquipmentList
               </div>
               <div>
                 <label className={labelClass} htmlFor="equipment-category">Categoría del catálogo</label>
-                <select className={fieldClass} id="equipment-category" value={form.categoria} onChange={(event) => setForm({ ...form, categoria: event.target.value })} required>
+                <select className={fieldClass} id="equipment-category" value={form.categoria} onChange={(event) => setForm({ ...form, categoria: event.target.value })} required disabled={Boolean(form.catalogo)}>
                   <option value="">Selecciona una categoría</option>
-                  {EQUIPMENT_CATEGORIES.filter((category) => category !== 'Sin equipo').map((category) => <option key={category} value={category}>{category}</option>)}
+                  {EQUIPMENT_CATEGORIES.filter((category) => category !== 'Sin equipo' || form.categoria === 'Sin equipo').map((category) => <option key={category} value={category}>{category}</option>)}
                 </select>
               </div>
             </div>
-            <p className={`${hintClass} -mt-2`}>La categoría desbloquea los ejercicios del catálogo global que usan esta familia de equipo.</p>
+            <p className={`${hintClass} -mt-2`}>
+              {form.catalogo
+                ? 'La categoría la define el catálogo de SIRID.'
+                : 'La categoría desbloquea los ejercicios del catálogo global que usan esta familia de equipo.'}
+            </p>
 
             <div>
               <label className={labelClass} htmlFor="equipment-image-url">Imagen (URL)</label>
               <input className={fieldClass} id="equipment-image-url" type="url" value={form.imageUrl} onChange={(event) => setForm({ ...form, imageUrl: event.target.value })} placeholder="https://..." />
+              {form.catalogo && !form.imageUrl && <p className={`${hintClass} mt-1`}>Sin foto propia se muestra la del catálogo.</p>}
             </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
