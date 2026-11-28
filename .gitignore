@@ -6,3 +6,7 @@ backend/.env
 *.log
 .DS_Store
 _site/
+
+# Herramientas locales del editor
+.github/prompts/
+.vscode/
