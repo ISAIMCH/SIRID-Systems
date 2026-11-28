@@ -23,6 +23,7 @@ const Gyms = lazy(() => import('./pages/Gyms'))
 const Documents = lazy(() => import('./pages/Documents'))
 const Platform = lazy(() => import('./pages/Platform'))
 const PlatformExercises = lazy(() => import('./pages/PlatformExercises'))
+const PlatformEquipment = lazy(() => import('./pages/PlatformEquipment'))
 const Billing = lazy(() => import('./pages/Billing'))
 const Cashier = lazy(() => import('./pages/Cashier'))
 const Movements = lazy(() => import('./pages/Movements'))
@@ -112,6 +113,7 @@ function App() {
               <Route element={<PlatformRoute />}>
                 <Route path="platform" element={<Platform />} />
                 <Route path="platform/exercises" element={<PlatformExercises />} />
+                <Route path="platform/equipment" element={<PlatformEquipment />} />
               </Route>
               <Route element={<OwnerRoute />}>
                 <Route path="billing" element={<Billing />} />

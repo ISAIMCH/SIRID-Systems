@@ -61,6 +61,7 @@ const navigation: NavItem[] = [
   { label: 'Mi plan GymGo', to: '/billing', icon: Gem, section: 'Cuenta', ownerOnly: true },
   { label: 'Organizaciones', to: '/platform', icon: Building2, end: true, section: 'SIRID', platformOnly: true },
   { label: 'Catálogo global', to: '/platform/exercises', icon: BookOpen, section: 'SIRID', platformOnly: true },
+  { label: 'Catálogo de equipos', to: '/platform/equipment', icon: Dumbbell, section: 'SIRID', platformOnly: true },
 ]
 
 const APPLICATION_STATUS = { pending: 'está en revisión', rejected: 'fue rechazada', suspended: 'está suspendida', active: 'está activa' } as const
