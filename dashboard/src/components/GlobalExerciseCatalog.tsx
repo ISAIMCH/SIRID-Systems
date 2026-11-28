@@ -111,7 +111,11 @@ export default function GlobalExerciseCatalog() {
   const unlocked = new Set(result?.unlockedCategories ?? [])
   const outOfService = new Set(result?.outOfServiceCategories ?? [])
 
-  function statusOf(equipment: string): { label: string; tone: BadgeTone; icon?: typeof Lock } {
+  function statusOf(equipment: string, availability?: CatalogExercise['availability']): { label: string; tone: BadgeTone; icon?: typeof Lock } {
+    // The API decides per exercise when it can: master-catalog equipment may unlock a few exercises of a family.
+    if (availability === 'locked') return { label: 'Falta equipo', tone: 'neutral', icon: Lock }
+    if (availability === 'maintenance') return { label: 'En mantenimiento', tone: 'warning', icon: AlertTriangle }
+    if (availability === 'available') return { label: 'Disponible', tone: 'success' }
     if (!unlocked.has(equipment)) return { label: 'Falta equipo', tone: 'neutral', icon: Lock }
     if (outOfService.has(equipment)) return { label: 'En mantenimiento', tone: 'warning', icon: AlertTriangle }
     return { label: 'Disponible', tone: 'success' }
@@ -172,7 +176,7 @@ export default function GlobalExerciseCatalog() {
           <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {exercises.map((exercise) => {
               const equipment = exercise.equipment || 'Sin equipo'
-              const status = statusOf(equipment)
+              const status = statusOf(equipment, exercise.availability)
               const thumbnail = exercise.imageUrl || exercise.gifUrl
               return (
                 <li key={exercise._id}>

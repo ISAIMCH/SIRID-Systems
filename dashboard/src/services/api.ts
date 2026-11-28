@@ -1335,6 +1335,8 @@ export interface CatalogExercise {
   metricType: 'strength' | 'cardio'
   source: 'global' | 'custom'
   isCustom: boolean
+  // Global exercises only: whether the gym's equipment unlocks it ('maintenance': only equipment out of service has it).
+  availability?: 'available' | 'maintenance' | 'locked'
 }
 
 export interface CatalogExerciseDetail extends CatalogExercise {
@@ -1455,6 +1457,9 @@ export interface EquipmentCatalogItem {
   description: string
   muscleGroups: string[]
   imageUrl: string | null
+  // Exercises it unlocks; empty means every exercise of its family.
+  exerciseIds: string[]
+  exercises?: { _id: string; name: string; equipment: string; isActive: boolean }[]
   origin: 'seed' | 'sirid'
   isActive: boolean
   updatedAt: string
@@ -1467,6 +1472,7 @@ export interface EquipmentCatalogPayload {
   description: string
   muscleGroups: string[]
   imageUrl: string
+  exerciseIds: string[]
 }
 
 export interface EquipmentCatalogFilters {
