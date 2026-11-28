@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Archive, Boxes, History, ImageIcon, Package, PackageSearch, Pencil, Plus, Search, TriangleAlert, Wallet } from 'lucide-react'
-import { createProduct, deleteProduct, getInventoryMovements, getProducts, updateProduct } from '../services/api'
-import type { InventoryMovement, Product } from '../types'
+import { Archive, Boxes, History, ImageIcon, Package, PackagePlus, PackageSearch, Pencil, Plus, Search, TrendingUp, TriangleAlert, Wallet } from 'lucide-react'
+import { createProduct, deleteProduct, getInventoryMovements, getInventoryStats, getProducts, restockProduct, setProductMinStock, updateProduct } from '../services/api'
+import type { InventoryMovement, InventoryStats, Product } from '../types'
 import { isValidImageValue } from '../utils/imageValidation'
 import GymSelect from '../components/GymSelect'
 import { useAuth } from '../store/useAuth'
@@ -23,8 +23,17 @@ interface ProductFormState {
   nombre: string
   categoria: string
   precio: string
+  costo: string
   stock: string
+  minimo: string
   imageUrl: string
+  gymId: string
+}
+
+interface RestockFormState {
+  quantity: string
+  unitCost: string
+  reason: string
   gymId: string
 }
 
@@ -35,10 +44,17 @@ const emptyProductForm: ProductFormState = {
   nombre: '',
   categoria: '',
   precio: '',
+  costo: '',
   stock: '',
+  minimo: '',
   imageUrl: '',
   gymId: '',
 }
+
+// Below this a product is low in a gym with no minimum of its own (the API uses the same default).
+const DEFAULT_LOW_STOCK = 5
+
+const optionalNumber = (value: string) => (value.trim() === '' ? null : Number(value))
 
 async function fetchProducts() {
   const response = await getProducts<ProductsResponse>()
@@ -49,15 +65,19 @@ async function fetchProducts() {
   return Array.isArray(productsCandidate) ? productsCandidate as Product[] : []
 }
 
-// Same threshold Inicio uses for its "stock bajo" count.
-const LOW_STOCK = 5
-
 type StockFilter = 'all' | 'low' | 'out'
 
 const MOVEMENT_TYPES: Record<InventoryMovement['type'], { label: string; tone: BadgeTone }> = {
   initial: { label: 'Alta', tone: 'brand' },
   sale: { label: 'Venta', tone: 'info' },
   adjustment: { label: 'Ajuste', tone: 'neutral' },
+  restock: { label: 'Entrada', tone: 'success' },
+}
+
+// Gross margin over the sale price, or null when the cost is unknown.
+function marginOf(price: number, cost: number | null | undefined) {
+  if (cost === null || cost === undefined || price <= 0) return null
+  return Math.round(((price - cost) / price) * 100)
 }
 
 const currency = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' })
@@ -94,17 +114,30 @@ function Inventory() {
   const [searchParams] = useSearchParams()
   const [stockFilter, setStockFilter] = useState<StockFilter>(searchParams.get('stock') === 'bajo' ? 'low' : 'all')
   const [customCategory, setCustomCategory] = useState('')
+  const [stats, setStats] = useState<InventoryStats | null>(null)
+  const [restockFor, setRestockFor] = useState<Product | null>(null)
+  const [restockForm, setRestockForm] = useState<RestockFormState>({ quantity: '', unitCost: '', reason: '', gymId: '' })
+  const [restockError, setRestockError] = useState<string | null>(null)
+  const [isRestocking, setIsRestocking] = useState(false)
   // In the all-gyms view each gym has its own stock, so it is shown per gym and edited from that gym.
   const isStockReadOnly = isAllGyms && editingProduct !== null
+
+  // Indicators are a bonus: if they fail the product list still works.
+  async function refresh() {
+    const [productsArray, statsResult] = await Promise.all([fetchProducts(), getInventoryStats().catch(() => null)])
+    setProducts(productsArray)
+    setStats(statsResult)
+  }
 
   useEffect(() => {
     let isMounted = true
 
     async function loadProducts() {
       try {
-        const productsArray = await fetchProducts()
+        const [productsArray, statsResult] = await Promise.all([fetchProducts(), getInventoryStats().catch(() => null)])
         if (isMounted) {
           setProducts(productsArray)
+          setStats(statsResult)
           setError(null)
         }
       } catch (requestError) {
@@ -142,7 +175,9 @@ function Inventory() {
       nombre: product.name || '',
       categoria: isPresetCategory ? category : customCategoryOption,
       precio: String(product.price ?? ''),
+      costo: product.cost === null || product.cost === undefined ? '' : String(product.cost),
       stock: String(product.stock ?? ''),
+      minimo: product.minQuantity === null || product.minQuantity === undefined ? '' : String(product.minQuantity),
       imageUrl: product.imageUrl || '',
       gymId: '',
     })
@@ -150,6 +185,34 @@ function Inventory() {
     setStockReason('')
     setModalError(null)
     setIsModalOpen(true)
+  }
+
+  function openRestock(product: Product) {
+    setRestockFor(product)
+    setRestockForm({ quantity: '', unitCost: product.cost === null || product.cost === undefined ? '' : String(product.cost), reason: '', gymId: '' })
+    setRestockError(null)
+  }
+
+  async function handleRestock(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const productId = restockFor?._id || restockFor?.id
+    if (!productId) return
+    setRestockError(null)
+    setIsRestocking(true)
+    try {
+      await restockProduct(productId, {
+        quantity: Number(restockForm.quantity),
+        unitCost: optionalNumber(restockForm.unitCost),
+        ...(restockForm.reason.trim() ? { reason: restockForm.reason.trim() } : {}),
+        ...targetGymField(isAllGyms, restockForm.gymId),
+      })
+      await refresh()
+      setRestockFor(null)
+    } catch (requestError) {
+      setRestockError(requestError instanceof Error ? requestError.message : 'No se pudo registrar la entrada.')
+    } finally {
+      setIsRestocking(false)
+    }
   }
 
   async function openMovements(product: Product) {
@@ -202,6 +265,8 @@ function Inventory() {
         name: form.nombre.trim(),
         category: (form.categoria === customCategoryOption ? customCategory : form.categoria).trim(),
         price: Number(form.precio),
+        // The cost is the owner's; a Gerente never sends it.
+        ...(isOwner ? { cost: optionalNumber(form.costo) } : {}),
         ...(isStockReadOnly ? {} : { stock: Number(form.stock) }),
         // What was on screen when editing started: a sale made meanwhile is reported instead of overwritten.
         ...(editingProduct && !isStockReadOnly ? { stockBefore: Number(editingProduct.stock ?? 0), ...(stockReason.trim() ? { stockReason: stockReason.trim() } : {}) } : {}),
@@ -214,14 +279,23 @@ function Inventory() {
       }
       const productId = editingProduct?._id || editingProduct?.id
 
+      const minimum = optionalNumber(form.minimo)
       if (editingProduct) {
         if (!productId) throw new Error('El producto no tiene un identificador válido.')
         await updateProduct(productId, payload)
+        // The minimum belongs to the selected gym, like the stock count.
+        if (!isStockReadOnly && minimum !== (editingProduct.minQuantity ?? null)) {
+          await setProductMinStock(productId, { minQuantity: minimum })
+        }
       } else {
-        await createProduct(payload)
+        const created = await createProduct(payload) as { product?: Product }
+        const createdId = created?.product?._id || created?.product?.id
+        if (createdId && minimum !== null) {
+          await setProductMinStock(createdId, { minQuantity: minimum, ...targetGymField(isAllGyms, form.gymId) })
+        }
       }
 
-      setProducts(await fetchProducts())
+      await refresh()
       setError(null)
       setEditingProduct(null)
       setForm(emptyProductForm)
@@ -246,20 +320,23 @@ function Inventory() {
 
     try {
       await deleteProduct(productId)
-      setProducts(await fetchProducts())
+      await refresh()
       setError(null)
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'No se pudo descontinuar el producto.')
     }
   }
 
-  // In the all-gyms view each gym keeps its own count: a product is low or out when any gym is.
-  const quantitiesOf = (product: Product) =>
-    isAllGyms && product.stockByGym?.length ? product.stockByGym.map((item) => item.quantity) : [Number(product.stock ?? 0)]
-  const totalOf = (product: Product) => quantitiesOf(product).reduce((sum, quantity) => sum + quantity, 0)
+  // In the all-gyms view each gym keeps its own count and minimum: a product is low or out when any gym is.
+  const gymStocksOf = (product: Product) =>
+    isAllGyms && product.stockByGym?.length
+      ? product.stockByGym
+      : [{ quantity: Number(product.stock ?? 0), minQuantity: product.minQuantity ?? null, lowStock: product.lowStock }]
+  const totalOf = (product: Product) => gymStocksOf(product).reduce((sum, item) => sum + item.quantity, 0)
   const levelOf = (product: Product): Exclude<StockFilter, 'all'> | 'ok' => {
-    const lowest = Math.min(...quantitiesOf(product))
-    return lowest <= 0 ? 'out' : lowest <= LOW_STOCK ? 'low' : 'ok'
+    const stocks = gymStocksOf(product)
+    if (stocks.some((item) => item.quantity <= 0)) return 'out'
+    return stocks.some((item) => item.lowStock ?? item.quantity <= (item.minQuantity ?? DEFAULT_LOW_STOCK)) ? 'low' : 'ok'
   }
 
   // "Stock bajo" counts out-of-stock products too, like Inicio does.
@@ -280,7 +357,6 @@ function Inventory() {
   const filterOptions = ([['all', 'Todos'], ['low', 'Stock bajo'], ['out', 'Agotados']] as const)
     .map(([value, label]) => [value, `${label} ${countFor(value)}`] as const)
   const totalUnits = products.reduce((sum, product) => sum + totalOf(product), 0)
-  const stockValue = products.reduce((sum, product) => sum + totalOf(product) * Number(product.price || 0), 0)
   const lowCount = countFor('low')
   const outCount = countFor('out')
   const isFiltered = query !== '' || categoryFilter !== '' || stockFilter !== 'all'
@@ -304,6 +380,22 @@ function Inventory() {
             {perGym.map((item) => `${gymName(item.gymId)}: ${item.quantity}`).join(' · ')}
           </span>
         )}
+        {!perGym && product.minQuantity !== null && product.minQuantity !== undefined && (
+          <span className="text-xs text-slate-500">Mínimo {product.minQuantity}</span>
+        )}
+      </div>
+    )
+  }
+
+  function priceCell(product: Product) {
+    const price = Number(product.price || 0)
+    const margin = marginOf(price, product.cost)
+    return (
+      <div className="flex flex-col items-end gap-0.5">
+        <span className="font-medium text-ink tabular">{currency.format(price)}</span>
+        <span className="text-xs text-slate-500 tabular">
+          {product.cost === null || product.cost === undefined ? 'Sin costo' : `Costo ${currency.format(product.cost)}${margin === null ? '' : ` · ${margin}%`}`}
+        </span>
       </div>
     )
   }
@@ -312,6 +404,9 @@ function Inventory() {
     <div className="flex items-center justify-end gap-1">
       <button className={`${iconButton} hover:text-brand-text`} type="button" aria-label={`${isOwner ? 'Editar' : 'Ajustar stock de'} ${product.name || 'producto'}`} title={isOwner ? 'Editar' : 'Ajustar stock'} onClick={() => openEditModal(product)}>
         <Pencil size={17} aria-hidden />
+      </button>
+      <button className={`${iconButton} hover:text-emerald-700`} type="button" aria-label={`Entrada de mercancía de ${product.name || 'producto'}`} title="Entrada de mercancía" onClick={() => openRestock(product)}>
+        <PackagePlus size={17} aria-hidden />
       </button>
       <button className={`${iconButton} hover:text-sky-700`} type="button" aria-label={`Movimientos de ${product.name || 'producto'}`} title="Movimientos de inventario" onClick={() => void openMovements(product)}>
         <History size={17} aria-hidden />
@@ -329,7 +424,7 @@ function Inventory() {
       <PageHeader
         eyebrow="Operación"
         title="Inventario"
-        description={isOwner ? 'Los productos de la tienda, su precio y las unidades de cada sucursal. Caja descuenta el stock al cobrar.' : 'Las unidades de tu sucursal. Ajusta el conteo cuando llegue mercancía o haya merma.'}
+        description={isOwner ? 'Los productos de la tienda, su precio y las unidades de cada sucursal. Caja descuenta el stock al cobrar.' : 'Las unidades de tu sucursal. Registra las entradas de mercancía y ajusta el conteo cuando haya merma.'}
         actions={isOwner && (
           <button className={primaryButton} type="button" onClick={openCreateModal}>
             <Plus size={18} aria-hidden /> Nuevo producto
@@ -338,11 +433,62 @@ function Inventory() {
       />
 
       <div className="mt-6 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
-        <KpiCard label="Productos" value={products.length} icon={Package} isLoading={isLoading} hint={`${categories.length} categoría${categories.length === 1 ? '' : 's'}`} />
-        <KpiCard label="Unidades en stock" value={totalUnits.toLocaleString('es-MX')} icon={Boxes} tone="brand" isLoading={isLoading} hint={isAllGyms ? 'Suma de todas las sucursales' : 'En esta sucursal'} />
-        <KpiCard label={`Stock bajo (≤ ${LOW_STOCK})`} value={lowCount} icon={TriangleAlert} tone={lowCount > 0 ? 'warning' : 'default'} isLoading={isLoading} hint={lowCount > 0 ? 'Conviene resurtir' : 'Nada por resurtir'} />
-        <KpiCard label="Valor del inventario" value={currency.format(stockValue)} icon={Wallet} isLoading={isLoading} hint={outCount > 0 ? `${outCount} agotado${outCount === 1 ? '' : 's'}` : 'A precio de venta'} />
+        <KpiCard label="Unidades en stock" value={totalUnits.toLocaleString('es-MX')} icon={Boxes} tone="brand" isLoading={isLoading} hint={`${products.length} producto${products.length === 1 ? '' : 's'} · ${isAllGyms ? 'todas las sucursales' : 'esta sucursal'}`} />
+        <KpiCard label="Stock bajo" value={lowCount} icon={TriangleAlert} tone={lowCount > 0 ? 'warning' : 'default'} isLoading={isLoading} hint={outCount > 0 ? `${outCount} agotado${outCount === 1 ? '' : 's'}` : lowCount > 0 ? 'Conviene resurtir' : 'Nada por resurtir'} />
+        <KpiCard
+          label="Valor del inventario"
+          value={stats ? currency.format(stats.stock.valueAtCost) : '—'}
+          icon={Wallet}
+          isLoading={isLoading}
+          hint={stats ? (stats.stock.unitsWithoutCost > 0 ? `A costo · ${stats.stock.unitsWithoutCost} u. sin costo` : `A costo · ${currency.format(stats.stock.valueAtPrice)} a precio de venta`) : 'A costo'}
+        />
+        <KpiCard
+          label="Ganancia bruta · 30 días"
+          value={stats ? currency.format(stats.sales.grossProfit) : '—'}
+          icon={TrendingUp}
+          tone={stats && stats.sales.grossProfit > 0 ? 'brand' : 'default'}
+          isLoading={isLoading}
+          hint={stats ? `Ventas ${currency.format(stats.sales.revenue)} · ${stats.sales.units} u.` : 'Estimada con el costo de cada venta'}
+        />
       </div>
+
+      {stats && stats.topProducts.length > 0 && (
+        <Panel
+          className="mt-6"
+          title="Más vendidos · últimos 30 días"
+          icon={TrendingUp}
+          description={stats.sales.unitsWithoutCost > 0
+            ? `La ganancia no incluye ${stats.sales.unitsWithoutCost} u. vendidas sin costo registrado (${currency.format(stats.sales.revenueWithoutCost)} en ventas).`
+            : 'Ingresos después de promociones; ganancia con el costo que tenía cada producto al venderse.'}
+        >
+          <div className="-mx-5 overflow-x-auto sm:-mx-6">
+            <table className="min-w-full text-left text-sm">
+              <thead className={tableHeadClass}>
+                <tr>
+                  <th className={thClass}>Producto</th>
+                  <th className={`${thClass} text-right`}>Unidades</th>
+                  <th className={`${thClass} text-right`}>Ventas</th>
+                  <th className={`${thClass} text-right`}>Costo</th>
+                  <th className={`${thClass} text-right`}>Ganancia</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-slate-700">
+                {stats.topProducts.map((row) => (
+                  <tr key={row.productId}>
+                    <td className={`${tdClass} font-medium text-ink`}>{row.name}</td>
+                    <td className={`${tdClass} text-right tabular`}>{row.units}</td>
+                    <td className={`${tdClass} text-right tabular`}>{currency.format(row.revenue)}</td>
+                    <td className={`${tdClass} text-right tabular`}>{row.grossProfit === null ? '—' : currency.format(row.costOfGoods)}</td>
+                    <td className={`${tdClass} text-right font-semibold tabular ${row.grossProfit !== null && row.grossProfit < 0 ? 'text-red-600' : 'text-ink'}`}>
+                      {row.grossProfit === null ? 'Sin costo' : currency.format(row.grossProfit)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Panel>
+      )}
 
       <Panel
         className="mt-6"
@@ -392,7 +538,10 @@ function Inventory() {
                       <Thumbnail product={product} />
                       <div className="min-w-0 flex-1">
                         <p className="truncate font-semibold text-ink">{product.name || 'Sin nombre'}</p>
-                        <p className="truncate text-xs text-slate-500">{product.category || 'Sin categoría'} · {currency.format(Number(product.price || 0))}</p>
+                        <p className="truncate text-xs text-slate-500">
+                          {product.category || 'Sin categoría'} · {currency.format(Number(product.price || 0))}
+                          {product.cost !== null && product.cost !== undefined && ` · costo ${currency.format(product.cost)}`}
+                        </p>
                       </div>
                       {rowActions(product)}
                     </div>
@@ -408,7 +557,7 @@ function Inventory() {
                     <tr>
                       <th className={thClass}>Producto</th>
                       <th className={thClass}>Categoría</th>
-                      <th className={`${thClass} text-right`}>Precio</th>
+                      <th className={`${thClass} text-right`}>Precio / costo</th>
                       <th className={thClass}>Stock</th>
                       <th className={thClass}><span className="sr-only">Acciones</span></th>
                     </tr>
@@ -423,7 +572,7 @@ function Inventory() {
                           </div>
                         </td>
                         <td className={tdClass}><Badge>{product.category || 'Sin categoría'}</Badge></td>
-                        <td className={`${tdClass} text-right font-medium text-ink tabular`}>{currency.format(Number(product.price || 0))}</td>
+                        <td className={`${tdClass} text-right`}>{priceCell(product)}</td>
                         <td className={tdClass}>{stockCell(product)}</td>
                         <td className={tdClass}>{rowActions(product)}</td>
                       </tr>
@@ -440,7 +589,7 @@ function Inventory() {
         <Modal eyebrow="Inventario" title={editingProduct ? (isOwner ? 'Editar producto' : 'Ajustar stock') : 'Nuevo producto'} onClose={closeModal} size="md">
           {!isOwner && editingProduct && (
             <p className="mb-4 rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
-              Puedes ajustar el stock de tu sucursal. El nombre, precio, categoría e imagen los cambia el propietario.
+              Puedes ajustar el stock y el mínimo de tu sucursal. El nombre, precio, costo, categoría e imagen los cambia el propietario.
             </p>
           )}
           <form className="space-y-4" onSubmit={handleSubmit}>
@@ -468,23 +617,41 @@ function Inventory() {
               <input className={fieldClass} id="product-name" disabled={!isOwner} type="text" value={form.nombre} onChange={(event) => setForm({ ...form, nombre: event.target.value })} required />
             </div>
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label className={labelClass} htmlFor="product-category">Categoría</label>
+              <select className={fieldClass} id="product-category" disabled={!isOwner} value={form.categoria} onChange={(event) => setForm({ ...form, categoria: event.target.value })} required>
+                <option value="">Selecciona una categoría</option>
+                {categoryOptions.map((category) => <option key={category} value={category}>{category}</option>)}
+                <option value={customCategoryOption}>Agregar otra...</option>
+              </select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className={labelClass} htmlFor="product-category">Categoría</label>
-                <select className={fieldClass} id="product-category" disabled={!isOwner} value={form.categoria} onChange={(event) => setForm({ ...form, categoria: event.target.value })} required>
-                  <option value="">Selecciona una categoría</option>
-                  {categoryOptions.map((category) => <option key={category} value={category}>{category}</option>)}
-                  <option value={customCategoryOption}>Agregar otra...</option>
-                </select>
-              </div>
-              <div>
-                <label className={labelClass} htmlFor="product-price">Precio</label>
+                <label className={labelClass} htmlFor="product-price">Precio de venta</label>
                 <div className="relative">
                   <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-slate-400">$</span>
                   <input className={`${fieldClass} pl-7`} id="product-price" disabled={!isOwner} type="number" min="0" step="0.01" value={form.precio} onChange={(event) => setForm({ ...form, precio: event.target.value })} required />
                 </div>
               </div>
+              <div>
+                <label className={labelClass} htmlFor="product-cost">Costo unitario</label>
+                <div className="relative">
+                  <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-slate-400">$</span>
+                  <input className={`${fieldClass} pl-7`} id="product-cost" disabled={!isOwner} type="number" min="0" step="0.01" placeholder="Opcional" value={form.costo} onChange={(event) => setForm({ ...form, costo: event.target.value })} />
+                </div>
+              </div>
             </div>
+            {(() => {
+              const margin = marginOf(Number(form.precio), optionalNumber(form.costo))
+              return (
+                <p className={`${hintClass} -mt-2`}>
+                  {margin === null
+                    ? 'Con el costo calculamos la ganancia de cada venta. Se actualiza solo con cada entrada de mercancía.'
+                    : `Margen de ${margin}% sobre el precio de venta.`}
+                </p>
+              )
+            })()}
 
             {form.categoria === customCategoryOption && (
               <div>
@@ -503,8 +670,17 @@ function Inventory() {
               </p>
             ) : (
               <div>
-                <label className={labelClass} htmlFor="product-stock">{editingProduct ? 'Unidades en stock' : 'Stock inicial'}</label>
-                <input className={fieldClass} id="product-stock" type="number" min="0" step="1" value={form.stock} onChange={(event) => setForm({ ...form, stock: event.target.value })} required />
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className={labelClass} htmlFor="product-stock">{editingProduct ? 'Unidades en stock' : 'Stock inicial'}</label>
+                    <input className={fieldClass} id="product-stock" type="number" min="0" step="1" value={form.stock} onChange={(event) => setForm({ ...form, stock: event.target.value })} required />
+                  </div>
+                  <div>
+                    <label className={labelClass} htmlFor="product-min">Stock mínimo</label>
+                    <input className={fieldClass} id="product-min" type="number" min="0" step="1" placeholder={String(DEFAULT_LOW_STOCK)} value={form.minimo} onChange={(event) => setForm({ ...form, minimo: event.target.value })} />
+                  </div>
+                </div>
+                <p className={hintClass}>Al llegar al mínimo de esta sucursal el producto se marca como stock bajo. Vacío usa {DEFAULT_LOW_STOCK}.</p>
                 {editingProduct && String(editingProduct.stock ?? '') !== form.stock && (
                   <>
                     <input
@@ -528,6 +704,39 @@ function Inventory() {
               <button className={primaryButton} type="submit" disabled={isSubmitting}>
                 {isSubmitting ? 'Guardando...' : editingProduct ? 'Guardar cambios' : 'Crear producto'}
               </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {restockFor && (
+        <Modal eyebrow="Entrada de mercancía" title={restockFor.name} onClose={() => { if (!isRestocking) setRestockFor(null) }} size="md">
+          <form className="space-y-4" onSubmit={handleRestock}>
+            <GymSelect id="restock-gym" label="Sucursal que recibe" value={restockForm.gymId} onChange={(gymId) => setRestockForm({ ...restockForm, gymId })} />
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className={labelClass} htmlFor="restock-quantity">Unidades que llegaron</label>
+                <input className={fieldClass} id="restock-quantity" type="number" min="1" step="1" value={restockForm.quantity} onChange={(event) => setRestockForm({ ...restockForm, quantity: event.target.value })} required autoFocus />
+              </div>
+              <div>
+                <label className={labelClass} htmlFor="restock-cost">Costo por unidad</label>
+                <div className="relative">
+                  <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-slate-400">$</span>
+                  <input className={`${fieldClass} pl-7`} id="restock-cost" type="number" min="0" step="0.01" placeholder="Opcional" value={restockForm.unitCost} onChange={(event) => setRestockForm({ ...restockForm, unitCost: event.target.value })} />
+                </div>
+              </div>
+            </div>
+            <p className={`${hintClass} -mt-2`}>
+              El costo que captures pasa a ser el costo del producto en todas las sucursales. Las ventas anteriores conservan el suyo.
+            </p>
+            <div>
+              <label className={labelClass} htmlFor="restock-reason">Nota</label>
+              <input className={fieldClass} id="restock-reason" maxLength={300} placeholder="Proveedor, factura, folio..." value={restockForm.reason} onChange={(event) => setRestockForm({ ...restockForm, reason: event.target.value })} />
+            </div>
+            {restockError && <p className={errorAlert} role="alert">{restockError}</p>}
+            <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
+              <button className={secondaryButton} type="button" onClick={() => setRestockFor(null)} disabled={isRestocking}>Cancelar</button>
+              <button className={primaryButton} type="submit" disabled={isRestocking}>{isRestocking ? 'Guardando...' : 'Registrar entrada'}</button>
             </div>
           </form>
         </Modal>
@@ -557,6 +766,9 @@ function Inventory() {
                       <div className="flex flex-wrap items-center gap-2">
                         <Badge tone={type.tone}>{type.label}</Badge>
                         <span className="text-sm text-slate-500 tabular">{movement.quantityBefore} → {movement.quantityAfter} u.</span>
+                        {movement.unitCost !== null && movement.unitCost !== undefined && (
+                          <span className="text-sm text-slate-500 tabular">· costo {currency.format(movement.unitCost)} c/u</span>
+                        )}
                       </div>
                       <p className="mt-1 text-xs text-slate-500">
                         {new Date(movement.createdAt).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' })}
